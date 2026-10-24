@@ -11,6 +11,7 @@ The frontend is a Next.js App Router client in `frontend/`. Business state is in
 | `/dashboard` | Coordinator organization and mission creation | `src/app/dashboard/page.tsx` |
 | `/missions/[missionId]` | RFQs, quote comparison, planning, approvals, POs | `src/components/mission-workspace.tsx` |
 | `/invitations/[token]` | Supplier RFQ acceptance and quote submission | `src/components/invitation-client.tsx` |
+| `/join/[token]` | Single-use organization-member invitation acceptance | `src/components/join-client.tsx` |
 | `/supplier` | Supplier quote revisions/withdrawals and PO inbox | `src/app/supplier/page.tsx` |
 
 ## Design integration boundaries
@@ -21,6 +22,7 @@ The frontend is a Next.js App Router client in `frontend/`. Business state is in
 - `useSession()` provides client session state. Do not infer permission from a hidden button: the FastAPI backend enforces role and organization access.
 - A plan card must visibly distinguish `feasible`, `approved`, `stale`, and `infeasible`. `stale` means approval is invalid and must not look actionable.
 - Preserve the explicit `Confirm & send` PO action. Generating a draft PO is deliberately separate from emailing it.
+- A real mission requester must not see an actionable approval control. The invited `approver` role is the independent approval path; the labeled demo override remains backend-enforced.
 
 ## API expectations that affect UI
 
@@ -28,3 +30,4 @@ The frontend is a Next.js App Router client in `frontend/`. Business state is in
 - Quote and plan lists poll every two seconds in a mission workspace so a submitted quote or replan becomes visible without a frontend-only event simulation.
 - Development can expose an invitation link only with `RELIEFMESH_EXPOSE_INVITATION_LINKS=true`; production must keep it `false` and relies on actual email delivery.
 - API error messages are safe to show in the current inline error panels. Preserve retry/error/empty states when restyling.
+- Quote forms receive each mission requirement's immutable `id`; preserve it in `lines[].requirement_id` even when a supplier changes the visible product description.
