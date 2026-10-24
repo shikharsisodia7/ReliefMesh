@@ -2,11 +2,14 @@ services:
   - type: web
     name: reliefmesh-api
     runtime: python
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
       - key: RELIEFMESH_APP_ENV
         value: production
       - key: RELIEFMESH_STORAGE_MODE
@@ -19,7 +22,31 @@ services:
         sync: false
       - key: RELIEFMESH_CORS_ORIGINS
         sync: false
+      - key: RELIEFMESH_PUBLIC_API_URL
+        sync: false
+      - key: RELIEFMESH_DEMO_CONTROLS_ENABLED
+        value: "true"
+      - key: RELIEFMESH_EXPOSE_INVITATION_LINKS
+        value: "false"
       - key: RELIEFMESH_RESEND_API_KEY
         sync: false
       - key: RELIEFMESH_EMAIL_FROM
+        sync: false
+      - key: RELIEFMESH_NASA_FIRMS_MAP_KEY
+        sync: false
+      - key: RELIEFMESH_SAM_GOV_API_KEY
+        sync: false
+      - key: RELIEFMESH_APIFY_API_TOKEN
+        sync: false
+      - key: RELIEFMESH_CRS_USERNAME
+        sync: false
+      - key: RELIEFMESH_CRS_PASSWORD
+        sync: false
+      - key: RELIEFMESH_AGENT_PRIVILEGED_SENDERS
+        sync: false
+      - key: RELIEFMESH_X402_PAY_TO
+        sync: false
+      - key: RELIEFMESH_X402_BUYER_PRIVATE_KEY
+        sync: false
+      - key: RELIEFMESH_X402_TREASURY_PRIVATE_KEY
         sync: false

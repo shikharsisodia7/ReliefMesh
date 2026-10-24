@@ -66,8 +66,12 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await sends.first().click();
   await expect(sends).toHaveCount(0);
 
-  await pioneer.getByLabel("Clear finding reason").fill("Distinct US entity; EIN and address verified by phone");
-  await pioneer.getByRole("button", { name: "Clear finding" }).click();
+  // OFAC false positive, and (when the CRS sandbox is configured) the failed signer identity check.
+  for (let index = 0; index < 3 && (await pioneer.getByRole("button", { name: "Clear finding" }).count()) > 0; index += 1) {
+    await pioneer.getByLabel("Clear finding reason").first().fill("Distinct US entity; signer and EIN verified by phone");
+    await pioneer.getByRole("button", { name: "Clear finding" }).first().click();
+    await page.waitForTimeout(1500);
+  }
   await expect(page.getByRole("heading", { name: "Plan v3" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Total \$2,600\.00/)).toBeVisible();
   await expect(page.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });

@@ -20,6 +20,7 @@ from ..core import (
     Services, audit, current_principal, get_services, new_id, notify, now_iso, require_admin, require_mission_access,
     token_hash,
 )
+from ..integrations.crs import SANDBOX_PERSONAS
 from ..jobs import enqueue
 from ..planning import evaluate_mission, invalidate_for_change
 from ..schemas import DisruptionRequest
@@ -29,11 +30,18 @@ router = APIRouter()
 
 # Pioneer Logistics Supply shares a name with the real SDN-listed entity "PIONEER LOGISTICS"; the live
 # OFAC screen flags it as a POTENTIAL_MATCH, which the policy engine routes to human review.
+# Each TEST supplier's authorized signer is bound to a CRS sandbox persona (never real personal data):
+# Pioneer's signer is the CRS identity-mismatch persona, so even after a human clears its sanctions
+# false positive, the live CRS identity check still holds it for review.
 DEMO_SUPPLIERS = [
-    {"key": "a", "legal_name": "Bayside Relief Supply Co", "price": "1.00", "share": "0.60", "ship": "0.020", "eta": 0.40},
-    {"key": "b", "legal_name": "Pioneer Logistics Supply", "price": "0.85", "share": "1.00", "ship": "0.010", "eta": 0.30},
-    {"key": "c", "legal_name": "Golden Gate Medical Logistics", "price": "1.08", "share": "0.70", "ship": "0.015", "eta": 0.50},
-    {"key": "d", "legal_name": "Sierra Backup Provisions", "price": "1.22", "share": "1.00", "ship": "0.005", "eta": 0.75},
+    {"key": "a", "legal_name": "Bayside Relief Supply Co", "price": "1.00", "share": "0.60", "ship": "0.020", "eta": 0.40,
+     "signer": "P01"},
+    {"key": "b", "legal_name": "Pioneer Logistics Supply", "price": "0.85", "share": "1.00", "ship": "0.010", "eta": 0.30,
+     "signer": "P12"},
+    {"key": "c", "legal_name": "Golden Gate Medical Logistics", "price": "1.08", "share": "0.70", "ship": "0.015",
+     "eta": 0.50, "signer": "P02"},
+    {"key": "d", "legal_name": "Sierra Backup Provisions", "price": "1.22", "share": "1.00", "ship": "0.005", "eta": 0.75,
+     "signer": "P19"},
 ]
 
 
@@ -81,6 +89,8 @@ async def seed_demo_suppliers(mission_id: str, user: dict = Depends(current_prin
         supplier = {
             "id": supplier_id, "user_id": supplier_id, "email": email, "legal_name": spec["legal_name"],
             "country": "US", "is_demo": True, "data_origin": "TEST", "demo_organization_id": mission["organization_id"],
+            "authorized_signer": {"name": SANDBOX_PERSONAS[spec["signer"]]["name"], "crs_persona_id": spec["signer"],
+                                  "source": "CRS Cal Hacks sandbox test persona (fake identity)"},
             "demo_mission_id": mission_id, "created_at": now_iso(),
         }
         await services.store.insert("suppliers", supplier)

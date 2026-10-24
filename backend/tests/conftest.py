@@ -64,6 +64,13 @@ class FakeUpstream:
             return httpx.Response(404, json={"error": "not found"})
         if host == "api.weather.gov":
             return httpx.Response(200, json={"type": "FeatureCollection", "features": []})
+        if host == "api-sandbox.stitchcredit.com":  # CRS sandbox stand-in (persona-driven like the real one)
+            if path.endswith("/users/login"):
+                return httpx.Response(200, json={"token": "sandbox-token"})
+            if path.endswith("/identity-manager-verification/basic"):
+                body = json.loads(request.content)
+                messages = [{"code": "2201", "text": "SSN issued to a different name"}] if body.get("ssn") == "666701012" else []
+                return httpx.Response(200, json={"addOnProducts": [{"idManagerVerification": {"messages": messages}}]})
         if host == "www.fema.gov":
             return httpx.Response(200, json={"DisasterDeclarationsSummaries": []})
         raise httpx.ConnectError(f"no network in tests: {url}", request=request)

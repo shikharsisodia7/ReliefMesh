@@ -52,8 +52,9 @@ class Settings(BaseSettings):
     # Sponsor integrations.
     apify_api_token: SecretStr | None = None
     apify_discovery_actor: str = "compass~crawler-google-places"
-    crs_api_key: SecretStr | None = None
-    crs_base_url: str = "https://calhacks.crscreditapi.com"
+    crs_username: SecretStr | None = None
+    crs_password: SecretStr | None = None
+    crs_base_url: str = "https://api-sandbox.stitchcredit.com/api"
     nessie_api_key: SecretStr | None = None
     nessie_base_url: str = "http://api.nessieisreal.com"
     elastic_url: str | None = None

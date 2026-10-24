@@ -261,4 +261,6 @@ async def invitation_from_token(token: str, services: Services) -> dict[str, Any
 
 
 def secret(value: Any) -> str | None:
-    return value.get_secret_value() if value is not None else None
+    if value is None:
+        return None
+    return value.get_secret_value() if hasattr(value, "get_secret_value") else str(value)

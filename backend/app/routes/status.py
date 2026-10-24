@@ -136,6 +136,15 @@ async def check_x402(services: Services) -> tuple[str, str, str | None]:
                   f"{held:g} devnet USDC"), "SANDBOX"
 
 
+async def check_crs(services: Services) -> tuple[str, str, str | None]:
+    from ..integrations import crs
+
+    settings = services.settings
+    result = await crs.login(services.hub, settings.crs_base_url, secret(settings.crs_username),
+                             secret(settings.crs_password))
+    return from_result(result, "sandbox login token active (TransUnion TruValidate identity verification)")
+
+
 CHECKS: dict[str, tuple[str, str, Check]] = {
     "mongodb": ("MongoDB Atlas", "core", check_mongo),
     "nasa_eonet": ("NASA EONET", "open data", check_eonet),
@@ -147,6 +156,7 @@ CHECKS: dict[str, tuple[str, str, Check]] = {
     "usaspending": ("USAspending", "evidence", check_usaspending),
     "openfda": ("openFDA", "evidence", check_openfda),
     "apify": ("Apify", "sponsor", check_apify),
+    "crs": ("CRS Credit API sandbox", "sponsor", check_crs),
     "x402": ("Coinbase x402 · Solana devnet", "sponsor", check_x402),
     "resend": ("Resend email", "core", check_resend),
 }

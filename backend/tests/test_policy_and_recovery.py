@@ -431,3 +431,27 @@ def test_free_text_cannot_change_policy() -> None:
     quote = _quote(lines=[{**_quote()["lines"][0], "restrictions": INJECTION}])
     report = evaluate(_mission(), [quote], supplier, {}, {})
     assert report["suppliers"]["s1"]["status"] == "NEEDS_REVIEW"
+
+
+@pytest.mark.anyio
+async def test_crs_identity_check_holds_supplier_after_sanctions_clearance(app_and_client) -> None:
+    app, client = app_and_client
+    settings = app.state.services.settings
+    settings.crs_username, settings.crs_password = "sandbox-user", "sandbox-pass"
+    ctx = await demo_mission(client)
+    suppliers = (await client.get(f"/v1/missions/{ctx['mission']}/suppliers", headers=auth(ctx["token"]))).json()
+    crs = {row["supplier"]["legal_name"]: row["latest_evidence"]["CRS_VERIFICATION"] for row in suppliers}
+    assert {name: record["status"] for name, record in crs.items()} == {
+        "Bayside Relief Supply Co": "PASS", "Golden Gate Medical Logistics": "PASS",
+        "Pioneer Logistics Supply": "FAIL", "Sierra Backup Provisions": "PASS"}
+    assert all(record["provenance"] == "SANDBOX" for record in crs.values())
+    pioneer = ctx["suppliers"]["Pioneer Logistics Supply"]
+    await client.post(f"/v1/missions/{ctx['mission']}/suppliers/{pioneer}/review", headers=auth(ctx["token"]),
+                      json={"action": "clear", "rule_id": "SANCTIONS_POTENTIAL_MATCH", "reason": "Different entity"})
+    plan = await optimize(client, ctx)
+    assert plan["policy"]["suppliers"][pioneer]["status"] == "NEEDS_REVIEW"  # CRS still holds it
+    assert "Pioneer Logistics Supply" not in units_by(plan)
+    await client.post(f"/v1/missions/{ctx['mission']}/suppliers/{pioneer}/review", headers=auth(ctx["token"]),
+                      json={"action": "clear", "rule_id": "CRS_VERIFICATION", "reason": "Signer re-verified in person"})
+    plan = await optimize(client, ctx)
+    assert units_by(plan) == {"Pioneer Logistics Supply": 100}
