@@ -33,8 +33,9 @@ class Settings(BaseSettings):
     job_max_attempts: int = 3
     stuck_job_seconds: int = 120
 
-    # Judge/demo controls mutate only clearly labeled TEST suppliers.
-    demo_controls_enabled: bool = True
+    # Demo/judge tooling: seeded TEST suppliers with synthetic quotes, simulated disruptions, and the
+    # demo-org self-approval override. Off unless explicitly enabled; production refuses to start with it.
+    demo_mode: bool = False
     # Agent chat senders allowed to spend paid credits (Apify discovery). Empty denies every agent sender.
     agent_privileged_senders: list[str] = []
 
@@ -86,8 +87,16 @@ class Settings(BaseSettings):
             raise ValueError("Memory storage is forbidden in production")
         return value
 
+    @property
+    def demo_enabled(self) -> bool:
+        return self.demo_mode and self.app_env != "production"
+
     def validate_runtime(self) -> None:
         if self.app_env == "production":
+            if self.demo_mode:
+                raise RuntimeError("RELIEFMESH_DEMO_MODE must be false in production (no synthetic data in prod)")
+            if self.expose_invitation_links:
+                raise RuntimeError("RELIEFMESH_EXPOSE_INVITATION_LINKS is a development-only setting")
             if self.storage_mode != "mongo" or not self.mongodb_uri:
                 raise RuntimeError("Production requires RELIEFMESH_MONGODB_URI and MongoDB storage")
             if self.jwt_secret.get_secret_value() == "change-me-before-production":

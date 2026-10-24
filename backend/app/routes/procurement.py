@@ -87,6 +87,9 @@ async def create_organization(payload: CreateOrganizationRequest, user: dict = D
                               services: Services = Depends(get_services)) -> dict:
     if user["role"] != "coordinator":
         raise HTTPException(status_code=403, detail="Only coordinators can create organizations")
+    if payload.demo and not services.settings.demo_enabled:
+        raise HTTPException(status_code=422, detail={"code": "DEMO_MODE_DISABLED",
+                                                     "message": "Demo organizations exist only in demo deployments"})
     organization = {"id": new_id(), "name": payload.name.strip(), "is_demo": payload.demo, "created_at": now_iso()}
     await services.store.insert("organizations", organization)
     await services.store.insert("memberships", {
@@ -550,7 +553,7 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     allocated = {row["supplier_id"] for row in plan["allocations"]}
     allocated_suppliers = [await services.store.get("suppliers", sid) for sid in allocated]
     all_test = bool(allocated) and all((row or {}).get("is_demo") for row in allocated_suppliers)
-    demo_override = bool(organization.get("is_demo") and services.settings.demo_controls_enabled and all_test)
+    demo_override = bool(organization.get("is_demo") and services.settings.demo_enabled and all_test)
     if self_approval and not demo_override:
         raise HTTPException(status_code=403, detail={
             "code": "SEGREGATION_OF_DUTIES",

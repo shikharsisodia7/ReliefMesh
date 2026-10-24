@@ -50,8 +50,9 @@ def cents(value: Decimal) -> Decimal:
 
 
 def require_demo(services: Services) -> None:
-    if not services.settings.demo_controls_enabled:
-        raise HTTPException(status_code=403, detail="Demo controls are disabled in this environment")
+    # Outside an explicit demo/test deployment these endpoints do not exist.
+    if not services.settings.demo_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 async def require_demo_operator(mission: dict[str, Any], principal: dict[str, Any], services: Services) -> None:
