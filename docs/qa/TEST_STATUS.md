@@ -1,5 +1,8 @@
 # QA test status
 
+> Update 2026-10-24: REL-003 and REL-004 are fixed; the full backend suite is 52 passed with no `xfail` (pytest 9.1.1).
+> The deployed smoke check passes against the production API. Details: `RELEASE_VERDICT.md`.
+
 Audited branch: `origin/feat/reliefmesh-finish` at `643a4c1`; QA work is isolated on `codex/qa-release`.
 
 | Suite | Command | Result | Notes |

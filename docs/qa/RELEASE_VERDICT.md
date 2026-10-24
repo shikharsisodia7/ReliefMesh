@@ -1,5 +1,22 @@
 # Release verdict
 
+## Re-verification (2026-10-24, after the fixes below)
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| REL-003 agent plan leak | **FIXED** | `get_plan()` now uses `require_mission_access()`; `test_agent_cannot_read_a_plan_from_another_agent_conversation` passes (xfail removed) |
+| REL-004 replayable RFQ acceptance | **FIXED** | second accept returns `409`; `test_invitation_acceptance_is_one_time` passes (xfail removed) |
+| REL-005 demo controls in production | **FIXED** | `RELIEFMESH_DEMO_MODE` defaults off and production refuses to start with it on; demo endpoints 404 on the live API |
+| DEP-001 pytest advisory | **FIXED** | `pytest>=9.0.3` (9.1.1 installed); suite green |
+| Deployed smoke check | **PASS** | `scripts/qa/smoke.py` against https://reliefmesh-api.onrender.com: health, login, me, organizations, missions (0 missions) |
+
+Backend suite: 52 passed, 0 xfail. Live production verification and the data-integrity audit are in
+[`../FINAL_STATUS.md`](../FINAL_STATUS.md). The original audit below is kept unchanged for history.
+
+---
+
+## Original audit
+
 Audited implementation commit: `643a4c1` (`origin/feat/reliefmesh-finish`). QA changes are isolated on `codex/qa-release`.
 
 ## Remediated and independently verified
