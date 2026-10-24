@@ -314,6 +314,8 @@ async def accept_invitation(token: str, user: dict = Depends(current_user),
     invitation = await invitation_from_token(token, services)
     if user["role"] != "supplier" or user["email"] != invitation["supplier_email"]:
         raise HTTPException(status_code=403, detail="This invitation belongs to a different supplier account")
+    if invitation["status"] == "accepted":  # single use (REL-004)
+        raise HTTPException(status_code=409, detail="This RFQ invitation was already accepted")
     invitation.update(status="accepted", accepted_by_user_id=user["id"], accepted_at=now_iso())
     await services.store.replace("invitations", invitation["id"], invitation)
     supplier = await ensure_supplier(services, user)
@@ -531,7 +533,8 @@ async def get_plan(plan_id: str, principal: dict = Depends(current_principal),
     plan = await services.store.get("plans", plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
-    await require_org_member(plan["organization_id"], principal, services)
+    # Same check as every mission route: org membership plus per-conversation isolation for agents (REL-003).
+    await require_mission_access(plan["mission_id"], principal, services)
     return plan
 
 

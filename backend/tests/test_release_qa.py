@@ -194,7 +194,6 @@ async def test_organization_invitation_acceptance_is_one_time(client: httpx.Asyn
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(strict=True, reason="REL-003: direct plan reads skip agent_sender mission isolation")
 async def test_agent_cannot_read_a_plan_from_another_agent_conversation(client: httpx.AsyncClient) -> None:
     coordinator = await register(client, "agent-qa@ops.example.com", "coordinator")
     organization = await client.post("/v1/organizations", json={"name": "Agent QA"}, headers=auth(coordinator))
@@ -233,7 +232,6 @@ async def test_plan_is_not_visible_to_another_organization_or_supplier(client: h
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(strict=True, reason="REL-004: supplier RFQ invitation tokens can be accepted repeatedly after use")
 async def test_invitation_acceptance_is_one_time(client: httpx.AsyncClient) -> None:
     coordinator = await register(client, "invite-admin@ops.example.com", "coordinator")
     supplier = await register(client, "invite-vendor@vendor.example.com", "supplier")
