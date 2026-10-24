@@ -25,7 +25,48 @@ class Settings(BaseSettings):
     email_from: str = "ReliefMesh <rfq@reliefmesh.example>"
     expose_invitation_links: bool = False
     auth_rate_limit_per_minute: int = 12
+
+    # Approval and job hardening.
+    approval_ttl_minutes: int = 240
+    job_max_attempts: int = 3
+    stuck_job_seconds: int = 120
+
+    # Judge/demo controls mutate only clearly labeled TEST suppliers.
+    demo_controls_enabled: bool = True
+
+    # Evidence freshness windows: older evidence is treated as stale by the policy engine.
+    ofac_evidence_ttl_hours: int = 24
+    sam_evidence_ttl_hours: int = 24 * 7
+    fda_evidence_ttl_hours: int = 24 * 7
+    crs_evidence_ttl_hours: int = 24 * 7
+
+    # Public-data integrations. Keyless sources need no configuration.
+    http_user_agent: str = "ReliefMesh/1.0 (+https://github.com/shikharsisodia7/calhacks)"
+    nasa_firms_map_key: SecretStr | None = None
+    sam_gov_api_key: SecretStr | None = None
+    ofac_sdn_url: str = "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
+    ofac_alt_url: str = "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/ALT.CSV"
+
+    # Sponsor integrations.
     apify_api_token: SecretStr | None = None
+    apify_discovery_actor: str = "compass~crawler-google-places"
+    crs_api_key: SecretStr | None = None
+    crs_base_url: str = "https://calhacks.crscreditapi.com"
+    nessie_api_key: SecretStr | None = None
+    nessie_base_url: str = "http://api.nessieisreal.com"
+    elastic_url: str | None = None
+    elastic_api_key: SecretStr | None = None
+    elastic_index_prefix: str = "reliefmesh"
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-sonnet-5-5"
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
+    # x402 paid evidence resource (Solana devnet by default; test funds only).
+    x402_pay_to: str | None = None
+    x402_network: str = "solana-devnet"
+    x402_facilitator_url: str = "https://x402.org/facilitator"
+    x402_price_usd: str = "0.01"
 
     @field_validator("storage_mode")
     @classmethod

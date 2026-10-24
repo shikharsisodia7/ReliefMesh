@@ -5,7 +5,7 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Any, Protocol
 
-from pymongo import ASCENDING, AsyncMongoClient
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient
 
 
 Document = dict[str, Any]
@@ -17,6 +17,8 @@ class Store(Protocol):
     async def get(self, collection: str, document_id: str) -> Document | None: ...
     async def find(self, collection: str, **filters: Any) -> list[Document]: ...
     async def replace(self, collection: str, document_id: str, document: Document) -> Document: ...
+    async def upsert(self, collection: str, document: Document) -> Document: ...
+    async def ping(self) -> bool: ...
     async def close(self) -> None: ...
 
 
@@ -56,6 +58,14 @@ class MemoryStore:
             self._documents[collection][document_id] = deepcopy(document)
         return deepcopy(document)
 
+    async def upsert(self, collection: str, document: Document) -> Document:
+        async with self._lock:
+            self._documents[collection][document["id"]] = deepcopy(document)
+        return deepcopy(document)
+
+    async def ping(self) -> bool:
+        return True
+
     async def close(self) -> None:
         return None
 
@@ -64,7 +74,7 @@ class MongoStore:
     """MongoDB persistence using PyMongo's native asynchronous client."""
 
     def __init__(self, uri: str, database_name: str) -> None:
-        self.client = AsyncMongoClient(uri)
+        self.client = AsyncMongoClient(uri, serverSelectionTimeoutMS=8000)
         self.database = self.client[database_name]
 
     async def initialize(self) -> None:
@@ -80,6 +90,24 @@ class MongoStore:
         )
         await self.database.jobs.create_index([("status", ASCENDING), ("created_at", ASCENDING)])
         await self.database.audit_events.create_index([("mission_id", ASCENDING), ("created_at", ASCENDING)])
+        # A forked audit chain (two events claiming one sequence slot) must fail loudly.
+        await self.database.audit_events.create_index(
+            [("chain_key", ASCENDING), ("sequence", ASCENDING)],
+            unique=True,
+            partialFilterExpression={"chain_key": {"$exists": True}},
+        )
+        await self.database.evidence.create_index(
+            [("organization_id", ASCENDING), ("subject_id", ASCENDING), ("retrieved_at", DESCENDING)]
+        )
+        await self.database.payments.create_index([("transaction", ASCENDING)], unique=True, sparse=True)
+        await self.database.agent_tokens.create_index([("token_hash", ASCENDING)], unique=True)
+        for collection in (
+            "quotes", "plans", "approvals", "notifications", "supplier_leads",
+            "supplier_reviews", "disruptions", "payments",
+        ):
+            await self.database[collection].create_index([("mission_id", ASCENDING)])
+        for collection in ("organizations", "users", "missions", "quotes", "plans", "suppliers", "evidence"):
+            await self.database[collection].create_index([("id", ASCENDING)], unique=True)
 
     async def insert(self, collection: str, document: Document) -> Document:
         await self.database[collection].insert_one(deepcopy(document))
@@ -98,6 +126,14 @@ class MongoStore:
         if not result.matched_count:
             raise KeyError(document_id)
         return deepcopy(document)
+
+    async def upsert(self, collection: str, document: Document) -> Document:
+        await self.database[collection].replace_one({"id": document["id"]}, deepcopy(document), upsert=True)
+        return deepcopy(document)
+
+    async def ping(self) -> bool:
+        await self.client.admin.command("ping")
+        return True
 
     async def close(self) -> None:
         await self.client.close()
