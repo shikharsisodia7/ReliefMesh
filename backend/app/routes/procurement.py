@@ -719,16 +719,22 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
                    "provider_id": None, "error": None, "created_at": now_iso()}
         await services.store.insert("email_dispatches", attempt)
     else:
+        lines = "".join(f"<li>{row['quantity']} x {row.get('line_description') or row['item']} at "
+                        f"${row['unit_price']} (deliver by {row['delivery_date'][:10]})</li>" for row in order["lines"])
         attempt = await record_email(
-            to=order["supplier_email"], subject=f"Purchase order {order['po_number']}",
-            html=f"<p>Purchase order {order['po_number']} is ready for your acceptance.</p>",
+            to=order["supplier_email"], subject=f"Purchase order {order['po_number']} from {order['buyer_organization']}",
+            html=(f"<p>{order['buyer_organization']} issued purchase order <strong>{order['po_number']}</strong> "
+                  f"for delivery to {order['delivery_location']}:</p><ul>{lines}</ul>"
+                  f"<p>Subtotal ${order['subtotal']} {order['currency']}. Accept or decline it in your "
+                  f"<a href=\"{services.settings.frontend_origin}/supplier\">ReliefMesh supplier portal</a>.</p>"),
             kind="purchase_order", entity_id=order_id, services=services,
         )
     if attempt["status"] not in {"sent", "skipped_test_supplier"}:
         order["send_error"] = attempt["error"]
         await services.store.replace("purchase_orders", order_id, order)
         raise HTTPException(status_code=502, detail="Purchase order email was not delivered; the failure was recorded")
-    order.update(status="sent", sent_at=now_iso())
+    order.update(status="sent", sent_at=now_iso(),
+                 delivery={key: attempt.get(key) for key in ("provider", "status", "message_id", "sent_at", "error")})
     order["events"].append({"status": "sent", "at": now_iso(), "actor_id": user["id"]})
     await services.store.replace("purchase_orders", order_id, order)
     await audit("purchase_order.sent", user["id"], order["organization_id"], order["mission_id"], "purchase_order",
@@ -855,6 +861,8 @@ async def mission_email_dispatches(mission_id: str, user: dict = Depends(current
     attempts = []
     for invitation in await services.store.find("invitations", mission_id=mission_id):
         attempts.extend(await services.store.find("email_dispatches", entity_id=invitation["id"]))
+    for order in await services.store.find("purchase_orders", mission_id=mission_id):
+        attempts.extend(await services.store.find("email_dispatches", entity_id=order["id"]))
     return sorted(attempts, key=lambda row: row["created_at"], reverse=True)
 
 

@@ -53,6 +53,9 @@ async def test_declined_po_replans_only_the_uncommitted_remainder(client: httpx.
         sent = await client.post(f"/v1/purchase-orders/{order['id']}/send", json={"confirm": True},
                                  headers=auth(coordinator))
         assert sent.status_code == 200, sent.text
+    kinds = [row["kind"] for row in (await client.get(f"/v1/missions/{mid}/email-dispatches",
+                                                          headers=auth(coordinator))).json()]
+    assert kinds.count("purchase_order") == 2 and kinds.count("rfq_invitation") == 3
     alpha_order = next(o for o in orders if o["supplier_email"].startswith("a@"))
     beta_order = next(o for o in orders if o["supplier_email"].startswith("b@"))
     assert (await client.post(f"/v1/purchase-orders/{beta_order['id']}/supplier-response", headers=auth(beta),
