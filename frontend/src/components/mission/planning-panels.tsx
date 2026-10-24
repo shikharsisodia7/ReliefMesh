@@ -58,7 +58,7 @@ export function OptimizerPanel({ mission, plan, eligibleCount, quoteCount, onOpt
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Mixed-integer optimizer (PuLP / CBC)</h2>
           <p className="mt-1 text-sm"><span className="font-mono text-telemetry">{eligibleCount}</span> of {quoteCount} submitted quote{quoteCount === 1 ? "" : "s"} policy-eligible · latest plan: {plan ? `v${plan.version} ${plan.status}` : "not calculated"}</p>
         </div>
-        <Button onClick={onOptimize} disabled={busy}><Play className="size-3.5" />Run optimization</Button>
+        <div className="text-right"><Button onClick={onOptimize} disabled={busy || eligibleCount === 0}><Play className="size-3.5" />Run optimization</Button>{eligibleCount === 0 && <p className="mt-1 max-w-56 text-[11px] text-muted-foreground">{quoteCount === 0 ? "Waiting for supplier quotes." : "Waiting for evidence checks to make a quote eligible."} A plan can be generated after eligible quotes are received.</p>}</div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <div className="rounded border p-2"><dt className="text-muted-foreground">Budget ceiling</dt><dd className="font-mono text-base text-telemetry">{money(mission.budget)}</dd></div>
@@ -246,9 +246,9 @@ export function PaymentsPanel({ payments }: { payments: Payment[] }) {
     <section aria-label="Machine payments" className="rounded-xl border border-violet-400/30 bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Machine payments · x402 on Solana devnet</h2>
-        <ProvenanceBadge value="SANDBOX" />
+        <span className="flex gap-1.5"><ProvenanceBadge value="SANDBOX" /><span className="rounded border border-violet-400/40 px-1.5 py-0.5 font-mono text-[10px] text-violet-300">DEVNET · TEST PAYMENT</span></span>
       </div>
-      <p className="mb-2 text-xs text-tertiary">HTTP 402 → signed USDC transfer → facilitator verification and on-chain settlement → evidence unlocked. Devnet test USDC only; procurement funds never move through x402.</p>
+      <p className="mb-2 text-xs text-tertiary">HTTP 402 → signed USDC transfer → facilitator verification and on-chain settlement → evidence unlocked. Devnet test USDC only: this proves machine-to-machine payment works. No supplier is paid and procurement funds never move through x402.</p>
       <ul className="space-y-2">
         {payments.map((payment) => (
           <li key={payment.id} className="rounded border p-2 text-xs">

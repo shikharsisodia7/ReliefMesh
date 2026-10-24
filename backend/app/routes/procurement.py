@@ -256,13 +256,16 @@ async def create_invitation_record(services: Services, mission: dict, supplier_e
         kind="rfq_invitation", entity_id=invitation["id"], services=services,
     )
     invitation["delivery_status"] = attempt["status"]
+    invitation["delivery"] = {key: attempt[key] for key in ("provider", "status", "message_id", "sent_at", "error")}
     await services.store.replace("invitations", invitation["id"], invitation)
     await audit("rfq.invited", actor["id"], mission["organization_id"], mission["id"], "invitation", invitation["id"],
                 services, {"delivery_status": attempt["status"], "lead_id": lead_id})
     response = {key: value for key, value in invitation.items() if key != "token_hash"}
-    if services.settings.expose_invitation_links:
+    # Only the invited address can accept the link (sign-in email must match), so the coordinator may relay it.
+    if services.settings.expose_invitation_links or attempt["status"] != "sent":
         response["token"] = raw_token
         response["invitation_url"] = url
+        response["link_reason"] = "development" if services.settings.expose_invitation_links else "email_not_sent"
     return response
 
 

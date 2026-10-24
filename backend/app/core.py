@@ -243,8 +243,11 @@ async def record_email(*, to: str, subject: str, html: str, kind: str, entity_id
         "subject": subject,
         "kind": kind,
         "entity_id": entity_id,
-        "status": "sent" if result.delivered else "failed",
+        "provider": result.provider,
+        "status": "sent" if result.delivered else ("failed" if result.configured else "not_configured"),
         "provider_id": result.provider_id,
+        "message_id": result.provider_id,
+        "sent_at": now_iso() if result.delivered else None,
         "error": result.error,
         "created_at": now_iso(),
     }

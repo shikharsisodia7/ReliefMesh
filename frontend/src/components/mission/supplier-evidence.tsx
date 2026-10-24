@@ -84,7 +84,7 @@ export function SupplierEvidence({ missionId, token, rows, quotes, run, canRevie
         </div>
         <Button size="sm" variant="secondary" disabled={checking || rows.length === 0} onClick={() => void run(async () => { await api(`/v1/missions/${missionId}/evidence/refresh`, { method: "POST", token }); })}><RefreshCw className={checking ? "size-3.5 animate-spin" : "size-3.5"} />{checking ? "Checks running…" : "Run evidence checks"}</Button>
       </div>
-      {rows.length === 0 ? <p className="text-sm text-muted-foreground">No supplier has submitted a quote yet.</p> : (
+      {rows.length === 0 ? <p className="text-sm text-muted-foreground">No suppliers have responded yet. Discover suppliers or send an RFQ; evidence is collected once a supplier quotes.</p> : (
         <div className="grid gap-3 xl:grid-cols-2">
           {rows.map((row) => {
             const quote = quoteBySupplier.get(row.supplier.id);

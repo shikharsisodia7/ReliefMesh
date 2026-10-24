@@ -174,6 +174,18 @@ CHECKS: dict[str, tuple[str, str, Check]] = {
 }
 
 
+@router.get("/v1/config")
+async def runtime_config(services: Services = Depends(get_services)) -> dict[str, Any]:
+    """What this deployment can do. The UI renders demo tooling only when demo_mode is true."""
+    settings = services.settings
+    return {
+        "app_env": settings.app_env,
+        "demo_mode": settings.demo_enabled,
+        "email": "configured" if settings.resend_api_key else "not_configured",
+        "quote_assistant": bool(settings.gemini_api_key),
+    }
+
+
 def register_check(key: str, name: str, category: str, check: Check) -> None:
     CHECKS[key] = (name, category, check)
 

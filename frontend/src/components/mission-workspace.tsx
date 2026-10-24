@@ -12,6 +12,7 @@ import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { ProvenanceBadge, money, when } from "@/components/status-badges";
 import { api } from "@/lib/api";
+import { useAppConfig } from "@/hooks/use-config";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Organization = { id: string; membership_role: string; is_demo?: boolean };
@@ -24,6 +25,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
   const data = useMissionData(missionId, session?.token);
+  const { demoMode } = useAppConfig();
   const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
   const supplierOrder = useMemo(() => {
     const order: string[] = [];
@@ -72,17 +74,17 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
 
         <EmergencyPanel mission={mission} context={data.context.data} loading={data.context.isLoading} />
         <div className="grid gap-5 xl:grid-cols-[1fr_1.4fr]">
-          <MarketPanel mission={mission} token={token} leads={data.leads.data ?? []} invitations={data.invitations.data ?? []} jobs={jobs} run={run} setNotice={setNotice} hasDemo={suppliers.some((row) => row.supplier.is_demo)} />
+          <MarketPanel mission={mission} token={token} leads={data.leads.data ?? []} invitations={data.invitations.data ?? []} jobs={jobs} run={run} setNotice={setNotice} demoMode={demoMode} hasDemo={suppliers.some((row) => row.supplier.is_demo)} />
           <SupplierEvidence missionId={missionId} token={token} rows={suppliers} quotes={quotes} run={run} canReview={isAdmin} checking={checking} />
         </div>
         <OptimizerPanel mission={mission} plan={latest} eligibleCount={eligible} quoteCount={quotes.filter((quote) => quote.status === "submitted").length} busy={replanning} onOptimize={() => void run(async () => { const response = await api<{ plan_id: string; version: number }>(`/v1/missions/${missionId}/optimize`, { method: "POST", token }); setNotice(`Plan v${response.version} computed from current policy-eligible quotes.`); })} />
-        {isAdmin && suppliers.length > 0 && <DisruptionConsole missionId={missionId} token={token} rows={suppliers} plan={latest} run={run} disruptions={data.disruptions.data ?? []} setNotice={setNotice} />}
+        {demoMode && isAdmin && suppliers.length > 0 && <DisruptionConsole missionId={missionId} token={token} rows={suppliers} plan={latest} run={run} disruptions={data.disruptions.data ?? []} setNotice={setNotice} />}
         <PlanComparison plans={plans} approvals={data.approvals.data ?? []} order={supplierOrder} />
         <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} />
         <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
         <PaymentsPanel payments={data.payments.data ?? []} />
         <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
-        <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo fixtures</p>
+        <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo</>} fixtures</p>
       </div>
     </main>
   );

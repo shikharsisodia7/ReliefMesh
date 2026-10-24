@@ -15,8 +15,17 @@ type Run = (operation: () => Promise<void>) => Promise<void>;
 
 const leadTone: Record<Lead["status"], string> = { lead: "text-muted-foreground", invited: "text-telemetry", onboarded: "text-ok", dismissed: "text-tertiary line-through" };
 
-export function MarketPanel({ mission, token, leads, invitations, jobs, run, setNotice, hasDemo }: {
-  mission: Mission; token: string; leads: Lead[]; invitations: Invitation[]; jobs: Job[]; run: Run; setNotice: (value: string) => void; hasDemo: boolean;
+type RfqResponse = { supplier_email: string; delivery_status: string; delivery?: { provider?: string | null; message_id?: string | null; error?: string | null }; invitation_url?: string; link_reason?: "development" | "email_not_sent" };
+
+// Never imply delivery: a sent email cites the provider's message id; anything else says it was NOT sent.
+export function rfqNotice(response: RfqResponse) {
+  if (response.link_reason === "development") return `Development invitation: ${response.invitation_url}`;
+  if (response.delivery_status === "sent") return `RFQ emailed to ${response.supplier_email} via ${response.delivery?.provider ?? "email"} (message ${response.delivery?.message_id ?? "accepted"}).`;
+  return `Email NOT sent to ${response.supplier_email} (${response.delivery?.error ?? response.delivery_status}). Share this secure RFQ link with them yourself; only that address can accept it: ${response.invitation_url}`;
+}
+
+export function MarketPanel({ mission, token, leads, invitations, jobs, run, setNotice, demoMode, hasDemo }: {
+  mission: Mission; token: string; leads: Lead[]; invitations: Invitation[]; jobs: Job[]; run: Run; setNotice: (value: string) => void; demoMode: boolean; hasDemo: boolean;
 }) {
   const [supplierEmail, setSupplierEmail] = useState("");
   const [query, setQuery] = useState(`${mission.requirements[0]?.item ?? "relief supplies"} wholesale supplier`);
@@ -27,10 +36,10 @@ export function MarketPanel({ mission, token, leads, invitations, jobs, run, set
     <section aria-label="Supplier market" className="space-y-4 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Supplier market</h2>
-        {!hasDemo && <Button size="sm" variant="outline" onClick={() => void run(async () => { await api(`/v1/missions/${mission.id}/demo/seed`, { method: "POST", token }); setNotice("Seeded four labeled TEST suppliers with synthetic quotes. Live OFAC / openFDA / USAspending checks are running on their names."); })}><FlaskConical className="size-3.5" />Seed TEST suppliers</Button>}
+        {demoMode && !hasDemo && <Button size="sm" variant="outline" onClick={() => void run(async () => { await api(`/v1/missions/${mission.id}/demo/seed`, { method: "POST", token }); setNotice("Seeded four labeled TEST suppliers with synthetic quotes. Live OFAC / openFDA / USAspending checks are running on their names."); })}><FlaskConical className="size-3.5" />Seed TEST suppliers</Button>}
       </div>
 
-      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<{ delivery_status: string; invitation_url?: string }>(`/v1/missions/${mission.id}/invitations`, { method: "POST", token, body: JSON.stringify({ supplier_email: supplierEmail }) }); setNotice(response.invitation_url ? `Development invitation: ${response.invitation_url}` : `RFQ delivery status: ${response.delivery_status}`); setSupplierEmail(""); }); }}>
+      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<RfqResponse>(`/v1/missions/${mission.id}/invitations`, { method: "POST", token, body: JSON.stringify({ supplier_email: supplierEmail }) }); setNotice(rfqNotice(response)); setSupplierEmail(""); }); }}>
         <div className="flex-1"><Label className="sr-only" htmlFor="supplier-email">Supplier email</Label><Input id="supplier-email" type="email" required value={supplierEmail} onChange={(event) => setSupplierEmail(event.target.value)} placeholder="supplier@example.com" /></div>
         <Button type="submit"><Send className="size-3.5" />Send RFQ</Button>
       </form>
@@ -55,7 +64,7 @@ export function MarketPanel({ mission, token, leads, invitations, jobs, run, set
                 <div className="flex items-center gap-2">
                   {lead.website && <a className="text-live" href={lead.website} target="_blank" rel="noreferrer" aria-label={`${lead.name} website`}><ExternalLink className="size-3.5" /></a>}
                   {lead.status === "lead" && (
-                    <form className="flex gap-1" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<{ invitation: { invitation_url?: string; delivery_status: string } }>(`/v1/leads/${lead.id}/invite`, { method: "POST", token, body: JSON.stringify({ supplier_email: leadEmails[lead.id] }) }); setNotice(response.invitation.invitation_url ? `Development invitation: ${response.invitation.invitation_url}` : `RFQ sent to lead (${response.invitation.delivery_status}).`); }); }}>
+                    <form className="flex gap-1" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<{ invitation: RfqResponse }>(`/v1/leads/${lead.id}/invite`, { method: "POST", token, body: JSON.stringify({ supplier_email: leadEmails[lead.id] }) }); setNotice(rfqNotice(response.invitation)); }); }}>
                       <Input aria-label={`RFQ email for ${lead.name}`} className="h-7 w-48 text-xs" type="email" required placeholder="verified sales email" value={leadEmails[lead.id] ?? ""} onChange={(event) => setLeadEmails({ ...leadEmails, [lead.id]: event.target.value })} />
                       <Button size="sm" type="submit">Invite</Button>
                     </form>

@@ -262,10 +262,11 @@ async def test_unconfigured_email_is_recorded_as_a_failed_delivery() -> None:
             headers=auth(coordinator),
         )
         assert invitation.status_code == 201
-        assert invitation.json()["delivery_status"] == "failed"
+        assert invitation.json()["delivery_status"] == "not_configured"
         deliveries = await client.get(
             f"/v1/missions/{mission.json()['id']}/email-dispatches", headers=auth(coordinator)
         )
         assert deliveries.status_code == 200
-        assert deliveries.json()[0]["status"] == "failed"
-        assert deliveries.json()[0]["error"] == "RESEND_API_KEY is not configured"
+        assert deliveries.json()[0]["status"] == "not_configured"
+        assert deliveries.json()[0]["sent_at"] is None and deliveries.json()[0]["message_id"] is None
+        assert deliveries.json()[0]["error"] == "RELIEFMESH_RESEND_API_KEY is not configured; no email was sent"

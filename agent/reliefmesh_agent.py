@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -44,14 +45,37 @@ HELP = (
     "- `create a mission for 300 blankets delivered to Oakland, CA within 24 hours under $8,000`\n"
     "- `show wildfire events in California` (live NASA EONET)\n"
     "- `status` / `brief` for the current mission (quotes, policy, plan, disruptions)\n"
-    "- `run evidence checks` (live OFAC, SAM.gov, openFDA, USAspending)\n"
-    "- `seed test suppliers` (four labeled TEST suppliers with synthetic quotes, screened against live data)\n"
+    "- `run evidence checks` (live OFAC, SAM.gov, openFDA, USAspending on suppliers that have quoted)\n"
     "- `find suppliers for N95 masks` (Apify discovery; results are leads, never quotes)\n"
-    "- `optimize` (deterministic policy + integer optimizer)\n"
-    "- `why was Pioneer rejected?`\n"
-    "- `simulate Bayside withdrawing` (a real, persisted disruption on a TEST supplier; ReliefMesh replans itself)\n"
+    "- `optimize` (deterministic policy + integer optimizer over real supplier quotes)\n"
+    "- `why was <supplier> rejected?` / `what changed?` after a supplier withdraws or edits its quote\n"
+    "I only report what is in ReliefMesh: suppliers join by accepting an RFQ and quoting themselves. "
     "I cannot approve spending or send purchase orders. A human coordinator does that in ReliefMesh."
 )
+# Offered only when the ReliefMesh deployment runs in explicit demo mode (never in production).
+DEMO_HELP = (
+    "\nDemo deployment tools (labeled TEST data):\n"
+    "- `seed test suppliers` (four labeled TEST suppliers with synthetic quotes)\n"
+    "- `simulate Bayside withdrawing` (a persisted disruption on a TEST supplier)"
+)
+NO_DEMO = ("This ReliefMesh deployment works only with real supplier data, so there are no test suppliers or simulated "
+           "disruptions. A real disruption happens when a supplier withdraws or edits its quote in the supplier portal; "
+           "ReliefMesh then replans by itself. Say `what changed` afterwards.")
+_config: dict[str, Any] = {}
+
+
+async def demo_mode() -> bool:
+    """Ask the API whether it is a demo deployment (cached 10 min; unreachable means no)."""
+    if _config.get("expires", 0) > time.monotonic():
+        return bool(_config.get("demo_mode"))
+    try:
+        async with httpx.AsyncClient(timeout=15) as http:
+            response = await http.get(f"{API_URL}/v1/config")
+            response.raise_for_status()
+            _config.update(demo_mode=bool(response.json().get("demo_mode")), expires=time.monotonic() + 600)
+    except (httpx.HTTPError, ValueError):
+        return False
+    return bool(_config["demo_mode"])
 
 
 PRIVILEGED_SENDERS = {s.strip() for s in os.environ.get("RELIEFMESH_AGENT_PRIVILEGED_SENDERS", "").split(",") if s.strip()}
@@ -202,7 +226,9 @@ def link(mission_id: str) -> str:
 
 async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], ctx: Context | None, sender: str) -> str:
     if intent == "help":
-        return HELP
+        return HELP + (DEMO_HELP if await demo_mode() else "")
+    if intent in {"seed", "simulate"} and not await demo_mode():
+        return NO_DEMO
     if intent == "clarify_mission":
         return ("To create a mission I need a quantity + item, a US delivery location (City, ST), and a budget, e.g. "
                 "`create a mission for 300 blankets delivered to Oakland, CA within 24 hours under $8,000`.")
@@ -248,6 +274,9 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
     remember(ctx, sender, mission_id)
     if intent == "evidence":
         result = await client.call("POST", f"/v1/missions/{mission_id}/evidence/refresh", {})
+        if not result["checked"]:
+            return (f"No suppliers have quoted on **{mission['name']}** yet, so there is no one to screen. Suppliers "
+                    f"join by accepting an RFQ from a coordinator in ReliefMesh{link(mission_id)}.")
         brief = await client.call("GET", f"/v1/missions/{mission_id}/brief")
         lines = [f"Ran live evidence checks on {len(result['checked'])} supplier(s) for **{mission['name']}**:"]
         for row in brief["suppliers"]:
@@ -283,6 +312,9 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
                 f"(job `{job['id'][:8]}`). Results arrive as **leads** with public contact data only; a lead becomes a "
                 "supplier only after accepting an RFQ and quoting.")
     if intent == "optimize":
+        if not (await client.call("GET", f"/v1/missions/{mission_id}/brief"))["suppliers"]:
+            return (f"No supplier quotes have been received for **{mission['name']}** yet. A procurement plan can be "
+                    f"generated after eligible quotes arrive{link(mission_id)}.")
         result = await client.call("POST", f"/v1/missions/{mission_id}/optimize")
         plan = await client.call("GET", f"/v1/plans/{result['plan_id']}")
         return describe_plan(mission, plan)
@@ -423,7 +455,7 @@ async def answer(text: str, ctx: Context | None = None, sender: str = "local") -
         return "You have created the maximum number of missions for this hour."
     if intent == "discover" and sender not in PRIVILEGED_SENDERS:  # deny by default
         return ("Supplier discovery spends paid Apify credits, so it is limited to authorized coordinators. "
-                "Ask a ReliefMesh admin to run it, or continue with `seed test suppliers`.")
+                "Ask a ReliefMesh coordinator to run it or to send RFQs from the ReliefMesh app.")
     try:
         return await run_tool(ReliefMeshClient(API_URL, AGENT_TOKEN, sender), intent, args, ctx, sender)
     except AgentError as exc:
