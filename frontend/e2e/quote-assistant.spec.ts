@@ -58,4 +58,11 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await supplier.getByRole("button", { name: "Submit binding quote" }).click();
   await expect(supplier).toHaveURL(/\/supplier$/);
   await expect(supplier.getByText(/120 wool blankets at \$28\.50 · ETA/)).toBeVisible();
+
+  // A supplier revising its own quote in the portal is a real disruption the buyer must see.
+  await supplier.getByText("Revise price or inventory").click();
+  await supplier.getByLabel("wool blankets price").fill("31.00");
+  await supplier.getByRole("button", { name: "Save revision" }).click();
+  await expect(supplier.getByText(/Quote v2/)).toBeVisible();
+  await expect(supplier.getByText(/120 wool blankets at \$31\.00/)).toBeVisible();
 });
