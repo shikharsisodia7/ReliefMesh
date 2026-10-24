@@ -10,10 +10,64 @@ from typing import Any
 
 from .core import Services, audit, new_id, notify, now_iso
 from .integrations.http import canonical_json
-from .optimizer import solve
+from .optimizer import cents, money, solve
 from .policy.engine import EvidenceTTL, evaluate
 
 _mission_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+# Purchase orders a supplier has received and not declined/cancelled: their units are already bought.
+ACTIVE_ORDER_STATUSES = {"sent", "supplier_accepted", "in_fulfillment", "completed"}
+
+
+def committed_lines(orders: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{**line, "committed": True, "po_number": order["po_number"], "purchase_order_id": order["id"]}
+            for order in orders if order["status"] in ACTIVE_ORDER_STATUSES for line in order["lines"]]
+
+
+def residual_problem(mission: dict[str, Any], quotes: list[dict[str, Any]],
+                     commitments: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
+    """What is still unbought: requirements, budget, and quote inventory minus active purchase orders."""
+
+    from .requirements import requirement_key
+
+    covered: dict[str, int] = defaultdict(int)
+    taken: dict[tuple[str, str], int] = defaultdict(int)
+    spent = 0
+    for line in commitments:
+        covered[line["requirement_id"]] += line["quantity"]
+        taken[(line["quote_id"], line["requirement_id"])] += line["quantity"]
+        spent += cents(line["line_cost"])
+    by_id = {quote["id"]: quote for quote in quotes}
+    spent += sum(cents(by_id[qid].get("shipping_cost") or "0") for qid in {l["quote_id"] for l in commitments}
+                 if qid in by_id)
+    requirements = [{**row, "quantity": row["quantity"] - covered.get(requirement_key(row), 0)}
+                    for row in mission["requirements"] if row["quantity"] > covered.get(requirement_key(row), 0)]
+    remaining = {**mission, "requirements": requirements, "budget": money(max(0, cents(mission["budget"]) - spent))}
+    adjusted = []
+    for quote in quotes:
+        lines = []
+        for line in quote["lines"]:
+            left = line["available_quantity"] - taken.get((quote["id"], line.get("requirement_id")), 0)
+            if left > 0:
+                lines.append({**line, "available_quantity": left})
+        if lines:
+            adjusted.append({**quote, "lines": lines})
+    return remaining, adjusted, spent
+
+
+def merge_commitments(mission: dict[str, Any], outcome: dict[str, Any], commitments: list[dict[str, Any]],
+                      spent: int) -> dict[str, Any]:
+    """Present the full picture: fixed purchase-order lines plus the optimized remainder."""
+
+    new_spend = cents(outcome["total_cost"])
+    total = spent + new_spend
+    merged = {**outcome, "allocations": commitments + outcome["allocations"], "committed_cost": money(spent),
+              "new_spend": money(new_spend)}
+    if outcome["status"] == "feasible":
+        merged["total_cost"] = money(total)
+        merged["remaining_budget"] = money(cents(mission["budget"]) - total)
+        merged["coverage"] = [{"item": row["item"], "requirement_id": row.get("id"), "required": row["quantity"],
+                               "allocated": row["quantity"]} for row in mission["requirements"]]
+    return merged
 
 
 def evidence_ttl(services: Services) -> EvidenceTTL:
@@ -121,7 +175,18 @@ async def compute_plan(services: Services, mission_id: str, trigger: str,
             raise RuntimeError(f"mission {mission_id} disappeared while optimizing")
         report, quotes = await evaluate_mission(services, mission)
         eligible = [quote for quote in quotes if report["quotes"][quote["id"]]["eligible"]]
-        outcome = solve(mission, eligible)
+        commitments = committed_lines(await services.store.find("purchase_orders", mission_id=mission_id))
+        if commitments:
+            remaining, open_quotes, spent = residual_problem(mission, quotes, commitments)
+            open_ids = {quote["id"] for quote in eligible}
+            open_quotes = [quote for quote in open_quotes if quote["id"] in open_ids]
+            outcome = solve(remaining, open_quotes) if remaining["requirements"] else {
+                "status": "feasible", "solver_status": "already_covered", "allocations": [], "total_cost": "0.00",
+                "shipping_cost": "0.00", "coverage": [], "remaining_budget": remaining["budget"],
+                "supplier_concentration": [], "binding_constraints": [], "rejected_quotes": [], "shortages": []}
+            outcome = merge_commitments(mission, outcome, commitments, spent)
+        else:
+            outcome = solve(mission, eligible)
         by_id = {quote["id"]: quote for quote in quotes}
         policy_rejections = []
         for quote_id, row in sorted(report["quotes"].items()):

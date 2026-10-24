@@ -177,7 +177,7 @@ export function PlanVersions({ plans, approvals, token, run, setNotice, order, i
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2"><h3 className="font-semibold">Plan v{plan.version}</h3><PlanStatusBadge value={plan.status} /><span className="font-mono text-[10px] text-tertiary">{plan.trigger} · {ago(plan.computed_at)}</span></div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Total {money(plan.total_cost)} · Shipping {money(plan.shipping_cost)} · Remaining {money(plan.remaining_budget)}{plan.difference.total_cost_before ? ` · Prior total ${money(plan.difference.total_cost_before)}` : ""}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">Total {money(plan.total_cost)} · Shipping {money(plan.shipping_cost)} · Remaining {money(plan.remaining_budget)}{plan.committed_cost ? ` · Committed on POs ${money(plan.committed_cost)} · New spend ${money(plan.new_spend ?? "0")}` : ""}{plan.difference.total_cost_before ? ` · Prior total ${money(plan.difference.total_cost_before)}` : ""}</p>
                   </div>
                   <div className="flex gap-2">
                     {plan.status === "feasible" && !isAdmin && approvalBlocked && <span className="max-w-xs text-right text-xs text-telemetry">{approvalBlocked}</span>}
@@ -189,7 +189,7 @@ export function PlanVersions({ plans, approvals, token, run, setNotice, order, i
                 {plan.status === "infeasible" ? (
                   <ul className="mt-2 list-disc pl-5 text-sm text-critical">{plan.shortages.map((shortage) => <li key={shortage.item}>{shortage.item}: shortage {shortage.shortage}; constraint: {shortage.reason}</li>)}</ul>
                 ) : (
-                  <ul className="mt-2 grid gap-0.5 text-sm">{plan.allocations.map((allocation) => <li key={`${allocation.supplier_id}-${allocation.item}`} className="flex items-center gap-1.5"><span className="inline-block size-2 rounded-sm" style={{ background: colorFor(order, allocation.supplier_id) }} />{supplierName(plan, allocation.supplier_id)}: {allocation.quantity} {allocation.item} × {money(allocation.unit_price)} = {money(allocation.line_cost)}</li>)}</ul>
+                  <ul className="mt-2 grid gap-0.5 text-sm">{plan.allocations.map((allocation) => <li key={`${allocation.supplier_id}-${allocation.item}-${allocation.po_number ?? "new"}`} className="flex items-center gap-1.5"><span className="inline-block size-2 rounded-sm" style={{ background: colorFor(order, allocation.supplier_id) }} />{supplierName(plan, allocation.supplier_id)}: {allocation.quantity} {allocation.item} × {money(allocation.unit_price)} = {money(allocation.line_cost)}{allocation.committed && <span className="rounded border px-1 font-mono text-[10px] text-muted-foreground" title="Already on an active purchase order; kept fixed while replanning">on {allocation.po_number}</span>}</li>)}</ul>
                 )}
                 {plan.rejected_quotes.some((row) => row.reason.startsWith("policy")) && (
                   <details className="mt-2 text-xs"><summary className="cursor-pointer text-telemetry">Withheld by policy ({plan.rejected_quotes.filter((row) => row.reason.startsWith("policy")).length})</summary>

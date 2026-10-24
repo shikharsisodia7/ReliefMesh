@@ -108,7 +108,7 @@ export type SupplierRow = {
   reviews: Review[];
 };
 
-export type Allocation = { quote_id: string; supplier_id: string; supplier_email: string; item: string; quantity: number; unit_price: string; line_cost: string; delivery_date: string };
+export type Allocation = { quote_id: string; supplier_id: string; supplier_email: string; item: string; quantity: number; unit_price: string; line_cost: string; delivery_date: string; committed?: boolean; po_number?: string };
 
 export type Plan = {
   id: string;
@@ -117,6 +117,8 @@ export type Plan = {
   trigger: string;
   trigger_detail: { kind: string; summary?: string; supplier_id?: string; at?: string }[];
   computed_at: string;
+  committed_cost?: string; // units already on active purchase orders, kept fixed by a replan
+  new_spend?: string;
   total_cost: string;
   shipping_cost: string;
   remaining_budget: string;

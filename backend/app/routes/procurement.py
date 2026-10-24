@@ -647,6 +647,8 @@ async def create_purchase_orders(plan_id: str, request: Request, user: dict = De
     assert mission and organization
     by_supplier: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for allocation in plan["allocations"]:
+        if allocation.get("committed"):
+            continue  # already on an active purchase order from an earlier plan
         by_supplier[allocation["supplier_id"]].append(allocation)
     orders = []
     for supplier_id, allocations in by_supplier.items():
@@ -751,7 +753,25 @@ async def supplier_response(order_id: str, payload: SupplierResponseRequest, use
         await notify(services, mission, "po_response",
                      f"{order['po_number']} was {'accepted' if payload.accepted else 'declined'} by the supplier.",
                      "success" if payload.accepted else "warning", {"order_id": order_id})
+        if not payload.accepted:
+            reason = f": {payload.reason}" if payload.reason else ""
+            await supplier_backed_out(services, mission, order, user, f"declined {order['po_number']}{reason}")
     return order
+
+
+async def supplier_backed_out(services: Services, mission: dict, order: dict, user: dict, what: str) -> None:
+    """A declined or cancelled order is a real supply disruption: the quote is withdrawn and ReliefMesh replans."""
+    quotes = [q for q in await services.store.find("quotes", mission_id=mission["id"], supplier_id=user["id"])
+              if q["status"] == "submitted"]
+    if not quotes:
+        return
+    supplier = await services.store.get("suppliers", user["id"])
+    label = (supplier or {}).get("legal_name") or user["email"]
+    quote = max(quotes, key=lambda row: row["created_at"])
+    _, job = await apply_quote_change(services, quote, mission, user["id"], kind="withdrawn",
+                                      summary=f"{label} {what}", withdraw=True)
+    await audit("quote.withdrawn", user["id"], mission["organization_id"], mission["id"], "quote", quote["id"],
+                services, {"job_id": job["id"], "cause": what, "purchase_order_id": order["id"]})
 
 
 @router.post("/v1/purchase-orders/{order_id}/fulfillment")
@@ -772,7 +792,10 @@ async def update_fulfillment(order_id: str, payload: FulfillmentUpdateRequest, u
     mission = await services.store.get("missions", order["mission_id"])
     if mission:
         await notify(services, mission, "fulfillment", f"{order['po_number']}: {payload.status} - {payload.note}",
-                     "info", {"order_id": order_id})
+                     "warning" if payload.status == "cancelled" else "info", {"order_id": order_id})
+        if payload.status == "cancelled":
+            await supplier_backed_out(services, mission, order, user,
+                                      f"cancelled fulfillment of {order['po_number']}: {payload.note}")
     return order
 
 
