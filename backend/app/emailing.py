@@ -46,7 +46,10 @@ def recipient_allowed(settings: Settings, address: str) -> bool:
     if not allowed:
         return True
     address = address.lower()
-    return any(address == entry or (entry.startswith("@") and address.endswith(entry)) for entry in allowed)
+    local, _, domain = address.partition("@")
+    mailbox = f"{local.split('+', 1)[0]}@{domain}"  # you+rfq@x.org is the same mailbox as you@x.org
+    return any(entry in {address, mailbox} or (entry.startswith("@") and address.endswith(entry))
+               for entry in allowed)
 
 
 class EmailGateway:

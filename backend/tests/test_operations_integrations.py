@@ -640,3 +640,13 @@ async def test_stale_calendar_update_cannot_overwrite_a_newer_one(ops_client, pr
     await store.replace("ops_deliveries", older["id"], older)
     await ops.attempt(older["id"])
     assert (await store.get("ops_deliveries", older["id"]))["status"] == "SKIPPED"
+
+
+def test_allowlist_matches_exact_mailboxes_plus_addresses_and_domains() -> None:
+    from app.emailing import recipient_allowed
+
+    settings = ops_settings(email_allowed_recipients=["ops@relief.org", "@county.gov"])
+    assert recipient_allowed(settings, "ops@relief.org") and recipient_allowed(settings, "OPS+rfq7@relief.org")
+    assert recipient_allowed(settings, "buyer@county.gov")
+    for blocked in ("ops@relief.org.evil.com", "other@relief.org", "ops+x@evil.org"):
+        assert not recipient_allowed(settings, blocked)
