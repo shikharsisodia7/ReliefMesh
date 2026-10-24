@@ -30,6 +30,11 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     )
     assert organization.status_code == 201
     organization_id = organization.json()["id"]
+    approver = await register(client, "approver@reliefmesh.example.com", "coordinator")
+    added = await client.post(f"/v1/organizations/{organization_id}/members",
+                              json={"email": "approver@reliefmesh.example.com", "role": "approver"},
+                              headers=auth(coordinator))
+    assert added.status_code == 201 and added.json()["status"] == "accepted"
     deadline = (datetime.now(UTC) + timedelta(days=10)).isoformat()
     mission = await client.post(
         "/v1/missions",
@@ -105,8 +110,12 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     assert initial_plan["status"] == "feasible"
     assert initial_plan["total_cost"] == "80.00"
 
-    approved = await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(coordinator))
+    self_approval = await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(coordinator))
+    assert self_approval.status_code == 403
+    assert self_approval.json()["detail"]["code"] == "SEGREGATION_OF_DUTIES"
+    approved = await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(approver))
     assert approved.status_code == 201, approved.text
+    assert approved.json()["segregation_of_duties"] == "INDEPENDENT_APPROVER"
 
     withdrawn = await client.post(
         f"/v1/quotes/{first_quote.json()['id']}/withdraw", headers=auth(supplier_one)
@@ -133,7 +142,7 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     assert "withdrew" in approvals.json()[0]["invalidation_reason"]
 
     revised_approval = await client.post(
-        f"/v1/plans/{revised_plan['id']}/approve", headers=auth(coordinator)
+        f"/v1/plans/{revised_plan['id']}/approve", headers=auth(approver)
     )
     assert revised_approval.status_code == 201
     key = "po-request-001"

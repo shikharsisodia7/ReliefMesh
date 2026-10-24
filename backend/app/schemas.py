@@ -30,6 +30,13 @@ class TokenResponse(APIModel):
 
 class CreateOrganizationRequest(APIModel):
     name: str = Field(min_length=2, max_length=160)
+    # Demo organizations allow a labeled self-approval override; real organizations enforce segregation of duties.
+    demo: bool = False
+
+
+class MemberInviteRequest(APIModel):
+    email: EmailStr
+    role: Literal["approver", "coordinator", "admin"] = "approver"
 
 
 class RequirementInput(APIModel):

@@ -24,7 +24,8 @@ from ..jobs import enqueue
 from ..planning import compute_plan, evaluate_mission, plan_hash
 from ..requirements import assign_quote_lines, new_requirement_id
 from ..schemas import (
-    CreateOrganizationRequest, FulfillmentUpdateRequest, InvitationCreateRequest, LoginRequest, MissionCreateRequest,
+    CreateOrganizationRequest, FulfillmentUpdateRequest, InvitationCreateRequest, LoginRequest, MemberInviteRequest,
+    MissionCreateRequest,
     PurchaseOrderSendRequest, QuoteCreateRequest, QuoteUpdateRequest, RegisterRequest, SupplierProfileInput,
     SupplierResponseRequest,
 )
@@ -46,8 +47,25 @@ async def register(payload: RegisterRequest, request: Request, services: Service
     }
     await services.store.insert("users", user)
     await audit("user.registered", user["id"], None, None, "user", user["id"], services)
+    await apply_pending_memberships(services, user)
     return {"access_token": create_access_token(user, services.settings), "token_type": "bearer",
             "user": public_user(user)}
+
+
+async def apply_pending_memberships(services: Services, user: dict) -> None:
+    """Organization invitations sent before this coordinator registered take effect on sign-up/sign-in."""
+
+    if user["role"] != "coordinator":
+        return
+    for invite in await services.store.find("org_invites", email=user["email"], status="pending"):
+        if not await services.store.find("memberships", organization_id=invite["organization_id"], user_id=user["id"]):
+            await services.store.insert("memberships", {
+                "id": new_id(), "organization_id": invite["organization_id"], "user_id": user["id"],
+                "role": invite["role"], "created_at": now_iso(), "invited_by": invite["invited_by"]})
+        invite.update(status="accepted", accepted_at=now_iso(), user_id=user["id"])
+        await services.store.replace("org_invites", invite["id"], invite)
+        await audit("organization.member_joined", user["id"], invite["organization_id"], None, "membership",
+                    user["id"], services, {"role": invite["role"]})
 
 
 @router.post("/v1/auth/login")
@@ -57,6 +75,7 @@ async def login(payload: LoginRequest, request: Request, services: Services = De
     if not users or not users[0].get("password_hash") or not verify_password(payload.password, users[0]["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     user = users[0]
+    await apply_pending_memberships(services, user)
     return {"access_token": create_access_token(user, services.settings), "token_type": "bearer",
             "user": public_user(user)}
 
@@ -71,7 +90,7 @@ async def create_organization(payload: CreateOrganizationRequest, user: dict = D
                               services: Services = Depends(get_services)) -> dict:
     if user["role"] != "coordinator":
         raise HTTPException(status_code=403, detail="Only coordinators can create organizations")
-    organization = {"id": new_id(), "name": payload.name.strip(), "created_at": now_iso()}
+    organization = {"id": new_id(), "name": payload.name.strip(), "is_demo": payload.demo, "created_at": now_iso()}
     await services.store.insert("organizations", organization)
     await services.store.insert("memberships", {
         "id": new_id(), "organization_id": organization["id"], "user_id": user["id"], "role": "admin",
@@ -80,6 +99,41 @@ async def create_organization(payload: CreateOrganizationRequest, user: dict = D
     await audit("organization.created", user["id"], organization["id"], None, "organization", organization["id"],
                 services)
     return organization
+
+
+@router.post("/v1/organizations/{organization_id}/members", status_code=status.HTTP_201_CREATED)
+async def invite_member(organization_id: str, payload: MemberInviteRequest, user: dict = Depends(current_user),
+                        services: Services = Depends(get_services)) -> dict:
+    membership = await require_org_member(organization_id, user, services)
+    if membership["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only an organization administrator can add members")
+    email_address = str(payload.email).lower()
+    existing = await services.store.find("users", email=email_address)
+    if existing and existing[0]["role"] != "coordinator":
+        raise HTTPException(status_code=409, detail="Supplier accounts cannot join a buyer organization")
+    invite = {"id": new_id(), "organization_id": organization_id, "email": email_address, "role": payload.role,
+              "status": "pending", "invited_by": user["id"], "created_at": now_iso()}
+    await services.store.insert("org_invites", invite)
+    await audit("organization.member_invited", user["id"], organization_id, None, "org_invite", invite["id"], services,
+                {"email": email_address, "role": payload.role})
+    if existing:
+        await apply_pending_memberships(services, existing[0])
+        invite = await services.store.get("org_invites", invite["id"])
+    return invite
+
+
+@router.get("/v1/organizations/{organization_id}/members")
+async def list_members(organization_id: str, user: dict = Depends(current_user),
+                       services: Services = Depends(get_services)) -> dict:
+    await require_org_member(organization_id, user, services)
+    members = []
+    for membership in await services.store.find("memberships", organization_id=organization_id):
+        member = await services.store.get("users", membership["user_id"])
+        members.append({"user_id": membership["user_id"], "email": (member or {}).get("email"),
+                        "role": membership["role"], "joined_at": membership["created_at"]})
+    pending = [i for i in await services.store.find("org_invites", organization_id=organization_id)
+               if i["status"] == "pending"]
+    return {"members": members, "pending": pending}
 
 
 @router.get("/v1/organizations")
@@ -431,8 +485,18 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
     membership = await require_org_member(plan["organization_id"], user, services)
-    if user["role"] != "coordinator" or membership["role"] != "admin":
-        raise HTTPException(status_code=403, detail="An organization administrator must approve this plan")
+    if user["role"] != "coordinator" or membership["role"] not in {"admin", "approver"}:
+        raise HTTPException(status_code=403, detail="An organization administrator or approver must approve this plan")
+    mission = await services.store.get("missions", plan["mission_id"])
+    organization = await services.store.get("organizations", plan["organization_id"])
+    assert mission and organization
+    self_approval = mission.get("created_by") == user["id"]
+    if self_approval and not organization.get("is_demo"):
+        raise HTTPException(status_code=403, detail={
+            "code": "SEGREGATION_OF_DUTIES",
+            "message": "The coordinator who requested this procurement cannot approve it. Another approver in the "
+                       "organization must review and approve the plan.",
+            "requested_by": mission.get("created_by")})
     if plan["status"] != "feasible":
         raise HTTPException(status_code=409, detail="Only a current feasible plan can be approved")
     newer = [p for p in await services.store.find("plans", mission_id=plan["mission_id"]) if p["version"] > plan["version"]]
@@ -440,8 +504,6 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
         raise HTTPException(status_code=409, detail="A newer plan version exists; approve the latest plan")
     if plan_hash(plan) != plan.get("plan_hash"):
         raise HTTPException(status_code=409, detail="Plan contents do not match their recorded hash")
-    mission = await services.store.get("missions", plan["mission_id"])
-    assert mission
     report, _ = await evaluate_mission(services, mission)
     if report["fingerprint"] != plan["policy"]["fingerprint"]:
         raise HTTPException(status_code=409,
@@ -455,7 +517,10 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
         "id": new_id(), "plan_id": plan_id, "plan_version": plan["version"], "plan_hash": plan["plan_hash"],
         "mission_id": plan["mission_id"], "organization_id": plan["organization_id"], "amount": plan["total_cost"],
         "currency": plan.get("currency", "USD"), "spending_ceiling": mission["budget"],
-        "scope": "issue_purchase_orders", "approver_id": user["id"], "status": "active",
+        "scope": "issue_purchase_orders", "approver_id": user["id"], "approver_email": user["email"],
+        "requested_by": mission.get("created_by"),
+        "segregation_of_duties": "DEMO_ORG_SELF_APPROVAL_OVERRIDE" if self_approval else "INDEPENDENT_APPROVER",
+        "status": "active",
         "approved_at": approved_at.isoformat(),
         "expires_at": (approved_at + timedelta(minutes=services.settings.approval_ttl_minutes)).isoformat(),
         "nonce": secrets.token_hex(16),
