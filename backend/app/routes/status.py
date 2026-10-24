@@ -116,6 +116,26 @@ async def check_resend(services: Services) -> tuple[str, str, str | None]:
     return "error", f"last delivery failed: {last.get('error')}", None
 
 
+async def check_x402(services: Services) -> tuple[str, str, str | None]:
+    settings = services.settings
+    if not settings.x402_pay_to:
+        return "not_configured", "RELIEFMESH_X402_PAY_TO is not configured", None
+    result = await services.hub.fetch("x402_facilitator", f"{settings.x402_facilitator_url.rstrip('/')}/supported")
+    if not result.ok:
+        return from_result(result, "")
+    kinds = [k for k in (result.data or {}).get("kinds", []) if str(k.get("network", "")).startswith("solana:EtWT")]
+    if not kinds:
+        return "error", "facilitator does not advertise Solana devnet", None
+    balance = await services.hub.fetch("solana_devnet", "https://api.devnet.solana.com", method="POST", json_body={
+        "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
+        "params": [settings.x402_pay_to, {"mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"},
+                   {"encoding": "jsonParsed"}]})
+    accounts = ((balance.data or {}).get("result") or {}).get("value") or [] if balance.ok else []
+    held = sum(a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0 for a in accounts)
+    return "ok", (f"facilitator supports exact/solana-devnet; treasury {settings.x402_pay_to[:6]}… holds "
+                  f"{held:g} devnet USDC"), "SANDBOX"
+
+
 CHECKS: dict[str, tuple[str, str, Check]] = {
     "mongodb": ("MongoDB Atlas", "core", check_mongo),
     "nasa_eonet": ("NASA EONET", "open data", check_eonet),
@@ -127,6 +147,7 @@ CHECKS: dict[str, tuple[str, str, Check]] = {
     "usaspending": ("USAspending", "evidence", check_usaspending),
     "openfda": ("openFDA", "evidence", check_openfda),
     "apify": ("Apify", "sponsor", check_apify),
+    "x402": ("Coinbase x402 · Solana devnet", "sponsor", check_x402),
     "resend": ("Resend email", "core", check_resend),
 }
 

@@ -421,7 +421,7 @@ async def answer(text: str, ctx: Context | None = None, sender: str = "local") -
     intent, args = routed or classify(text)
     if intent == "create_mission" and rate_limited(ctx, sender, "missions", MAX_MISSIONS_PER_HOUR):
         return "You have created the maximum number of missions for this hour."
-    if intent in {"discover"} and PRIVILEGED_SENDERS and sender not in PRIVILEGED_SENDERS:
+    if intent == "discover" and sender not in PRIVILEGED_SENDERS:  # deny by default
         return ("Supplier discovery spends paid Apify credits, so it is limited to authorized coordinators. "
                 "Ask a ReliefMesh admin to run it, or continue with `seed test suppliers`.")
     try:

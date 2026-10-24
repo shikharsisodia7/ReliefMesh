@@ -18,6 +18,9 @@ async def start_discovery(mission_id: str, payload: DiscoveryRequest, principal:
     mission, _ = await require_mission_access(mission_id, principal, services)
     if principal["role"] not in {"coordinator", "agent"}:
         raise HTTPException(status_code=403, detail="Only coordinators can run supplier discovery")
+    if principal["role"] == "agent" and principal.get("sender") not in services.settings.agent_privileged_senders:
+        raise HTTPException(status_code=403, detail="Supplier discovery spends paid credits; this agent conversation "
+                                                    "is not authorized to run it")
     if not services.settings.apify_api_token:
         raise HTTPException(status_code=503, detail="BLOCKED_EXTERNAL: RELIEFMESH_APIFY_API_TOKEN is not configured")
     job = await enqueue(services, "supplier_discovery", mission, coalesce=False, payload={

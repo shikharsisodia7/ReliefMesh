@@ -12,7 +12,8 @@ from .core import Services
 from .emailing import EmailGateway, ResendEmailGateway, TestEmailGateway
 from .integrations.http import IntegrationHub
 from .jobs import recover_jobs
-from .routes import agent, demo, evidence, intel, market, procurement, status
+from .payments import x402_exchange
+from .routes import agent, demo, evidence, intel, market, payments, procurement, status
 from .settings import Settings, get_settings
 from .store import MemoryStore, MongoStore, Store
 from .workflows import register_handlers
@@ -59,11 +60,18 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
         expose_headers=["X-PAYMENT-RESPONSE", "PAYMENT-RESPONSE", "PAYMENT-REQUIRED"],
     )
 
+    if runtime_settings.x402_pay_to:
+        x402_gate = x402_exchange.build_payment_middleware(services)
+
+        @app.middleware("http")
+        async def x402_payment_gate(request, call_next):  # official Coinbase x402 middleware
+            return await x402_gate(request, call_next)
+
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "storage": runtime_settings.storage_mode}
 
-    for module in (procurement, intel, evidence, market, demo, agent, status):
+    for module in (procurement, intel, evidence, market, demo, agent, payments, x402_exchange, status):
         app.include_router(module.router)
     return app
 

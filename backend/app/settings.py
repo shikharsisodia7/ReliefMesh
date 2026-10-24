@@ -33,6 +33,8 @@ class Settings(BaseSettings):
 
     # Judge/demo controls mutate only clearly labeled TEST suppliers.
     demo_controls_enabled: bool = True
+    # Agent chat senders allowed to spend paid credits (Apify discovery). Empty denies every agent sender.
+    agent_privileged_senders: list[str] = []
 
     # Evidence freshness windows: older evidence is treated as stale by the policy engine.
     ofac_evidence_ttl_hours: int = 24
@@ -67,6 +69,11 @@ class Settings(BaseSettings):
     x402_network: str = "solana-devnet"
     x402_facilitator_url: str = "https://x402.org/facilitator"
     x402_price_usd: str = "0.01"
+    x402_daily_cap_usd: str = "0.10"
+    x402_buyer_private_key: SecretStr | None = None
+    x402_treasury_private_key: SecretStr | None = None
+    # Public base URL of this API (the buyer reaches the Evidence Exchange over real HTTP).
+    public_api_url: str = "http://127.0.0.1:8000"
 
     @field_validator("storage_mode")
     @classmethod
