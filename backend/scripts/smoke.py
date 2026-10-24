@@ -22,7 +22,7 @@ def main(base: str) -> None:
                                                   "password": "correct horse battery staple", "role": "coordinator"})
     reg.raise_for_status()
     headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
-    org = client.post("/v1/organizations", json={"name": f"Smoke Relief {stamp}"}, headers=headers).json()
+    org = client.post("/v1/organizations", json={"name": f"Smoke Relief {stamp}", "demo": True}, headers=headers).json()
     events = client.get("/v1/emergency-events").json()
     us_events = [e for e in events if e.get("state")] or events
     event = us_events[0]
