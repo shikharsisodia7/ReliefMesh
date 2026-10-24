@@ -8,7 +8,7 @@ where approval still requires the approver's own session and authorization rules
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 
@@ -99,11 +99,22 @@ async def revoke(client: httpx.AsyncClient, token: str) -> bool:
         return False
 
 
+def validated_webhook(url: str) -> str:
+    """Only Slack's own webhook host is reachable from here (an admin-supplied URL must not become SSRF)."""
+
+    parsed = urlparse(url.strip())
+    if (parsed.scheme != "https" or (parsed.hostname or "").rstrip(".").lower() != "hooks.slack.com"
+            or parsed.port not in (None, 443) or parsed.username or parsed.password
+            or not parsed.path.startswith("/services/")):
+        raise IntegrationError(f"Slack webhook URL must start with {WEBHOOK_PREFIX}")
+    return f"https://hooks.slack.com{parsed.path}"
+
+
 async def post_webhook(client: httpx.AsyncClient, url: str, text: str, blocks: list[dict[str, Any]]) -> None:
-    if not url.startswith(WEBHOOK_PREFIX):
-        raise IntegrationError("Slack webhook URL must start with https://hooks.slack.com/services/")
+    target = validated_webhook(url)
     try:
-        response = await client.post(url, json={"text": text, "blocks": blocks, "unfurl_links": False})
+        response = await client.post(target, json={"text": text, "blocks": blocks, "unfurl_links": False},
+                                     follow_redirects=False)
     except httpx.HTTPError as exc:
         raise IntegrationError(f"Slack webhook unreachable ({type(exc).__name__})", retryable=True) from exc
     if response.status_code == 429 or response.status_code >= 500:
