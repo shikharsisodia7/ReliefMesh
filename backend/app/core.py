@@ -66,6 +66,9 @@ class Services:
         self.audit_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.job_handlers: dict[str, Callable[[Services, dict[str, Any]], Awaitable[dict[str, Any]]]] = {}
         self.status_cache: dict[str, Any] = {}
+        # Operations integrations (Gmail/Calendar/Slack/Drive); wired in main.create_app.
+        self.vault: Any = None
+        self.ops: Any = None
 
     def schedule(self, coroutine: Any, delay: float = 0.0) -> None:
         async def runner() -> None:
@@ -235,20 +238,32 @@ async def notify(services: Services, mission: dict[str, Any], kind: str, message
 
 
 async def record_email(*, to: str, subject: str, html: str, kind: str, entity_id: str,
-                       services: Services) -> dict[str, Any]:
-    result = await services.email.send(to, subject, html)
+                       services: Services, organization_id: str | None = None, text: str | None = None,
+                       attachments: tuple = ()) -> dict[str, Any]:
+    """Send a transactional email (RFQ, PO, org invite) via the org's Gmail or Resend and record it."""
+
+    from .integrations.gmail import OutgoingEmail
+
+    result = await services.email.send(
+        OutgoingEmail(to=to, subject=subject, html=html, text=text, attachments=attachments,
+                      headers={"X-ReliefMesh-Event": kind}), organization_id)
     attempt = {
         "id": new_id(),
         "to": to,
         "subject": subject,
         "kind": kind,
         "entity_id": entity_id,
+        "organization_id": organization_id,
+        # sent | failed | not_configured | test (EMAIL_MODE=test) | disabled | suppressed
+        "status": result.status,
         "provider": result.provider,
-        "status": "sent" if result.delivered else ("failed" if result.configured else "not_configured"),
         "provider_id": result.provider_id,
         "message_id": result.provider_id,
-        "sent_at": now_iso() if result.delivered else None,
+        "thread_id": result.thread_id,
+        "sender": result.sender,
+        "attachments": [a.filename for a in attachments],
         "error": result.error,
+        "sent_at": now_iso() if result.delivered else None,
         "created_at": now_iso(),
     }
     await services.store.insert("email_dispatches", attempt)

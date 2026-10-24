@@ -81,6 +81,36 @@ class Settings(BaseSettings):
     # Public base URL of this API (the buyer reaches the Evidence Exchange over real HTTP).
     public_api_url: str = "http://127.0.0.1:8000"
 
+    # Operations integrations (Gmail, Google Calendar, Google Drive, Slack). All are per-organization
+    # OAuth connections; these settings only identify the ReliefMesh OAuth apps.
+    # disabled = never send email; test = persist the rendered email without sending; live = Gmail/Resend.
+    # Unset resolves to "test" under app_env=test and "live" elsewhere (live still needs a connected transport).
+    email_mode: Literal["disabled", "test", "live"] | None = None
+    # Optional live-mode safety rail: only these addresses (or "@domain" suffixes) may receive email.
+    email_allowed_recipients: list[str] = []
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: SecretStr | None = None
+    google_oauth_redirect_uri: str | None = None  # default: {public_api_url}/v1/integrations/google/callback
+    slack_client_id: str | None = None
+    slack_client_secret: SecretStr | None = None
+    slack_redirect_uri: str | None = None  # default: {public_api_url}/v1/integrations/slack/callback
+    # Fernet key for OAuth tokens at rest; derived from the JWT secret when unset.
+    integration_encryption_key: SecretStr | None = None
+    ops_delivery_max_attempts: int = 4
+    ops_retry_base_seconds: float = 2.0
+
+    @property
+    def resolved_email_mode(self) -> str:
+        return self.email_mode or ("test" if self.app_env == "test" else "live")
+
+    @property
+    def google_redirect_uri(self) -> str:
+        return self.google_oauth_redirect_uri or f"{self.public_api_url.rstrip('/')}/v1/integrations/google/callback"
+
+    @property
+    def slack_oauth_redirect_uri(self) -> str:
+        return self.slack_redirect_uri or f"{self.public_api_url.rstrip('/')}/v1/integrations/slack/callback"
+
     @field_validator("storage_mode")
     @classmethod
     def memory_is_non_production(cls, value: str, info):

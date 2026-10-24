@@ -105,11 +105,12 @@ async def check_apify(services: Services) -> tuple[str, str, str | None]:
 
 
 async def check_resend(services: Services) -> tuple[str, str, str | None]:
-    if services.settings.app_env == "test":
-        return "degraded", "test email double (no network delivery)", None
+    if services.settings.resolved_email_mode != "live":
+        return "degraded", f"RELIEFMESH_EMAIL_MODE={services.settings.resolved_email_mode} (no network delivery)", None
     if not services.settings.resend_api_key:
-        return "not_configured", "RELIEFMESH_RESEND_API_KEY is not configured; RFQ emails are recorded as failed", None
-    dispatches = await services.store.find("email_dispatches")
+        return "not_configured", ("RELIEFMESH_RESEND_API_KEY is not configured; email goes through each "
+                                  "organization's connected Gmail instead"), None
+    dispatches = await services.store.find("email_dispatches", provider="resend")
     if dispatches:
         last = max(dispatches, key=lambda row: row["created_at"])
         if last["status"] == "sent":

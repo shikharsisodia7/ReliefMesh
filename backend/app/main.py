@@ -9,11 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core import Services
-from .emailing import EmailGateway, ResendEmailGateway, TestEmailGateway
+from .emailing import EmailGateway
+from .integrations.connections import TokenVault
 from .integrations.http import IntegrationHub
 from .jobs import recover_jobs
+from .operations.notifications import OperationsService
 from .payments import x402_exchange
-from .routes import agent, demo, evidence, intel, market, payments, procurement, status
+from .routes import agent, demo, evidence, integrations, intel, market, payments, procurement, status
 from .settings import Settings, get_settings
 from .store import MemoryStore, MongoStore, Store
 from .workflows import register_handlers
@@ -27,15 +29,19 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
         if not runtime_settings.mongodb_uri:
             raise RuntimeError("RELIEFMESH_MONGODB_URI is required when storage mode is mongo")
         store = MongoStore(runtime_settings.mongodb_uri, runtime_settings.mongodb_database)
-    email: EmailGateway = TestEmailGateway() if runtime_settings.app_env == "test" else ResendEmailGateway(runtime_settings)
     hub = IntegrationHub(store, runtime_settings.http_user_agent, transport=http_transport)
+    vault = TokenVault(runtime_settings)
+    email = EmailGateway(runtime_settings, store, vault, hub.client)
     services = Services(runtime_settings, store, email, hub)
+    services.vault = vault
+    services.ops = OperationsService(services)
     register_handlers(services)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await services.store.initialize()
         await recover_jobs(services)
+        await services.ops.recover()
         yield
         if services.jobs:
             await asyncio.gather(*services.jobs, return_exceptions=True)
@@ -72,7 +78,7 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
     async def health() -> dict[str, str]:
         return {"status": "ok", "storage": runtime_settings.storage_mode}
 
-    for module in (procurement, intel, evidence, market, demo, agent, payments, x402_exchange, status):
+    for module in (procurement, intel, evidence, market, demo, agent, payments, x402_exchange, integrations, status):
         app.include_router(module.router)
     return app
 

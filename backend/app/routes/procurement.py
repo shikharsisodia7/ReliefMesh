@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from html import escape
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -12,15 +11,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 
+from .. import documents
 from ..auth import create_access_token, hash_password, verify_password
 from ..core import (
     Services, audit, secret, current_principal, current_user, get_services, invitation_from_token, new_id, notify, now_iso,
     public_user, record_email, require_admin, require_mission_access, require_org_member, token_hash, verify_chain,
 )
 from ..integrations import emergency, gemini
+from ..integrations.gmail import Attachment
+from ..operations import events as ops_events
+from ..operations import templates
 from ..jobs import enqueue
 from ..planning import compute_plan, evaluate_mission, plan_hash
 from ..requirements import assign_quote_lines, new_requirement_id
@@ -122,7 +123,7 @@ async def invite_member(organization_id: str, payload: MemberInviteRequest, user
     attempt = await record_email(
         to=email_address, subject=f"Join {(organization or {}).get('name')} on ReliefMesh",
         html=f"<p>You were invited as <strong>{payload.role}</strong>.</p><p><a href=\"{url}\">Accept invitation</a></p>",
-        kind="org_invite", entity_id=invite["id"], services=services)
+        kind="org_invite", entity_id=invite["id"], services=services, organization_id=organization_id)
     await audit("organization.member_invited", user["id"], organization_id, None, "org_invite", invite["id"], services,
                 {"email": email_address, "role": payload.role, "delivery_status": attempt["status"]})
     # The secret link goes only to the inviting admin (and the invitee's inbox when email is configured).
@@ -214,6 +215,8 @@ async def create_mission_record(services: Services, payload: MissionCreateReques
     await services.store.insert("missions", mission)
     await audit("mission.created", actor["id"], mission["organization_id"], mission["id"], "mission", mission["id"],
                 services, {"emergency_event_id": payload.emergency_event_id, "via": mission["created_via"]})
+    await ops_events.emit(services, ops_events.MISSION_CREATED, mission, subject_id=mission["id"],
+                          version=mission["delivery_deadline"])
     return mission
 
 
@@ -251,11 +254,12 @@ async def create_invitation_record(services: Services, mission: dict, supplier_e
     }
     await services.store.insert("invitations", invitation)
     url = f"{services.settings.frontend_origin}/invitations/{raw_token}"
+    organization = await services.store.get("organizations", mission["organization_id"]) or {}
+    subject, html, text = templates.rfq_email(organization, mission, url)
     attempt = await record_email(
-        to=invitation["supplier_email"], subject=f"RFQ invitation: {mission['name']}",
-        html=(f"<p>You have been invited to quote for <strong>{escape(mission['name'])}</strong>.</p>"
-              f"<p><a href=\"{url}\">Open secure RFQ</a></p>"),
+        to=invitation["supplier_email"], subject=subject, html=html, text=text,
         kind="rfq_invitation", entity_id=invitation["id"], services=services,
+        organization_id=mission["organization_id"],
     )
     invitation["delivery_status"] = attempt["status"]
     invitation["delivery"] = {key: attempt[key] for key in ("provider", "status", "message_id", "sent_at", "error")}
@@ -605,6 +609,8 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     await notify(services, mission, "plan_approved",
                  f"Plan v{plan['version']} approved for ${plan['total_cost']} (expires {approval['expires_at'][:16]}Z).",
                  "success", {"approval_id": approval["id"]})
+    await ops_events.emit(services, ops_events.PLAN_APPROVED, mission, subject_id=plan_id, version=plan["version"],
+                          data={"plan_id": plan_id, "approval_id": approval["id"]})
     return approval
 
 
@@ -724,28 +730,30 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
                    "provider_id": None, "error": None, "created_at": now_iso()}
         await services.store.insert("email_dispatches", attempt)
     else:
-        # Supplier- and buyer-entered text is escaped: it must never become markup in someone's inbox.
-        lines = "".join(f"<li>{row['quantity']} x {escape(row.get('line_description') or row['item'])} at "
-                        f"${escape(str(row['unit_price']))} (deliver by {escape(row['delivery_date'][:10])})</li>"
-                        for row in order["lines"])
+        mission = await services.store.get("missions", order["mission_id"]) or {"name": order["mission_id"]}
+        subject, html, text = templates.purchase_order_email(
+            order, mission, f"{services.settings.frontend_origin.rstrip('/')}/supplier")
         attempt = await record_email(
-            to=order["supplier_email"], subject=f"Purchase order {order['po_number']} from {order['buyer_organization']}",
-            html=(f"<p>{escape(order['buyer_organization'])} issued purchase order <strong>{order['po_number']}</strong> "
-                  f"for delivery to {escape(order['delivery_location'])}:</p><ul>{lines}</ul>"
-                  f"<p>Subtotal ${order['subtotal']} {escape(order['currency'])}. Accept or decline it in your "
-                  f"<a href=\"{services.settings.frontend_origin}/supplier\">ReliefMesh supplier portal</a>.</p>"),
-            kind="purchase_order", entity_id=order_id, services=services,
+            to=order["supplier_email"], subject=subject, html=html, text=text,
+            attachments=(Attachment(f"{order['po_number']}.pdf", documents.purchase_order_pdf(order)),),
+            kind="purchase_order", entity_id=order_id, services=services, organization_id=order["organization_id"],
         )
-    if attempt["status"] not in {"sent", "skipped_test_supplier"}:
+    # "test" = EMAIL_MODE=test captured the rendered PO without sending (test environments only).
+    if attempt["status"] not in {"sent", "skipped_test_supplier", "test"}:
         order["send_error"] = attempt["error"]
         await services.store.replace("purchase_orders", order_id, order)
         raise HTTPException(status_code=502, detail="Purchase order email was not delivered; the failure was recorded")
     order.update(status="sent", sent_at=now_iso(),
                  delivery={key: attempt.get(key) for key in ("provider", "status", "message_id", "sent_at", "error")})
-    order["events"].append({"status": "sent", "at": now_iso(), "actor_id": user["id"]})
+    order["events"].append({"status": "sent", "at": now_iso(), "actor_id": user["id"],
+                            "email_delivery": attempt["status"], "email_provider": attempt.get("provider")})
     await services.store.replace("purchase_orders", order_id, order)
     await audit("purchase_order.sent", user["id"], order["organization_id"], order["mission_id"], "purchase_order",
                 order_id, services)
+    mission = await services.store.get("missions", order["mission_id"])
+    if mission:
+        await ops_events.emit(services, ops_events.PURCHASE_ORDER_SENT, mission, subject_id=order_id,
+                              data={"order_id": order_id})
     return order
 
 
@@ -766,7 +774,10 @@ async def supplier_response(order_id: str, payload: SupplierResponseRequest, use
         await notify(services, mission, "po_response",
                      f"{order['po_number']} was {'accepted' if payload.accepted else 'declined'} by the supplier.",
                      "success" if payload.accepted else "warning", {"order_id": order_id})
-        if not payload.accepted:
+        if payload.accepted:
+            await ops_events.emit(services, ops_events.PURCHASE_ORDER_ACCEPTED, mission, subject_id=order_id,
+                                  data={"order_id": order_id})
+        else:
             reason = f": {payload.reason}" if payload.reason else ""
             await supplier_backed_out(services, mission, order, user, f"declined {order['po_number']}{reason}")
     return order
@@ -782,7 +793,8 @@ async def supplier_backed_out(services: Services, mission: dict, order: dict, us
     label = (supplier or {}).get("legal_name") or user["email"]
     quote = max(quotes, key=lambda row: row["created_at"])
     _, job = await apply_quote_change(services, quote, mission, user["id"], kind="withdrawn",
-                                      summary=f"{label} {what}", withdraw=True)
+                                      summary=f"{label} {what}", withdraw=True,
+                                      failure_type="Supplier backed out of an issued purchase order")
     await audit("quote.withdrawn", user["id"], mission["organization_id"], mission["id"], "quote", quote["id"],
                 services, {"job_id": job["id"], "cause": what, "purchase_order_id": order["id"]})
 
@@ -806,6 +818,9 @@ async def update_fulfillment(order_id: str, payload: FulfillmentUpdateRequest, u
     if mission:
         await notify(services, mission, "fulfillment", f"{order['po_number']}: {payload.status} - {payload.note}",
                      "warning" if payload.status == "cancelled" else "info", {"order_id": order_id})
+        await ops_events.emit(services, ops_events.FULFILLMENT_UPDATED, mission, subject_id=order_id,
+                              version=len(order["events"]),
+                              data={"order_id": order_id, "status": payload.status, "note": payload.note})
         if payload.status == "cancelled":
             await supplier_backed_out(services, mission, order, user,
                                       f"cancelled fulfillment of {order['po_number']}: {payload.note}")
@@ -816,21 +831,7 @@ async def update_fulfillment(order_id: str, payload: FulfillmentUpdateRequest, u
 async def purchase_order_pdf(order_id: str, user: dict = Depends(current_user),
                              services: Services = Depends(get_services)) -> Response:
     order = await purchase_order_access(order_id, user, services)
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    pdf.setTitle(order["po_number"])
-    pdf.drawString(72, 740, f"ReliefMesh Purchase Order {order['po_number']}")
-    pdf.drawString(72, 720, f"Buyer: {order['buyer_organization']}")
-    pdf.drawString(72, 700, f"Supplier: {order['supplier_email']}")
-    pdf.drawString(72, 680, f"Delivery: {order['delivery_location']}")
-    y = 650
-    for line in order["lines"]:
-        pdf.drawString(72, y, f"{line['item']}: {line['quantity']} x {line['unit_price']} = {line['line_cost']}")
-        y -= 20
-    pdf.drawString(72, y - 10, f"Approval reference: {order['approval_id']}")
-    pdf.drawString(72, y - 30, f"Plan v{order.get('plan_version', '?')} hash: {order.get('plan_hash', '')[:32]}")
-    pdf.save()
-    buffer.seek(0)
+    buffer = BytesIO(documents.purchase_order_pdf(order))
     return StreamingResponse(buffer, media_type="application/pdf",
                              headers={"Content-Disposition": f'attachment; filename="{order["po_number"]}.pdf"'})
 
