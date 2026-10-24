@@ -3,6 +3,16 @@ export type PolicyStatus = "PASS" | "WARN" | "NEEDS_REVIEW" | "BLOCK";
 
 export type Requirement = { id?: string; item: string; quantity: number };
 
+// Gemini-extracted form pre-fill. Never a quote: the supplier reviews and submits it themselves.
+export type QuoteDraftLine = {
+  requirement_id: string; item: string; available_quantity: number | null; unit_price: string | null; delivery_date: string | null;
+  source_excerpt: string; grounded: boolean; unverified_fields: ("available_quantity" | "unit_price")[];
+};
+export type QuoteDraft = {
+  lines: QuoteDraftLine[]; shipping_cost: string | null; currency: string | null; expires_at: string | null;
+  unmatched_items: string[]; model: string; provenance: "AI_DRAFT"; notice: string;
+};
+
 export type EmergencyEvent = {
   id: string;
   title: string;
