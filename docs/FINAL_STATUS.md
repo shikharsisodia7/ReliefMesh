@@ -15,7 +15,7 @@ Checked against the production MongoDB and the live site after the final deploy.
 | Synthetic emergency data in production | **0** (EONET/NWS/FIRMS/FEMA are fetched live; fixtures exist only in `backend/tests`) |
 | Silent mock API fallbacks | **0** (a failed call returns `UNAVAILABLE`, or `CACHED` real data with its original timestamp) |
 | Demo buttons visible in production | **0** (no Seed / Disrupt / demo-org controls; demo endpoints return 404; production refuses to start with `RELIEFMESH_DEMO_MODE=true`) |
-| Real RFQ email | **VERIFIED**: Resend, sender `rfq@send.shikharsisodia.tech`, delivered events recorded with message IDs |
+| Real RFQ email | **VERIFIED**: Resend, sender "ReliefMesh Procurement" on a temporarily verified domain (env `RELIEFMESH_EMAIL_FROM`), delivered events recorded with message IDs |
 | SAM.gov | **NOT_CONFIGURED** (needs a SAM.gov account API key; never substituted) |
 | CRS | **SANDBOX labeled**: only CRS-published test identities are sent; not real-world verification |
 | Solana / x402 | **DEVNET / TEST PAYMENT labeled**: proves machine-to-machine payment; no supplier is paid |
@@ -40,8 +40,8 @@ Found and fixed during verification: the supplier portal's "Save revision" never
 
 ## Known limits
 
-- RFQ emails are delivered (Resend "Delivered"), but inbox placement can suffer until the sending domain gets a DMARC
-  record and links use the sending domain (DNS on `shikharsisodia.tech`, owner action).
+- RFQ emails are delivered (Resend "Delivered"), but inbox placement can suffer until ReliefMesh sends from its own
+  domain with DMARC and matching link domain. The switch is env + DNS only: see [EMAIL_DOMAIN.md](EMAIL_DOMAIN.md).
 - SAM.gov stays NOT_CONFIGURED without a SAM.gov API key.
 - ASI:One chat from the owner's account needs the ASI:One onboarding completed; the agent itself is verified through
   Agentverse's chat-protocol test runner (live EONET answers, refusal of demo actions).

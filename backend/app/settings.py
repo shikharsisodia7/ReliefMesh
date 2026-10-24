@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     # Optional regex for preview deployments, e.g. https://reliefmesh-[a-z0-9-]+\.vercel\.app
     cors_origin_regex: str | None = None
     resend_api_key: SecretStr | None = None
-    email_from: str = "ReliefMesh <rfq@reliefmesh.example>"
+    # The sending domain lives only here (env RELIEFMESH_EMAIL_FROM); it must be a domain verified in Resend.
+    email_from: str = "ReliefMesh Procurement <procurement@reliefmesh.example>"
     expose_invitation_links: bool = False
     auth_rate_limit_per_minute: int = 12
 
@@ -46,7 +47,7 @@ class Settings(BaseSettings):
     crs_evidence_ttl_hours: int = 24 * 7
 
     # Public-data integrations. Keyless sources need no configuration.
-    http_user_agent: str = "ReliefMesh/1.0 (+https://github.com/shikharsisodia7/calhacks)"
+    http_user_agent: str = "ReliefMesh/1.0 (+https://reliefmesh-calhacks.vercel.app)"
     nasa_firms_map_key: SecretStr | None = None
     sam_gov_api_key: SecretStr | None = None
     ofac_sdn_url: str = "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"
