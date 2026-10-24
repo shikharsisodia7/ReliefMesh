@@ -74,6 +74,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
     await page.waitForTimeout(1500);
   }
   await expect(page.getByRole("heading", { name: "Plan v3" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/Total \$2,600\.00/)).toBeVisible();
+  // Units already on sent purchase orders stay committed: the policy change must not re-buy them.
+  await expect(page.getByText(/Committed on POs \$3,466\.00 · New spend \$0\.00/)).toBeVisible();
   await expect(page.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });
