@@ -22,7 +22,6 @@ from typing import Any
 from urllib.parse import urlencode
 
 import httpx
-import jwt
 
 from ..settings import Settings
 from ..store import Store
@@ -32,6 +31,7 @@ from .connections import IntegrationError, TokenVault
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 SCOPES = {
     "gmail": "https://www.googleapis.com/auth/gmail.send",
     "calendar": "https://www.googleapis.com/auth/calendar.app.created",
@@ -76,13 +76,17 @@ def capabilities(granted_scope: str | None) -> dict[str, bool]:
     return {name: scope in granted for name, scope in SCOPES.items()}
 
 
-def account_email(id_token: str | None) -> str | None:
-    if not id_token:
+async def account_email(client: httpx.AsyncClient, access_token: str) -> str | None:
+    """The connected account, as Google's userinfo endpoint reports it for this access token."""
+
+    try:
+        response = await client.get(USERINFO_URL, headers={"Authorization": f"Bearer {access_token}"})
+    except httpx.HTTPError:
         return None
-    # Received directly from Google's token endpoint over TLS (OIDC Core 3.1.3.7), so the
-    # signature check is not what establishes trust here; we only read the email claim.
-    claims = jwt.decode(id_token, options={"verify_signature": False})
-    return claims.get("email") if claims.get("email_verified", True) else None
+    if response.status_code != 200:
+        return None
+    body = response.json()
+    return body.get("email") if body.get("email_verified") else None
 
 
 def _error_code(response: httpx.Response) -> str:

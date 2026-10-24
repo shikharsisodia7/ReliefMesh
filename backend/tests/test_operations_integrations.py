@@ -55,6 +55,9 @@ class FakeProviders:
         host, path = request.url.host, request.url.path
         if host == "oauth2.googleapis.com":
             return self.google_token(request, path)
+        if host == "openidconnect.googleapis.com":  # userinfo for the access token just issued
+            assert request.headers["Authorization"].startswith("Bearer ya29.")
+            return httpx.Response(200, json={"sub": "1", "email": "ops@relief.example.org", "email_verified": True})
         if host == "gmail.googleapis.com":
             message = email.message_from_bytes(base64.urlsafe_b64decode(json.loads(request.content)["raw"]),
                                                policy=policy.default)

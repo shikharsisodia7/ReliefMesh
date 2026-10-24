@@ -205,11 +205,11 @@ async def google_callback(code: str | None = None, state: str | None = None, err
     try:
         async with services.hub.client(timeout=20) as client:
             tokens = await google_auth.exchange_code(client, services.settings, code, record["code_verifier"])
+            email = await google_auth.account_email(client, tokens["access_token"])
     except IntegrationError as exc:
         return RedirectResponse(settings_url(services, organization_id, google="error", reason=str(exc)[:160]),
                                 status_code=303)
     previous = await connections.load(services.store, organization_id, "google") or {}
-    email = google_auth.account_email(tokens.get("id_token"))
     same_account = previous.get("account_email") == email
     connection = {
         "id": connections.connection_id(organization_id, "google"), "organization_id": organization_id,
