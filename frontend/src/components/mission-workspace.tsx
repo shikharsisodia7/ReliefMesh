@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MarketPanel } from "@/components/mission/market-panel";
-import { DisruptionConsole, OptimizerPanel, OrdersPanel, PlanComparison, PlanVersions, Timeline } from "@/components/mission/planning-panels";
+import { DisruptionConsole, OptimizerPanel, OrdersPanel, PaymentsPanel, PlanComparison, PlanVersions, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { ProvenanceBadge, money, when } from "@/components/status-badges";
@@ -75,6 +75,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <PlanComparison plans={plans} approvals={data.approvals.data ?? []} order={supplierOrder} />
         <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={isAdmin} />
         <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
+        <PaymentsPanel payments={data.payments.data ?? []} />
         <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
         <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo fixtures</p>
       </div>

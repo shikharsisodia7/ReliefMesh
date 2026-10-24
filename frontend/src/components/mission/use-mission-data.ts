@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
-  Approval, AuditEvent, AuditVerification, Disruption, Job, Lead, Mission, MissionContext, Notification, Plan,
+  Approval, AuditEvent, AuditVerification, Disruption, Job, Lead, Mission, MissionContext, Notification, Payment, Plan,
   PurchaseOrder, Quote, SupplierRow,
 } from "@/lib/types";
 
@@ -30,11 +30,12 @@ export function useMissionData(missionId: string, token: string | undefined) {
   const verification = useQuery({ queryKey: ["audit-verify", missionId], enabled, refetchInterval: slow, queryFn: get<AuditVerification>(`/v1/missions/${missionId}/audit/verify`) });
   const leads = useQuery({ queryKey: ["leads", missionId], enabled, refetchInterval: slow, queryFn: get<Lead[]>(`/v1/missions/${missionId}/leads`) });
   const invitations = useQuery({ queryKey: ["invitations", missionId], enabled, refetchInterval: slow, queryFn: get<Invitation[]>(`/v1/missions/${missionId}/invitations`) });
+  const payments = useQuery({ queryKey: ["payments", missionId], enabled, refetchInterval: slow, queryFn: get<Payment[]>(`/v1/missions/${missionId}/payments`) });
   const disruptions = useQuery({ queryKey: ["disruptions", missionId], enabled, refetchInterval: fast, queryFn: get<Disruption[]>(`/v1/missions/${missionId}/disruptions`) });
   const orders = useQuery({
     queryKey: ["orders", missionId], enabled: enabled && Boolean(mission.data), refetchInterval: slow,
     queryFn: get<PurchaseOrder[]>(`/v1/purchase-orders?organization_id=${mission.data?.organization_id}&mission_id=${missionId}`),
   });
   const refresh = () => client.invalidateQueries({ predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[1] === missionId });
-  return { mission, context, quotes, plans, approvals, suppliers, notifications, audit, verification, leads, invitations, disruptions, orders, jobs, busy, refresh };
+  return { mission, context, quotes, plans, approvals, suppliers, notifications, audit, verification, leads, invitations, disruptions, payments, orders, jobs, busy, refresh };
 }

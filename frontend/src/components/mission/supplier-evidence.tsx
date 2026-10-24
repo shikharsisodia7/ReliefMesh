@@ -17,6 +17,7 @@ const EVIDENCE_ORDER = [
   ["FDA_RECALLS", "openFDA"],
   ["FEDERAL_AWARDS", "USAspending"],
   ["CRS_VERIFICATION", "CRS"],
+  ["PAID_DOSSIER", "x402 dossier"],
 ] as const;
 const CLEARABLE = new Set(["SANCTIONS_POTENTIAL_MATCH", "SANCTIONS_EXACT_MATCH", "PRODUCT_RECALL_MATCH", "CRS_VERIFICATION"]);
 
@@ -114,7 +115,7 @@ export function SupplierEvidence({ missionId, token, rows, quotes, run, canRevie
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {EVIDENCE_ORDER.map(([type, label]) => {
                     const record = row.latest_evidence[type];
-                    if (!record && type === "CRS_VERIFICATION") return null;
+                    if (!record && (type === "CRS_VERIFICATION" || type === "PAID_DOSSIER")) return null;
                     return (
                       <button key={type} type="button" disabled={!record} onClick={() => record && setDrawer({ record, history: row.evidence_history })} className={`rounded border px-1.5 py-0.5 text-left font-mono text-[10px] ${evidenceTone(record)} ${record ? "hover:bg-accent" : ""}`} title={record?.summary ?? "not checked"}>
                         <span className="font-semibold">{label}</span> {record ? record.status : "NOT CHECKED"} {record && <span className="text-tertiary">· {record.provenance === "LIVE" ? ago(record.retrieved_at) : record.provenance}</span>}
@@ -137,6 +138,7 @@ export function SupplierEvidence({ missionId, token, rows, quotes, run, canRevie
                   <ul className="mt-1 space-y-1">{row.policy.decisions.map((decision) => <li key={decision.rule_id} className="flex gap-1.5"><PolicyBadge value={decision.status} /><span><span className="font-mono text-[10px] text-muted-foreground">{decision.rule_id}</span> {decision.reason}</span></li>)}</ul>
                   {row.reviews.length > 0 && <ul className="mt-2 space-y-0.5 border-t pt-1">{row.reviews.map((entry) => <li key={entry.id} className="text-tertiary">{when(entry.created_at)} · {entry.action}{entry.rule_id ? ` ${entry.rule_id}` : ""}: {entry.reason}</li>)}</ul>}
                 </details>
+                {canReview && row.supplier.legal_name && !row.latest_evidence.PAID_DOSSIER && <Button size="xs" variant="outline" className="mt-2 border-violet-400/40 text-violet-300" onClick={() => void run(async () => { await api(`/v1/missions/${missionId}/suppliers/${row.supplier.id}/premium-dossier`, { method: "POST", token }); })}>Buy signed dossier · 0.01 devnet USDC (x402)</Button>}
                 {canReview && (blocked
                   ? <ReviewForm label="Unblock" onSubmit={(reason) => review(row.supplier.id, { action: "unblock", reason })} />
                   : <details className="mt-1 text-xs"><summary className="cursor-pointer text-critical/80">Block supplier</summary><ReviewForm label="Block" onSubmit={(reason) => review(row.supplier.id, { action: "block", reason })} /></details>)}

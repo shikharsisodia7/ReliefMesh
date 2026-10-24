@@ -157,3 +157,5 @@ export type MissionContext = {
 };
 
 export type IntegrationCheck = { id: string; name: string; category: string; status: "ok" | "degraded" | "not_configured" | "error"; detail: string; provenance: string | null; latency_ms: number; checked_at: string };
+
+export type Payment = { id: string; supplier_id: string; subject_name: string; protocol: string; scheme: string; network: string; network_label: string; asset_symbol: string; amount_display: string; payer: string; pay_to: string; transaction: string; explorer_url: string; status: string; verified: boolean; dossier_sha256: string; evidence_id: string; created_at: string };

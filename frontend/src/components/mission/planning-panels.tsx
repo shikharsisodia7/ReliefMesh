@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL, api } from "@/lib/api";
-import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Mission, Notification, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
+import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Mission, Notification, Payment, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
 
 type Run = (operation: () => Promise<void>) => Promise<void>;
 
@@ -235,6 +235,29 @@ export function OrdersPanel({ orders, token, run, setNotice }: { orders: Purchas
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+export function PaymentsPanel({ payments }: { payments: Payment[] }) {
+  if (payments.length === 0) return null;
+  return (
+    <section aria-label="Machine payments" className="rounded-xl border border-violet-400/30 bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Machine payments · x402 on Solana devnet</h2>
+        <ProvenanceBadge value="SANDBOX" />
+      </div>
+      <p className="mb-2 text-xs text-tertiary">HTTP 402 → signed USDC transfer → facilitator verification and on-chain settlement → evidence unlocked. Devnet test USDC only; procurement funds never move through x402.</p>
+      <ul className="space-y-2">
+        {payments.map((payment) => (
+          <li key={payment.id} className="rounded border p-2 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">Signed dossier: {payment.subject_name}</span><span className="font-mono text-telemetry">{payment.amount_display} · {payment.network_label}</span></div>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">{payment.payer.slice(0, 6)}… → {payment.pay_to.slice(0, 6)}… · {payment.scheme} · {payment.verified ? "settled" : payment.status} · {when(payment.created_at)}</p>
+            <a className="font-mono text-[11px] text-live hover:underline" href={payment.explorer_url} target="_blank" rel="noreferrer">tx {payment.transaction.slice(0, 20)}… ↗</a>
+            <span className="ml-2 font-mono text-[10px] text-tertiary">dossier sha256 {payment.dossier_sha256.slice(0, 12)}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
