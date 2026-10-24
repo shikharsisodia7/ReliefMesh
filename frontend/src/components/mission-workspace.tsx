@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import { useSession } from "@/hooks/use-session";
+import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Mission = { id: string; organization_id: string; name: string; delivery_location: string; delivery_deadline: string; budget: string; requirements: { item: string; quantity: number }[] };
 type Quote = { id: string; supplier_email: string; status: string; shipping_cost: string; lines: { item: string; unit_price: string; available_quantity: number; delivery_date: string }[] };
@@ -25,7 +25,8 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const [supplierEmail, setSupplierEmail] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!session || session.user.role !== "coordinator") router.replace("/sign-in"); }, [router, session]);
+  const hydrated = useHydrated();
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
   const mission = useQuery({ queryKey: ["mission", missionId], enabled: Boolean(session), queryFn: () => api<Mission>(`/v1/missions/${missionId}`, { token: session!.token }) });
   const quotes = useQuery({ queryKey: ["quotes", missionId], enabled: Boolean(session), refetchInterval: 2000, queryFn: () => api<Quote[]>(`/v1/missions/${missionId}/quotes`, { token: session!.token }) });
   const plans = useQuery({ queryKey: ["plans", missionId], enabled: Boolean(session), refetchInterval: 2000, queryFn: () => api<Plan[]>(`/v1/missions/${missionId}/plans`, { token: session!.token }) });

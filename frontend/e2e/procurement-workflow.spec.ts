@@ -71,7 +71,7 @@ test("coordinator and two suppliers complete quote, disruption recovery, approva
   await coordinator.getByRole("button", { name: "Generate POs" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
   await coordinator.getByRole("button", { name: "Confirm & send" }).click();
-  await expect(coordinator.getByText("sent").last()).toBeVisible();
+  await expect(coordinator.getByText("sent", { exact: true })).toBeVisible();
 
   await supplierTwo.reload();
   await expect(supplierTwo.getByRole("button", { name: "Accept" })).toBeVisible();

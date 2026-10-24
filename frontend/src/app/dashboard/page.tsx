@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { clearSession } from "@/lib/session";
-import { useSession } from "@/hooks/use-session";
+import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Organization = { id: string; name: string; membership_role: string };
 type Mission = { id: string; name: string; status: string; delivery_location: string; delivery_deadline: string; budget: string; requirements: { item: string; quantity: number }[] };
@@ -23,7 +23,8 @@ export default function DashboardPage() {
   const session = useSession();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!session || session.user.role !== "coordinator") router.replace("/sign-in"); }, [router, session]);
+  const hydrated = useHydrated();
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
   const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
   const selectedOrganizationId = organizationId ?? organizations.data?.[0]?.id ?? null;
   const missions = useQuery({ queryKey: ["missions", selectedOrganizationId], enabled: Boolean(session && selectedOrganizationId), queryFn: () => api<Mission[]>(`/v1/missions?organization_id=${selectedOrganizationId}`, { token: session!.token }) });

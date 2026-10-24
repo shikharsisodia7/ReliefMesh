@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { clearSession } from "@/lib/session";
-import { useSession } from "@/hooks/use-session";
+import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Invitation = { id: string; status: string; mission: { name: string; delivery_location: string; requirements: { item: string; quantity: number }[] } };
 type Quote = { id: string; mission_id: string; status: string; version: number; shipping_cost: string; expires_at: string; lines: { item: string; available_quantity: number; unit_price: string; delivery_date: string }[] };
@@ -18,7 +18,8 @@ type Order = { id: string; po_number: string; status: string; lines: { item: str
 
 export default function SupplierPage() {
   const router = useRouter(); const session = useSession(); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (!session || session.user.role !== "supplier") router.replace("/sign-in"); }, [router, session]);
+  const hydrated = useHydrated();
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "supplier")) router.replace("/sign-in"); }, [hydrated, router, session]);
   const invitations = useQuery({ queryKey: ["supplier-invitations"], enabled: Boolean(session), queryFn: () => api<Invitation[]>("/v1/supplier/invitations", { token: session!.token }) });
   const quotes = useQuery({ queryKey: ["supplier-quotes"], enabled: Boolean(session), queryFn: () => api<Quote[]>("/v1/supplier/quotes", { token: session!.token }) });
   const orders = useQuery({ queryKey: ["supplier-orders"], enabled: Boolean(session), queryFn: () => api<Order[]>("/v1/purchase-orders", { token: session!.token }) });
