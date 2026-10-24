@@ -212,3 +212,39 @@ async def integrations_status(refresh: bool = False, services: Services = Depend
                "breakers": services.hub.breaker_status()}
     services.status_cache["status"] = (time.monotonic(), payload)
     return payload
+
+
+CRS_PROOF_SECONDS = 900
+_crs_proof_lock = asyncio.Lock()
+
+
+@router.get("/v1/sandbox/crs-proof")
+async def crs_sandbox_proof(services: Services = Depends(get_services)) -> dict[str, Any]:
+    """Live CRS sandbox run on two CRS-published TEST identities (one clean, one mismatched). Never real people."""
+    from ..integrations import crs
+
+    async with _crs_proof_lock:  # one upstream run per cache window, however many viewers
+        cached = services.status_cache.get("crs_proof")
+        if cached and time.monotonic() - cached[0] < CRS_PROOF_SECONDS:
+            return cached[1]
+        settings = services.settings
+        username, password = secret(settings.crs_username), secret(settings.crs_password)
+        results = []
+        for persona_id in ("P01", "P12"):
+            persona = crs.SANDBOX_PERSONAS[persona_id]
+            if not (username and password):
+                results.append({"persona_id": persona_id, "test_identity": persona["name"], "outcome": "not_configured",
+                                "messages": [], "retrieved_at": None})
+                continue
+            result = await crs.verify_identity(services.hub, settings.crs_base_url, username, password, persona_id)
+            outcome = ("verified" if result.data["verified"] else "flagged") if result.ok else "unavailable"
+            results.append({"persona_id": persona_id, "test_identity": persona["name"], "outcome": outcome,
+                            "expected": "verified" if persona["expected"] == "PASS" else "flagged",
+                            "messages": result.data["messages"] if result.ok else [], "error": result.error,
+                            "retrieved_at": result.retrieved_at})
+        payload = {"provider": "CRS Credit API sandbox · TransUnion TruValidate", "provenance": "SANDBOX",
+                   "notice": "CRS-published test identities only. A sponsor-sandbox capability check, not real-world "
+                             "identity verification; real supplier data is never sent.",
+                   "checked_at": now_iso(), "results": results}
+        services.status_cache["crs_proof"] = (time.monotonic(), payload)
+        return payload

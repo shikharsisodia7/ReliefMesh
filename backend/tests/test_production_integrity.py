@@ -65,3 +65,19 @@ async def test_without_demo_mode_there_is_no_demo_tooling_and_missions_start_emp
     assert body["delivery_status"] == "not_configured"
     assert body["delivery"]["sent_at"] is None and "not configured" in body["delivery"]["error"]
     assert body["link_reason"] == "email_not_sent" and body["invitation_url"].endswith(body["token"])
+
+
+@pytest.mark.anyio
+async def test_crs_sandbox_proof_uses_test_identities_and_is_cached() -> None:
+    upstream = FakeUpstream()
+    app = create_app(make_settings(crs_username="sandbox-user", crs_password="sandbox-pass"),
+                     http_transport=httpx.MockTransport(upstream))
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            proof = (await client.get("/v1/sandbox/crs-proof")).json()
+            assert proof["provenance"] == "SANDBOX" and "not real-world" in proof["notice"]
+            outcomes = {row["persona_id"]: row["outcome"] for row in proof["results"]}
+            assert outcomes == {"P01": "verified", "P12": "flagged"}
+            calls = len([url for url in upstream.calls if "identity-manager-verification" in url])
+            await client.get("/v1/sandbox/crs-proof")
+            assert len([url for url in upstream.calls if "identity-manager-verification" in url]) == calls  # cached

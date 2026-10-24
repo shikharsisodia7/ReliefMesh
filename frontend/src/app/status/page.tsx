@@ -11,6 +11,7 @@ import { API_BASE_URL, api } from "@/lib/api";
 import type { IntegrationCheck } from "@/lib/types";
 
 type StatusPayload = { checked_at: string; environment: string; integrations: IntegrationCheck[] };
+type CrsProof = { provider: string; notice: string; checked_at: string; results: { persona_id: string; test_identity: string; outcome: "verified" | "flagged" | "unavailable" | "not_configured"; expected?: string; messages: { code: string; text: string }[]; error?: string | null }[] };
 
 const tone = { ok: "ok", degraded: "warn", not_configured: "idle", error: "critical" } as const;
 const label = { ok: "OPERATIONAL", degraded: "DEGRADED", not_configured: "NOT CONFIGURED", error: "ERROR" } as const;
@@ -18,6 +19,7 @@ const label = { ok: "OPERATIONAL", degraded: "DEGRADED", not_configured: "NOT CO
 export default function StatusPage() {
   const [refresh, setRefresh] = useState(0);
   const status = useQuery({ queryKey: ["integration-status", refresh], queryFn: () => api<StatusPayload>(`/v1/integrations/status${refresh ? "?refresh=true" : ""}`), refetchInterval: 60_000 });
+  const crsProof = useQuery({ queryKey: ["crs-proof"], queryFn: () => api<CrsProof>("/v1/sandbox/crs-proof"), staleTime: 5 * 60_000 });
   const groups = new Map<string, IntegrationCheck[]>();
   for (const check of status.data?.integrations ?? []) groups.set(check.category, [...(groups.get(check.category) ?? []), check]);
   return (
@@ -48,6 +50,24 @@ export default function StatusPage() {
             </ul>
           </section>
         ))}
+        <section aria-label="Sponsor sandbox proof" className="rounded-xl border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Sponsor sandbox proof · {crsProof.data?.provider ?? "CRS Credit API sandbox"}</h2>
+            <ProvenanceBadge value="SANDBOX" />
+          </div>
+          <p className="px-4 pt-3 text-xs text-muted-foreground">{crsProof.data?.notice ?? "Live identity check on CRS-published test identities."}</p>
+          {crsProof.isLoading && <p className="px-4 py-3 text-sm text-muted-foreground">Running the CRS sandbox check…</p>}
+          {crsProof.isError && <p className="px-4 py-3 text-sm text-critical">CRS sandbox check failed: {crsProof.error.message}</p>}
+          <ul className="divide-y divide-border/60">
+            {crsProof.data?.results.map((row) => (
+              <li key={row.persona_id} className="grid gap-1 px-4 py-3 sm:grid-cols-[220px_150px_1fr] sm:items-center">
+                <span className="font-medium">Test identity {row.persona_id} <span className="font-mono text-[11px] text-tertiary">{row.test_identity}</span></span>
+                <span className={`font-mono text-[11px] ${row.outcome === "verified" ? "text-ok" : row.outcome === "flagged" ? "text-warn" : "text-critical"}`}>{row.outcome.toUpperCase()}{row.expected && row.outcome === row.expected ? " · as expected" : ""}</span>
+                <span className="text-sm text-muted-foreground">{row.messages.length ? row.messages.map((m) => `${m.code}: ${m.text}`).join("; ") : row.error ?? (row.outcome === "verified" ? "Name, SSN, DOB and address belong together; no fraud flags" : "")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
         {status.data && <p className="text-xs text-tertiary">Environment {status.data.environment} · checked {ago(status.data.checked_at)}</p>}
       </div>
     </main>
