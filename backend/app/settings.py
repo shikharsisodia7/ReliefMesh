@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     jwt_issuer: str = "reliefmesh-api"
     frontend_origin: str = "http://localhost:3000"
     cors_origins: list[str] = ["http://localhost:3000"]
+    # Optional regex for preview deployments, e.g. https://reliefmesh-[a-z0-9-]+\.vercel\.app
+    cors_origin_regex: str | None = None
     resend_api_key: SecretStr | None = None
     email_from: str = "ReliefMesh <rfq@reliefmesh.example>"
     expose_invitation_links: bool = False
