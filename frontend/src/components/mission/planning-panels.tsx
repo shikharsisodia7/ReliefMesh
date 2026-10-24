@@ -163,7 +163,7 @@ export function PlanComparison({ plans, approvals, order }: { plans: Plan[]; app
   );
 }
 
-export function PlanVersions({ plans, approvals, token, run, setNotice, order, isAdmin }: { plans: Plan[]; approvals: Approval[]; token: string; run: Run; setNotice: (value: string) => void; order: string[]; isAdmin: boolean }) {
+export function PlanVersions({ plans, approvals, token, run, setNotice, order, isAdmin, approvalBlocked }: { plans: Plan[]; approvals: Approval[]; token: string; run: Run; setNotice: (value: string) => void; order: string[]; isAdmin: boolean; approvalBlocked?: string | null }) {
   return (
     <section aria-label="Plan versions" className="rounded-xl border bg-card p-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Plan versions</h2>
@@ -180,6 +180,7 @@ export function PlanVersions({ plans, approvals, token, run, setNotice, order, i
                     <p className="mt-0.5 text-sm text-muted-foreground">Total {money(plan.total_cost)} · Shipping {money(plan.shipping_cost)} · Remaining {money(plan.remaining_budget)}{plan.difference.total_cost_before ? ` · Prior total ${money(plan.difference.total_cost_before)}` : ""}</p>
                   </div>
                   <div className="flex gap-2">
+                    {plan.status === "feasible" && !isAdmin && approvalBlocked && <span className="max-w-xs text-right text-xs text-telemetry">{approvalBlocked}</span>}
                     {plan.status === "feasible" && isAdmin && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/plans/${plan.id}/approve`, { method: "POST", token }); setNotice(`Plan v${plan.version} is approved.`); })}><ShieldCheck className="size-3.5" />Approve plan</Button>}
                     {plan.status === "approved" && approval?.status === "active" && <Button size="sm" onClick={() => void run(async () => { const created = await api<PurchaseOrder[]>(`/v1/plans/${plan.id}/purchase-orders`, { method: "POST", token, headers: { "Idempotency-Key": crypto.randomUUID() } }); setNotice(`${created.length} purchase order draft${created.length === 1 ? "" : "s"} generated. Confirm each send below.`); })}>Generate POs</Button>}
                   </div>

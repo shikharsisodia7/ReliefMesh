@@ -14,7 +14,7 @@ import { ProvenanceBadge, money, when } from "@/components/status-badges";
 import { api } from "@/lib/api";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
-type Organization = { id: string; membership_role: string };
+type Organization = { id: string; membership_role: string; is_demo?: boolean };
 
 export function MissionWorkspace({ missionId }: { missionId: string }) {
   const router = useRouter();
@@ -41,7 +41,12 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const suppliers = data.suppliers.data ?? [];
   const jobs = data.jobs.data ?? [];
   const eligible = suppliers.flatMap((row) => row.quotes).filter((quote) => quote.policy.eligible).length;
-  const isAdmin = organizations.data?.find((organization) => organization.id === mission.organization_id)?.membership_role === "admin";
+  const organization = organizations.data?.find((row) => row.id === mission.organization_id);
+  const isAdmin = organization?.membership_role === "admin";
+  // Segregation of duties: approvers are admins/approvers who did not request this mission (DEMO orgs excepted).
+  const canApprove = (organization?.membership_role === "admin" || organization?.membership_role === "approver")
+    && (mission.created_by !== session.user.id || Boolean(organization?.is_demo));
+  const approvalBlocked = mission.created_by === session.user.id && !organization?.is_demo ? "You requested this mission, so another approver in your organization must approve its plan (segregation of duties)." : null;
   const checking = jobs.some((job) => job.type === "evidence_refresh" && (job.status === "queued" || job.status === "running"));
   const replanning = jobs.some((job) => job.type === "replan" && (job.status === "queued" || job.status === "running"));
   return (
@@ -51,7 +56,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-live">Mission · {mission.delivery_location}</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.name}</h1>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.name}{organization?.is_demo && <span className="ml-3 rounded border border-fuchsia-400/40 px-2 py-0.5 align-middle font-mono text-xs text-fuchsia-300">DEMO ORG</span>}</h1>
             <p className="mt-1 text-muted-foreground">Need {mission.requirements.map((item) => `${item.quantity} ${item.item}`).join(", ")} by {when(mission.delivery_deadline)} · Budget {money(mission.budget)}{mission.created_via === "agent" ? " · created by Fetch.ai agent" : ""}</p>
           </div>
           <div className="flex flex-wrap gap-2 font-mono text-xs">
@@ -73,7 +78,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <OptimizerPanel mission={mission} plan={latest} eligibleCount={eligible} quoteCount={quotes.filter((quote) => quote.status === "submitted").length} busy={replanning} onOptimize={() => void run(async () => { const response = await api<{ plan_id: string; version: number }>(`/v1/missions/${missionId}/optimize`, { method: "POST", token }); setNotice(`Plan v${response.version} computed from current policy-eligible quotes.`); })} />
         {isAdmin && suppliers.length > 0 && <DisruptionConsole missionId={missionId} token={token} rows={suppliers} plan={latest} run={run} disruptions={data.disruptions.data ?? []} setNotice={setNotice} />}
         <PlanComparison plans={plans} approvals={data.approvals.data ?? []} order={supplierOrder} />
-        <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={isAdmin} />
+        <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} />
         <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
         <PaymentsPanel payments={data.payments.data ?? []} />
         <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />

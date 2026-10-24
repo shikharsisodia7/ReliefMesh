@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Invitation = { id: string; status: string; mission: { name: string; delivery_location: string; requirements: { item: string; quantity: number }[] } };
-type Quote = { id: string; mission_id: string; status: string; version: number; shipping_cost: string; expires_at: string; supplier_name?: string | null; lines: { item: string; available_quantity: number; unit_price: string; delivery_date: string }[] };
+type Quote = { id: string; mission_id: string; status: string; version: number; shipping_cost: string; expires_at: string; supplier_name?: string | null; lines: { requirement_id?: string; item: string; available_quantity: number; unit_price: string; delivery_date: string }[] };
 type Order = { id: string; po_number: string; status: string; subtotal?: string; buyer_organization: string; delivery_location: string; lines: { item: string; quantity: number }[]; events: { status: string; note?: string; at: string }[] };
 
 const badge = "rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase";
@@ -29,7 +29,7 @@ export default function SupplierPage() {
   const respond = (orderId: string, accepted: boolean) => attempt(() => api(`/v1/purchase-orders/${orderId}/supplier-response`, { method: "POST", token: session.token, body: JSON.stringify({ accepted }) }), orders.refetch);
   const fulfill = (orderId: string, status: "in_fulfillment" | "completed") => attempt(() => api(`/v1/purchase-orders/${orderId}/fulfillment`, { method: "POST", token: session.token, body: JSON.stringify({ status, note: notes[orderId] || (status === "completed" ? "Delivered to site" : "Shipment dispatched") }) }), orders.refetch);
   const withdraw = (quoteId: string) => attempt(() => api(`/v1/quotes/${quoteId}/withdraw`, { method: "POST", token: session.token }), quotes.refetch);
-  const revise = async (event: React.FormEvent<HTMLFormElement>, quote: Quote) => { event.preventDefault(); const form = new FormData(event.currentTarget); await attempt(() => api(`/v1/quotes/${quote.id}`, { method: "PUT", token: session.token, body: JSON.stringify({ expires_at: new Date(String(form.get("expires_at"))).toISOString(), shipping_cost: Number(form.get("shipping_cost")).toFixed(2), lines: quote.lines.map((line, index) => ({ item: line.item, unit_price: Number(form.get(`price-${index}`)).toFixed(2), available_quantity: Number(form.get(`quantity-${index}`)), delivery_date: line.delivery_date })) }) }), quotes.refetch); };
+  const revise = async (event: React.FormEvent<HTMLFormElement>, quote: Quote) => { event.preventDefault(); const form = new FormData(event.currentTarget); await attempt(() => api(`/v1/quotes/${quote.id}`, { method: "PUT", token: session.token, body: JSON.stringify({ expires_at: new Date(String(form.get("expires_at"))).toISOString(), shipping_cost: Number(form.get("shipping_cost")).toFixed(2), lines: quote.lines.map((line, index) => ({ requirement_id: line.requirement_id ?? null, item: line.item, unit_price: Number(form.get(`price-${index}`)).toFixed(2), available_quantity: Number(form.get(`quantity-${index}`)), delivery_date: line.delivery_date })) }) }), quotes.refetch); };
   return (
     <main className="min-h-screen bg-background">
       <AppHeader email={session.user.email} home="/supplier" label="Supplier" />

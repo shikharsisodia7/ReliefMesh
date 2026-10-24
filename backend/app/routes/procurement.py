@@ -47,25 +47,23 @@ async def register(payload: RegisterRequest, request: Request, services: Service
     }
     await services.store.insert("users", user)
     await audit("user.registered", user["id"], None, None, "user", user["id"], services)
-    await apply_pending_memberships(services, user)
     return {"access_token": create_access_token(user, services.settings), "token_type": "bearer",
             "user": public_user(user)}
 
 
-async def apply_pending_memberships(services: Services, user: dict) -> None:
-    """Organization invitations sent before this coordinator registered take effect on sign-up/sign-in."""
+ORG_INVITE_DAYS = 7
 
-    if user["role"] != "coordinator":
-        return
-    for invite in await services.store.find("org_invites", email=user["email"], status="pending"):
-        if not await services.store.find("memberships", organization_id=invite["organization_id"], user_id=user["id"]):
-            await services.store.insert("memberships", {
-                "id": new_id(), "organization_id": invite["organization_id"], "user_id": user["id"],
-                "role": invite["role"], "created_at": now_iso(), "invited_by": invite["invited_by"]})
-        invite.update(status="accepted", accepted_at=now_iso(), user_id=user["id"])
-        await services.store.replace("org_invites", invite["id"], invite)
-        await audit("organization.member_joined", user["id"], invite["organization_id"], None, "membership",
-                    user["id"], services, {"role": invite["role"]})
+
+async def org_invite_from_token(token: str, services: Services) -> dict:
+    invites = await services.store.find("org_invites", token_hash=token_hash(token))
+    if not invites:
+        raise HTTPException(status_code=404, detail="Organization invitation not found")
+    invite = invites[0]
+    if invite["status"] != "pending":
+        raise HTTPException(status_code=409, detail="This organization invitation was already used")
+    if invite["expires_at"] <= now_iso():
+        raise HTTPException(status_code=410, detail="This organization invitation has expired")
+    return invite
 
 
 @router.post("/v1/auth/login")
@@ -75,7 +73,6 @@ async def login(payload: LoginRequest, request: Request, services: Services = De
     if not users or not users[0].get("password_hash") or not verify_password(payload.password, users[0]["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     user = users[0]
-    await apply_pending_memberships(services, user)
     return {"access_token": create_access_token(user, services.settings), "token_type": "bearer",
             "user": public_user(user)}
 
@@ -111,28 +108,61 @@ async def invite_member(organization_id: str, payload: MemberInviteRequest, user
     existing = await services.store.find("users", email=email_address)
     if existing and existing[0]["role"] != "coordinator":
         raise HTTPException(status_code=409, detail="Supplier accounts cannot join a buyer organization")
+    raw_token = secrets.token_urlsafe(32)
     invite = {"id": new_id(), "organization_id": organization_id, "email": email_address, "role": payload.role,
-              "status": "pending", "invited_by": user["id"], "created_at": now_iso()}
+              "status": "pending", "invited_by": user["id"], "token_hash": token_hash(raw_token),
+              "expires_at": (datetime.now(UTC) + timedelta(days=ORG_INVITE_DAYS)).isoformat(), "created_at": now_iso()}
     await services.store.insert("org_invites", invite)
+    organization = await services.store.get("organizations", organization_id)
+    url = f"{services.settings.frontend_origin}/join/{raw_token}"
+    attempt = await record_email(
+        to=email_address, subject=f"Join {(organization or {}).get('name')} on ReliefMesh",
+        html=f"<p>You were invited as <strong>{payload.role}</strong>.</p><p><a href=\"{url}\">Accept invitation</a></p>",
+        kind="org_invite", entity_id=invite["id"], services=services)
     await audit("organization.member_invited", user["id"], organization_id, None, "org_invite", invite["id"], services,
-                {"email": email_address, "role": payload.role})
-    if existing:
-        await apply_pending_memberships(services, existing[0])
-        invite = await services.store.get("org_invites", invite["id"])
-    return invite
+                {"email": email_address, "role": payload.role, "delivery_status": attempt["status"]})
+    # The secret link goes only to the inviting admin (and the invitee's inbox when email is configured).
+    return {k: v for k, v in invite.items() if k != "token_hash"} | {"invite_url": url,
+                                                                     "delivery_status": attempt["status"]}
+
+
+@router.get("/v1/org-invites/{token}")
+async def get_org_invite(token: str, services: Services = Depends(get_services)) -> dict:
+    invite = await org_invite_from_token(token, services)
+    organization = await services.store.get("organizations", invite["organization_id"])
+    return {"organization": (organization or {}).get("name"), "email": invite["email"], "role": invite["role"],
+            "expires_at": invite["expires_at"]}
+
+
+@router.post("/v1/org-invites/{token}/accept")
+async def accept_org_invite(token: str, user: dict = Depends(current_user),
+                            services: Services = Depends(get_services)) -> dict:
+    invite = await org_invite_from_token(token, services)
+    if user["role"] != "coordinator" or user["email"] != invite["email"]:
+        raise HTTPException(status_code=403, detail="Sign in as the invited coordinator email to accept")
+    if not await services.store.find("memberships", organization_id=invite["organization_id"], user_id=user["id"]):
+        await services.store.insert("memberships", {
+            "id": new_id(), "organization_id": invite["organization_id"], "user_id": user["id"], "role": invite["role"],
+            "created_at": now_iso(), "invited_by": invite["invited_by"]})
+    invite.update(status="accepted", accepted_at=now_iso(), user_id=user["id"])
+    await services.store.replace("org_invites", invite["id"], invite)
+    await audit("organization.member_joined", user["id"], invite["organization_id"], None, "membership", user["id"],
+                services, {"role": invite["role"], "invited_by": invite["invited_by"]})
+    return {"organization_id": invite["organization_id"], "role": invite["role"]}
 
 
 @router.get("/v1/organizations/{organization_id}/members")
 async def list_members(organization_id: str, user: dict = Depends(current_user),
                        services: Services = Depends(get_services)) -> dict:
-    await require_org_member(organization_id, user, services)
+    membership = await require_org_member(organization_id, user, services)
     members = []
     for membership in await services.store.find("memberships", organization_id=organization_id):
         member = await services.store.get("users", membership["user_id"])
         members.append({"user_id": membership["user_id"], "email": (member or {}).get("email"),
                         "role": membership["role"], "joined_at": membership["created_at"]})
-    pending = [i for i in await services.store.find("org_invites", organization_id=organization_id)
-               if i["status"] == "pending"]
+    pending = [{k: v for k, v in i.items() if k != "token_hash"}
+               for i in await services.store.find("org_invites", organization_id=organization_id)
+               if i["status"] == "pending"] if membership["role"] == "admin" else []
     return {"members": members, "pending": pending}
 
 
@@ -491,7 +521,11 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     organization = await services.store.get("organizations", plan["organization_id"])
     assert mission and organization
     self_approval = mission.get("created_by") == user["id"]
-    if self_approval and not organization.get("is_demo"):
+    allocated = {row["supplier_id"] for row in plan["allocations"]}
+    allocated_suppliers = [await services.store.get("suppliers", sid) for sid in allocated]
+    all_test = bool(allocated) and all((row or {}).get("is_demo") for row in allocated_suppliers)
+    demo_override = bool(organization.get("is_demo") and services.settings.demo_controls_enabled and all_test)
+    if self_approval and not demo_override:
         raise HTTPException(status_code=403, detail={
             "code": "SEGREGATION_OF_DUTIES",
             "message": "The coordinator who requested this procurement cannot approve it. Another approver in the "

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
+import { MembersPanel } from "@/components/members-panel";
 import { MissionForm } from "@/components/mission-form";
 import { OrganizationForm } from "@/components/organization-form";
 import { money, when } from "@/components/status-badges";
@@ -15,7 +16,7 @@ import { api } from "@/lib/api";
 import type { Mission } from "@/lib/types";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
-type Organization = { id: string; name: string; membership_role: string };
+type Organization = { id: string; name: string; membership_role: string; is_demo?: boolean };
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -37,7 +38,8 @@ export default function DashboardPage() {
         {error && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
         <Card><CardHeader><CardTitle>Organization</CardTitle><CardDescription>Create or choose the buyer organization that owns this procurement record.</CardDescription></CardHeader><CardContent className="space-y-4">
           <OrganizationForm onSubmit={async (values) => { try { const created = await api<Organization>("/v1/organizations", { method: "POST", body: JSON.stringify(values), token: session.token }); await queryClient.invalidateQueries({ queryKey: ["organizations"] }); setOrganizationId(created.id); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Could not create organization"); } }} />
-          <div className="flex flex-wrap gap-2">{organizations.data?.map((organization) => <Button key={organization.id} size="sm" variant={organization.id === selectedOrganizationId ? "default" : "outline"} onClick={() => setOrganizationId(organization.id)}>{organization.name}</Button>)}</div>
+          <div className="flex flex-wrap gap-2">{organizations.data?.map((organization) => <Button key={organization.id} size="sm" variant={organization.id === selectedOrganizationId ? "default" : "outline"} onClick={() => setOrganizationId(organization.id)}>{organization.name}{organization.is_demo ? " · DEMO" : ""} · {organization.membership_role}</Button>)}</div>
+          {selectedOrganizationId && <MembersPanel organizationId={selectedOrganizationId} token={session.token} isAdmin={organizations.data?.find((organization) => organization.id === selectedOrganizationId)?.membership_role === "admin"} />}
         </CardContent></Card>
         {selectedOrganizationId && <Card><CardHeader><CardTitle>New mission</CardTitle><CardDescription>Link a real emergency, then state exactly what must be bought. Quotes, evidence, and plans stay scoped to this organization.</CardDescription></CardHeader><CardContent>
           <MissionForm onSubmit={async (values) => { try {

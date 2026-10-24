@@ -477,14 +477,20 @@ async def test_segregation_of_duties_in_real_organizations(client: httpx.AsyncCl
     assert (await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(supplier))).status_code == 403
     outsider = await register(client, "outsider@other.example.com", "coordinator")
     assert (await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(outsider))).status_code == 403
-    viewer_email = "viewer@agency.example.com"
-    await client.post(f"/v1/organizations/{org['id']}/members", headers=auth(requester),
-                      json={"email": viewer_email, "role": "coordinator"})
-    viewer = await register(client, viewer_email, "coordinator")  # pending invite applies at registration
+    async def join(email: str, role: str) -> str:
+        invited = (await client.post(f"/v1/organizations/{org['id']}/members", headers=auth(requester),
+                                     json={"email": email, "role": role})).json()
+        member = await register(client, email, "coordinator")
+        token = invited["invite_url"].rsplit("/", 1)[1]
+        squatter = await register(client, f"squatter-{role}@other.example.com", "coordinator")
+        assert (await client.post(f"/v1/org-invites/{token}/accept", headers=auth(squatter))).status_code == 403
+        assert (await client.post(f"/v1/org-invites/{token}/accept", headers=auth(member))).status_code == 200
+        return member
+
+    viewer = await join("viewer@agency.example.com", "coordinator")
+    assert (await client.get(f"/v1/organizations/{org['id']}/members", headers=auth(viewer))).json()["pending"] == []
     assert (await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(viewer))).status_code == 403
-    await client.post(f"/v1/organizations/{org['id']}/members", headers=auth(requester),
-                      json={"email": "approver@agency.example.com", "role": "approver"})
-    approver = await register(client, "approver@agency.example.com", "coordinator")
+    approver = await join("approver@agency.example.com", "approver")
     approved = await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(approver))
     assert approved.status_code == 201 and approved.json()["requested_by"] != approved.json()["approver_id"]
     members = (await client.get(f"/v1/organizations/{org['id']}/members", headers=auth(requester))).json()

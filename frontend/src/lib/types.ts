@@ -1,7 +1,7 @@
 export type Provenance = "LIVE" | "CACHED" | "SANDBOX" | "USER_SUBMITTED" | "SYNTHETIC" | "TEST" | "BLOCKED_EXTERNAL" | "UNAVAILABLE";
 export type PolicyStatus = "PASS" | "WARN" | "NEEDS_REVIEW" | "BLOCK";
 
-export type Requirement = { item: string; quantity: number };
+export type Requirement = { id?: string; item: string; quantity: number };
 
 export type EmergencyEvent = {
   id: string;
@@ -36,6 +36,7 @@ export type Mission = {
   emergency_event?: EmergencyEvent | null;
   emergency_event_error?: string | null;
   created_via?: string;
+  created_by?: string;
 };
 
 export type QuoteLine = { item: string; unit_price: string; available_quantity: number; delivery_date: string; restrictions?: string | null };

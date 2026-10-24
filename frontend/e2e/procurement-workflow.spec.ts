@@ -37,6 +37,24 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
 
   await coordinator.getByPlaceholder("Organization name").fill("Harbor Response");
   await coordinator.getByRole("button", { name: "Create organization" }).click();
+
+  // Coordinator B joins through a single-use invite link and becomes the independent approver.
+  const approverEmail = `approver-${runId}@e2e.example.com`;
+  await coordinator.getByLabel("Member email").fill(approverEmail);
+  await coordinator.getByRole("button", { name: "Add member" }).click();
+  const inviteText = await coordinator.getByText(/Invite link/).textContent();
+  const joinUrl = inviteText?.match(/https?:\/\/\S+/)?.[0];
+  expect(joinUrl).toBeTruthy();
+  const approverContext = await browser.newContext();
+  const approver = await approverContext.newPage();
+  await approver.goto("/sign-up");
+  await approver.getByLabel("Email").fill(approverEmail);
+  await approver.getByLabel("Password").fill("correct horse battery staple");
+  await approver.getByRole("button", { name: "Create coordinator account" }).click();
+  await expect(approver).toHaveURL(/\/dashboard/);
+  await approver.goto(joinUrl!);
+  await approver.getByRole("button", { name: "Accept invitation" }).click();
+  await expect(approver).toHaveURL(/\/dashboard/);
   await coordinator.getByLabel("Mission name").fill("Winter response");
   await coordinator.getByLabel("Delivery location").fill("Oakland, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");
@@ -64,15 +82,22 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await coordinator.getByRole("button", { name: "Run optimization" }).click();
   await expect(coordinator.getByRole("heading", { name: "Plan v1" })).toBeVisible();
   await expect(coordinator.getByText(/Total \$80\.00/)).toBeVisible();
-  await coordinator.getByRole("button", { name: "Approve plan" }).click();
-  await expect(coordinator.getByText("approved", { exact: true }).first()).toBeVisible();
+  // Segregation of duties: the requester has no approve control; Coordinator B approves.
+  await expect(coordinator.getByText(/another approver in your organization must approve/).first()).toBeVisible();
+  await expect(coordinator.getByRole("button", { name: "Approve plan" })).toHaveCount(0);
+  await approver.goto(coordinator.url());
+  await expect(approver.getByRole("heading", { name: "Plan v1" })).toBeVisible();
+  await approver.getByRole("button", { name: "Approve plan" }).click();
+  await expect(approver.getByText("approved", { exact: true }).first()).toBeVisible();
 
   await supplierOne.getByRole("button", { name: "Withdraw quote" }).click();
   await expect(supplierOne.getByText("withdrawn", { exact: true })).toBeVisible();
   await expect(coordinator.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
   await expect(coordinator.getByText(/Total \$90\.00/)).toBeVisible();
   await expect(coordinator.getByText("INVALIDATED", { exact: true })).toBeVisible();
-  await coordinator.getByRole("button", { name: "Approve plan" }).click();
+  await expect(approver.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
+  await approver.getByRole("button", { name: "Approve plan" }).click();
+  await expect(approver.getByText("approved", { exact: true }).first()).toBeVisible();
   await coordinator.getByRole("button", { name: "Generate POs" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
   await coordinator.getByRole("button", { name: "Confirm & send" }).click();

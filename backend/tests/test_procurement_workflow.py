@@ -34,7 +34,12 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     added = await client.post(f"/v1/organizations/{organization_id}/members",
                               json={"email": "approver@reliefmesh.example.com", "role": "approver"},
                               headers=auth(coordinator))
-    assert added.status_code == 201 and added.json()["status"] == "accepted"
+    assert added.status_code == 201 and added.json()["status"] == "pending"
+    join_token = added.json()["invite_url"].rsplit("/", 1)[1]
+    joined = await client.post(f"/v1/org-invites/{join_token}/accept", headers=auth(approver))
+    assert joined.status_code == 200 and joined.json()["role"] == "approver"
+    replay = await client.post(f"/v1/org-invites/{join_token}/accept", headers=auth(approver))
+    assert replay.status_code == 409
     deadline = (datetime.now(UTC) + timedelta(days=10)).isoformat()
     mission = await client.post(
         "/v1/missions",

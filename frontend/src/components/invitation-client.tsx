@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useSession } from "@/hooks/use-session";
 import { api } from "@/lib/api";
 
-type Invitation = { supplier_email: string; status: string; mission: { id: string; name: string; delivery_location: string; delivery_deadline: string; requirements: { item: string; quantity: number }[] } };
+type Invitation = { supplier_email: string; status: string; mission: { id: string; name: string; delivery_location: string; delivery_deadline: string; requirements: { id?: string; item: string; quantity: number }[] } };
 
 export function InvitationClient({ token }: { token: string }) {
   const router = useRouter();
@@ -35,8 +35,8 @@ export function InvitationClient({ token }: { token: string }) {
         {!session ? <p className="text-sm">Sign in with <strong>{invitation.data.supplier_email}</strong> to securely accept this RFQ. <Link className="underline" href="/sign-in">Sign in</Link> or <Link className="underline" href="/sign-up?role=supplier">register as supplier</Link>.</p>
           : session.user.role !== "supplier" ? <p className="text-sm text-critical">This link must be accepted with a supplier account.</p>
           : !active ? <Button onClick={() => void (async () => { try { await api(`/v1/supplier-invitations/${token}/accept`, { method: "POST", token: session.token }); setAccepted(true); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Could not accept invitation"); } })()}>Accept RFQ</Button>
-          : <QuoteForm key={profile.data?.legal_name ?? "new"} item={invitation.data.mission.requirements[0]?.item ?? ""} legalName={profile.data?.legal_name} onSubmit={async (values) => { try {
-              await api("/v1/quotes", { method: "POST", token: session.token, body: JSON.stringify({ invitation_token: token, expires_at: new Date(values.expires_at).toISOString(), currency: "USD", shipping_cost: values.shipping_cost.toFixed(2), supplier_profile: { legal_name: values.legal_name, website: values.website || null }, lines: [{ item: values.item, unit_price: values.unit_price.toFixed(2), available_quantity: values.available_quantity, delivery_date: new Date(values.delivery_date).toISOString() }] }) });
+          : <QuoteForm key={profile.data?.legal_name ?? "new"} requirements={invitation.data.mission.requirements} legalName={profile.data?.legal_name} onSubmit={async (values) => { try {
+              await api("/v1/quotes", { method: "POST", token: session.token, body: JSON.stringify({ invitation_token: token, expires_at: new Date(values.expires_at).toISOString(), currency: "USD", shipping_cost: values.shipping_cost.toFixed(2), supplier_profile: { legal_name: values.legal_name, website: values.website || null }, lines: values.lines.map((line) => ({ requirement_id: line.requirement_id || null, item: line.item, unit_price: line.unit_price.toFixed(2), available_quantity: line.available_quantity, delivery_date: new Date(line.delivery_date).toISOString() })) }) });
               setNotice("Quote submitted. Compliance screening runs automatically; the coordinator optimizes only over screened quotes."); router.push("/supplier");
             } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Quote submission failed"); } }} />}
       </CardContent></Card>

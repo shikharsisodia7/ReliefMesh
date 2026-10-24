@@ -11,6 +11,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByRole("button", { name: "Create coordinator account" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
   await page.getByPlaceholder("Organization name").fill("Bay Area Emergency Logistics");
+  await page.getByLabel("Demo organization (labeled self-approval)").check();
   await page.getByRole("button", { name: "Create organization" }).click();
 
   const eventSelect = page.getByLabel("Real emergency (NASA EONET, open events)");
