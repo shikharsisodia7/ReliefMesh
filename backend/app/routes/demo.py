@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core import (
-    Services, audit, current_user, get_services, new_id, notify, now_iso, require_admin, require_mission_access,
+    Services, audit, current_principal, get_services, new_id, notify, now_iso, require_admin, require_mission_access,
     token_hash,
 )
 from ..jobs import enqueue
@@ -46,12 +46,22 @@ def require_demo(services: Services) -> None:
         raise HTTPException(status_code=403, detail="Demo controls are disabled in this environment")
 
 
+async def require_demo_operator(mission: dict[str, Any], principal: dict[str, Any], services: Services) -> None:
+    """An org admin, or the agent conversation that created this mission (TEST suppliers only)."""
+
+    if principal["role"] == "agent":
+        if mission.get("created_via") != "agent" or mission.get("created_by") != principal["id"]:
+            raise HTTPException(status_code=403, detail="Agents may only run demo controls on missions they created")
+        return
+    await require_admin(mission, principal, services)
+
+
 @router.post("/v1/missions/{mission_id}/demo/seed", status_code=status.HTTP_201_CREATED)
-async def seed_demo_suppliers(mission_id: str, user: dict = Depends(current_user),
+async def seed_demo_suppliers(mission_id: str, user: dict = Depends(current_principal),
                               services: Services = Depends(get_services)) -> dict:
     require_demo(services)
     mission, _ = await require_mission_access(mission_id, user, services)
-    await require_admin(mission, user, services)
+    await require_demo_operator(mission, user, services)
     existing = await services.store.find("suppliers", demo_mission_id=mission_id)
     if existing:
         return {"suppliers": existing, "seeded": False}
@@ -125,11 +135,13 @@ def describe(kind: str, name: str, before: dict[str, Any], after: dict[str, Any]
 
 
 @router.post("/v1/missions/{mission_id}/disruptions", status_code=status.HTTP_202_ACCEPTED)
-async def disrupt_supply_chain(mission_id: str, payload: DisruptionRequest, user: dict = Depends(current_user),
+async def disrupt_supply_chain(mission_id: str, payload: DisruptionRequest, user: dict = Depends(current_principal),
                                services: Services = Depends(get_services)) -> dict:
     require_demo(services)
     mission, _ = await require_mission_access(mission_id, user, services)
-    await require_admin(mission, user, services)
+    await require_demo_operator(mission, user, services)
+    if user["role"] == "agent" and payload.kind == "block_supplier":
+        raise HTTPException(status_code=403, detail="Blocking a supplier is a human policy decision")
     supplier = await services.store.get("suppliers", payload.supplier_id)
     quotes = [q for q in await services.store.find("quotes", mission_id=mission_id, supplier_id=payload.supplier_id)]
     if not supplier or not quotes:
@@ -204,7 +216,7 @@ async def disrupt_supply_chain(mission_id: str, payload: DisruptionRequest, user
 
 
 @router.get("/v1/missions/{mission_id}/disruptions")
-async def list_disruptions(mission_id: str, user: dict = Depends(current_user),
+async def list_disruptions(mission_id: str, user: dict = Depends(current_principal),
                            services: Services = Depends(get_services)) -> list:
     await require_mission_access(mission_id, user, services)
     return sorted(await services.store.find("disruptions", mission_id=mission_id), key=lambda row: row["created_at"],

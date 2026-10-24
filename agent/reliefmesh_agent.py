@@ -45,27 +45,47 @@ HELP = (
     "- `show wildfire events in California` (live NASA EONET)\n"
     "- `status` / `brief` for the current mission (quotes, policy, plan, disruptions)\n"
     "- `run evidence checks` (live OFAC, SAM.gov, openFDA, USAspending)\n"
+    "- `seed test suppliers` (four labeled TEST suppliers with synthetic quotes, screened against live data)\n"
     "- `find suppliers for N95 masks` (Apify discovery; results are leads, never quotes)\n"
     "- `optimize` (deterministic policy + integer optimizer)\n"
     "- `why was Pioneer rejected?`\n"
+    "- `simulate Bayside withdrawing` (a real, persisted disruption on a TEST supplier; ReliefMesh replans itself)\n"
     "I cannot approve spending or send purchase orders. A human coordinator does that in ReliefMesh."
 )
 
 
+PRIVILEGED_SENDERS = {s.strip() for s in os.environ.get("RELIEFMESH_AGENT_PRIVILEGED_SENDERS", "").split(",") if s.strip()}
+MAX_ACTIONS_PER_HOUR = int(os.environ.get("RELIEFMESH_AGENT_MAX_ACTIONS_PER_HOUR", "60"))
+MAX_MISSIONS_PER_HOUR = int(os.environ.get("RELIEFMESH_AGENT_MAX_MISSIONS_PER_HOUR", "5"))
+
+
+class AgentError(Exception):
+    """A failure whose message is safe to show the chat user."""
+
+
 class ReliefMeshClient:
-    def __init__(self, base: str, token: str) -> None:
+    def __init__(self, base: str, token: str, sender: str) -> None:
         self.base = base
-        self.headers = {"Authorization": f"Bearer {token}"}
+        # The sender header scopes every request to missions this chat user created.
+        self.headers = {"Authorization": f"Bearer {token}", "X-Agent-Sender": sender[:120]}
 
     async def call(self, method: str, path: str, body: Any = None) -> Any:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.request(method, f"{self.base}{path}", headers=self.headers, json=body)
-        if response.status_code >= 400:
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.request(method, f"{self.base}{path}", headers=self.headers, json=body)
+        except httpx.HTTPError as exc:
+            raise AgentError("ReliefMesh is temporarily unreachable; please retry in a moment.") from exc
+        if 400 <= response.status_code < 500:
+            # 4xx details are ReliefMesh's user-facing validation/policy messages.
             try:
                 detail = response.json().get("detail")
             except ValueError:
-                detail = response.text[:200]
-            raise RuntimeError(f"ReliefMesh refused ({response.status_code}): {detail}")
+                detail = None
+            if isinstance(detail, list):
+                detail = "; ".join(str(item.get("msg", item)) for item in detail[:3])
+            raise AgentError(f"ReliefMesh declined: {detail or 'request rejected'}")
+        if response.status_code >= 500:
+            raise AgentError("ReliefMesh hit a server error; the attempt was not applied.")
         return response.json()
 
 
@@ -135,6 +155,16 @@ def classify(text: str) -> tuple[str, dict[str, Any]]:
     if match and re.search(r"\b(why|explain)\b", lowered):
         name = re.sub(r"^(?:(?:was|is|did|does|the|supplier|vendor)\s+)+", "", match.group(1).strip(), flags=re.IGNORECASE)
         return "explain", {"supplier": name}
+    if re.search(r"\b(seed|add|load)\b.*\btest\b.*\bsupplier", lowered):
+        return "seed", {}
+    simulated = re.search(r"\b(?:simulate|make|have)\b\s+(?:supplier\s+)?(.+?)\s+(withdraw\w*|pull\w* out|"
+                          r"cut\w*|reduce\w*|rais\w*|increase\w*|delay\w*|slip\w*)", text, re.IGNORECASE)
+    if simulated:
+        verb = simulated.group(2).lower()
+        kind = ("withdraw" if verb.startswith(("withdraw", "pull")) else "reduce_inventory"
+                if verb.startswith(("cut", "reduc")) else "raise_price" if verb.startswith(("rais", "increas"))
+                else "delay_eta")
+        return "simulate", {"supplier": simulated.group(1).strip(), "kind": kind}
     if re.search(r"\b(evidence|screen|sanction|ofac|compliance)\b", lowered):
         return "evidence", {}
     if re.search(r"\b(find|discover|search|source)\b.*\b(supplier|vendor|lead)s?\b", lowered):
@@ -213,7 +243,7 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
 
     mission = await current_mission(client, ctx, sender)
     if not mission:
-        return "This organization has no missions yet. Try `create a mission for 300 blankets delivered to Oakland, CA under $8,000`."
+        return "You have no missions yet in this conversation. Try `create a mission for 300 blankets delivered to Oakland, CA under $8,000`."
     mission_id = mission["id"]
     remember(ctx, sender, mission_id)
     if intent == "evidence":
@@ -227,6 +257,25 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
             lines.append("Policy changed for: " + "; ".join(f"{c['before']}→{c['after']}" for c in result["policy_changes"])
                          + ". The current plan was invalidated and an autonomous replan was queued.")
         return "\n".join(lines)
+    if intent == "seed":
+        seeded = await client.call("POST", f"/v1/missions/{mission_id}/demo/seed")
+        names = ", ".join(s["legal_name"] for s in seeded["suppliers"])
+        return (f"Added four clearly labeled **TEST** suppliers with synthetic quotes to **{mission['name']}**: {names}. "
+                "Their names are screened against the live OFAC, SAM.gov, openFDA, and USAspending sources now; "
+                "say `run evidence checks` or `optimize` in a few seconds.")
+    if intent == "simulate":
+        brief = await client.call("GET", f"/v1/missions/{mission_id}/brief")
+        needle = args["supplier"].lower()
+        target = next((s for s in brief["suppliers"] if s["is_test"] and any(
+            w in (s["name"] or "").lower() for w in needle.split() if len(w) > 3)), None)
+        if not target:
+            return "I can only simulate disruptions on this mission's TEST suppliers: " + \
+                ", ".join(s["name"] for s in brief["suppliers"] if s["is_test"]) + "."
+        disruption = await client.call("POST", f"/v1/missions/{mission_id}/disruptions",
+                                       {"kind": args["kind"], "supplier_id": target["supplier_id"]})
+        return (f"Disruption applied to persisted state: **{disruption['summary']}**. ReliefMesh marked the current plan "
+                "stale, invalidated its approval, and queued an autonomous replan "
+                f"(job `{(disruption.get('job_id') or '')[:8]}`). Say `what changed` in a few seconds.")
     if intent == "discover":
         job = await client.call("POST", f"/v1/missions/{mission_id}/discovery",
                                 {"query": args.get("query") or "relief supplies", "max_results": 8})
@@ -348,18 +397,41 @@ async def route_with_asi1(text: str) -> tuple[str, dict[str, Any]] | None:
     return call["name"], args
 
 
+def rate_limited(ctx: Context | None, sender: str, bucket: str, limit: int) -> bool:
+    if ctx is None:
+        return False
+    now = datetime.now(timezone.utc).timestamp()
+    key = f"rate:{bucket}:{sender}"
+    recent = [t for t in (ctx.storage.get(key) or []) if now - t < 3600]
+    if len(recent) >= limit:
+        return True
+    ctx.storage.set(key, recent + [now])
+    return False
+
+
 async def answer(text: str, ctx: Context | None = None, sender: str = "local") -> str:
     if not AGENT_TOKEN:
         return "ReliefMesh agent token is not configured on this agent (RELIEFMESH_AGENT_TOKEN)."
+    if rate_limited(ctx, sender, "actions", MAX_ACTIONS_PER_HOUR):
+        return "You have reached this agent's hourly request limit. Please try again later."
     if ctx:
         previous = ctx.storage.get(f"last_text:{sender}") or ""
         ctx.storage.set(f"last_text:{sender}", (previous + " " + text)[-600:])
     routed = await route_with_asi1(text)
     intent, args = routed or classify(text)
+    if intent == "create_mission" and rate_limited(ctx, sender, "missions", MAX_MISSIONS_PER_HOUR):
+        return "You have created the maximum number of missions for this hour."
+    if intent in {"discover"} and PRIVILEGED_SENDERS and sender not in PRIVILEGED_SENDERS:
+        return ("Supplier discovery spends paid Apify credits, so it is limited to authorized coordinators. "
+                "Ask a ReliefMesh admin to run it, or continue with `seed test suppliers`.")
     try:
-        return await run_tool(ReliefMeshClient(API_URL, AGENT_TOKEN), intent, args, ctx, sender)
-    except Exception as exc:
-        return f"I could not complete that: {exc}"
+        return await run_tool(ReliefMeshClient(API_URL, AGENT_TOKEN, sender), intent, args, ctx, sender)
+    except AgentError as exc:
+        return str(exc)
+    except Exception:  # never echo internal details to the chat user
+        if ctx:
+            ctx.logger.exception("tool execution failed")
+        return "Something went wrong on my side; nothing was changed. Please try again."
 
 
 # ----- Agent Chat Protocol wiring -----

@@ -81,6 +81,7 @@ def get_services(request: Request) -> Services:
 
 
 async def current_principal(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     services: Services = Depends(get_services),
 ) -> dict[str, Any]:
@@ -102,6 +103,9 @@ async def current_principal(
             "organization_id": token["organization_id"],
             "scopes": token["scopes"],
             "created_by": token["created_by"],
+            # The agent runtime (the token holder) identifies which chat user it is acting for,
+            # so missions stay isolated between ASI:One users sharing one organization token.
+            "sender": (request.headers.get("X-Agent-Sender") or "")[:120] or None,
             "active": True,
         }
     claims = decode_access_token(raw, services.settings)
@@ -137,6 +141,8 @@ async def require_mission_access(
     if not mission:
         raise HTTPException(status_code=404, detail="Mission not found")
     membership = await require_org_member(mission["organization_id"], user, services)
+    if user.get("role") == "agent" and mission.get("agent_sender") != user.get("sender"):
+        raise HTTPException(status_code=403, detail="This mission belongs to a different agent conversation")
     return mission, membership
 
 

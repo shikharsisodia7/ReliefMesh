@@ -113,6 +113,7 @@ async def create_mission_record(services: Services, payload: MissionCreateReques
         "delivery_state": emergency.state_code(payload.delivery_location),
         "created_by": actor["id"],
         "created_via": "agent" if actor["role"] == "agent" else "web",
+        "agent_sender": actor.get("sender") if actor["role"] == "agent" else None,
         "status": "open",
         "created_at": now_iso(),
     }

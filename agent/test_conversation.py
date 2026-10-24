@@ -29,9 +29,9 @@ async def main(base: str) -> None:
     os.environ["RELIEFMESH_AGENT_TOKEN"] = agent_token["token"]
     import reliefmesh_agent as agent_module  # read env at import
 
-    async def say(text: str) -> str:
-        reply = await agent_module.answer(text)
-        print(f"\n> {text}\n{reply}")
+    async def say(text: str, sender: str = "agent1qjudge") -> str:
+        reply = await agent_module.answer(text, None, sender)
+        print(f"\n[{sender[-8:]}]> {text}\n{reply}")
         return reply
 
     events = await say("show wildfire events")
@@ -41,7 +41,10 @@ async def main(base: str) -> None:
     assert "Created mission" in created
     mission_id = http.get(f"/v1/missions?organization_id={org['id']}", headers=human).json()[0]["id"]
     assert http.get(f"/v1/missions/{mission_id}", headers=human).json()["created_via"] == "agent"
-    http.post(f"/v1/missions/{mission_id}/demo/seed", headers=human)  # human action: TEST suppliers quote
+    other = await say("status", sender="agent1qsomeoneelse")
+    assert "no missions yet" in other  # a different ASI:One user cannot see this mission
+    seeded = await say("seed test suppliers")
+    assert "TEST" in seeded and "Pioneer Logistics Supply" in seeded
     for _ in range(90):
         jobs = http.get(f"/v1/missions/{mission_id}/jobs", headers=human).json()
         if jobs and all(j["status"] in {"succeeded", "failed"} for j in jobs):
@@ -56,10 +59,10 @@ async def main(base: str) -> None:
     approve = http.post(f"/v1/plans/{http.get(f'/v1/missions/{mission_id}/plans', headers=human).json()[0]['id']}/approve",
                         headers=human)
     assert approve.status_code == 201
-    bayside = next(s for s in http.get(f"/v1/missions/{mission_id}/suppliers", headers=human).json()
-                   if s["supplier"]["legal_name"] == "Bayside Relief Supply Co")
-    http.post(f"/v1/missions/{mission_id}/disruptions", headers=human,
-              json={"kind": "withdraw", "supplier_id": bayside["supplier"]["id"]})
+    simulated = await say("simulate Bayside withdrawing")
+    assert "withdrew its quote" in simulated
+    blocked = await say("simulate Golden Gate cutting inventory", sender="agent1qsomeoneelse")
+    assert "no missions yet" in blocked
     for _ in range(60):
         if len(http.get(f"/v1/missions/{mission_id}/plans", headers=human).json()) >= 2:
             break

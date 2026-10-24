@@ -89,7 +89,8 @@ class AgentMissionRequest(APIModel):
 async def agent_overview(principal: dict = Depends(current_principal), services: Services = Depends(get_services)) -> dict:
     require_agent(principal)
     organization = await services.store.get("organizations", principal["organization_id"])
-    missions = sorted(await services.store.find("missions", organization_id=principal["organization_id"]),
+    missions = sorted(await services.store.find("missions", organization_id=principal["organization_id"],
+                                                agent_sender=principal.get("sender")),
                       key=lambda row: row["created_at"], reverse=True)
     summaries = []
     for mission in missions[:10]:
