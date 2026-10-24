@@ -442,7 +442,7 @@ except NameError:
     agent = Agent(
         name="reliefmesh-buyer-agent",
         seed=os.environ.get("AGENT_SEED", "reliefmesh-buyer-agent-local-dev-seed"),
-        port=int(os.environ.get("AGENT_PORT", "8001")),
+        port=int(os.environ.get("PORT") or os.environ.get("AGENT_PORT", "8001")),
         mailbox=True,
         publish_agent_details=True,
         description="Emergency procurement agent: creates missions from real emergencies, screens suppliers against "
