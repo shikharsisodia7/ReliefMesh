@@ -164,7 +164,7 @@ async def nws_alerts(hub: IntegrationHub, *, lat: float | None = None, lon: floa
 
 async def firms_detections(hub: IntegrationHub, map_key: str | None, *, lat: float, lon: float,
                            radius_deg: float = 0.5, days: int = 2,
-                           sensor: str = "VIIRS_SNPP_NRT") -> AdapterResult:
+                           sensor: str = "VIIRS_NOAA20_NRT") -> AdapterResult:
     bbox = f"{lon - radius_deg:.4f},{lat - radius_deg:.4f},{lon + radius_deg:.4f},{lat + radius_deg:.4f}"
     public_url = f"{FIRMS_BASE}/[MAP_KEY]/{sensor}/{bbox}/{days}"
     if not map_key:

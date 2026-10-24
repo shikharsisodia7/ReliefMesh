@@ -12,7 +12,7 @@ from .core import Services
 from .emailing import EmailGateway, ResendEmailGateway, TestEmailGateway
 from .integrations.http import IntegrationHub
 from .jobs import recover_jobs
-from .routes import demo, evidence, intel, market, procurement, status
+from .routes import agent, demo, evidence, intel, market, procurement, status
 from .settings import Settings, get_settings
 from .store import MemoryStore, MongoStore, Store
 from .workflows import register_handlers
@@ -63,7 +63,7 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
     async def health() -> dict[str, str]:
         return {"status": "ok", "storage": runtime_settings.storage_mode}
 
-    for module in (procurement, intel, evidence, market, demo, status):
+    for module in (procurement, intel, evidence, market, demo, agent, status):
         app.include_router(module.router)
     return app
 
