@@ -8,36 +8,15 @@ import pytest
 
 from app.main import create_app
 from app.settings import Settings
+from conftest import auth, register, settle_jobs
 
 
-@pytest.fixture
-async def client() -> httpx.AsyncClient:
-    app = create_app(
-        Settings(
-            app_env="test",
-            storage_mode="memory",
-            jwt_secret="test-secret-that-is-long-enough-to-be-safe",
-            expose_invitation_links=True,
-            frontend_origin="http://localhost:3000",
-        )
-    )
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
-    ) as test_client:
-        yield test_client
+async def screened(client: httpx.AsyncClient, coordinator: str, mission_id: str) -> None:
+    """Suppliers without screening evidence are withheld by policy, so collect it first."""
 
-
-async def register(client: httpx.AsyncClient, email: str, role: str) -> str:
-    response = await client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "correct horse battery staple", "role": role},
-    )
-    assert response.status_code == 201, response.text
-    return response.json()["access_token"]
-
-
-def auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    await settle_jobs(client, coordinator, mission_id)
+    refreshed = await client.post(f"/v1/missions/{mission_id}/evidence/refresh", headers=auth(coordinator))
+    assert refreshed.status_code == 202, refreshed.text
 
 
 @pytest.mark.anyio
@@ -97,6 +76,7 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
             "expires_at": quote_deadline,
             "shipping_cost": "10.00",
             "lines": [{"item": "blankets", "unit_price": "7.00", "available_quantity": 10, "delivery_date": delivery}],
+            "supplier_profile": {"legal_name": "Northwind Blanket Co", "country": "US"},
         },
         headers=auth(supplier_one),
     )
@@ -108,6 +88,7 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
             "expires_at": quote_deadline,
             "shipping_cost": "0.00",
             "lines": [{"item": "blankets", "unit_price": "9.00", "available_quantity": 10, "delivery_date": delivery}],
+            "supplier_profile": {"legal_name": "Harbor Textile Supply", "country": "US"},
         },
         headers=auth(supplier_two),
     )
@@ -116,6 +97,7 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     private_quote = await client.get(f"/v1/quotes/{second_quote.json()['id']}", headers=auth(supplier_one))
     assert private_quote.status_code == 403
 
+    await screened(client, coordinator, mission_id)
     optimized = await client.post(f"/v1/missions/{mission_id}/optimize", headers=auth(coordinator))
     assert optimized.status_code == 202, optimized.text
     plan_id = optimized.json()["plan_id"]
@@ -132,7 +114,7 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     assert withdrawn.status_code == 202, withdrawn.text
 
     revised_plan = None
-    for _ in range(40):
+    for _ in range(80):
         plans = await client.get(f"/v1/missions/{mission_id}/plans", headers=auth(coordinator))
         assert plans.status_code == 200
         if len(plans.json()) >= 2:
@@ -142,10 +124,13 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
     assert revised_plan is not None
     assert revised_plan["version"] == 2
     assert revised_plan["total_cost"] == "90.00"
+    assert revised_plan["difference"]["cost_delta"] == "+10.00"
+    assert any("withdrew" in reason for reason in revised_plan["difference"]["why"])
 
     approvals = await client.get(f"/v1/missions/{mission_id}/approvals", headers=auth(coordinator))
     assert approvals.status_code == 200
     assert approvals.json()[0]["status"] == "invalidated"
+    assert "withdrew" in approvals.json()[0]["invalidation_reason"]
 
     revised_approval = await client.post(
         f"/v1/plans/{revised_plan['id']}/approve", headers=auth(coordinator)
@@ -216,10 +201,12 @@ async def test_budget_and_deadline_make_plan_honestly_infeasible(client: httpx.A
             "expires_at": (datetime.now(UTC) + timedelta(hours=12)).isoformat(),
             "shipping_cost": "0.00",
             "lines": [{"item": "masks", "unit_price": "10.00", "available_quantity": 5, "delivery_date": deadline}],
+            "supplier_profile": {"legal_name": "Coastal Mask Works"},
         },
         headers=auth(supplier),
     )
     assert quote.status_code == 201
+    await screened(client, coordinator, mission.json()["id"])
     result = await client.post(f"/v1/missions/{mission.json()['id']}/optimize", headers=auth(coordinator))
     plan = await client.get(f"/v1/plans/{result.json()['plan_id']}", headers=auth(coordinator))
     assert plan.json()["status"] == "infeasible"
