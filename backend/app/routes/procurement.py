@@ -158,15 +158,16 @@ async def accept_org_invite(token: str, user: dict = Depends(current_user),
 @router.get("/v1/organizations/{organization_id}/members")
 async def list_members(organization_id: str, user: dict = Depends(current_user),
                        services: Services = Depends(get_services)) -> dict:
-    membership = await require_org_member(organization_id, user, services)
+    caller = await require_org_member(organization_id, user, services)
     members = []
-    for membership in await services.store.find("memberships", organization_id=organization_id):
-        member = await services.store.get("users", membership["user_id"])
-        members.append({"user_id": membership["user_id"], "email": (member or {}).get("email"),
-                        "role": membership["role"], "joined_at": membership["created_at"]})
+    for row in await services.store.find("memberships", organization_id=organization_id):
+        member = await services.store.get("users", row["user_id"])
+        members.append({"user_id": row["user_id"], "email": (member or {}).get("email"),
+                        "role": row["role"], "joined_at": row["created_at"]})
+    # Pending invites are visible to the calling admin only (never decided by another member's row).
     pending = [{k: v for k, v in i.items() if k != "token_hash"}
                for i in await services.store.find("org_invites", organization_id=organization_id)
-               if i["status"] == "pending"] if membership["role"] == "admin" else []
+               if i["status"] == "pending"] if caller["role"] == "admin" else []
     return {"members": members, "pending": pending}
 
 
