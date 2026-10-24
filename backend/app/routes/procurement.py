@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from html import escape
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -251,7 +252,7 @@ async def create_invitation_record(services: Services, mission: dict, supplier_e
     url = f"{services.settings.frontend_origin}/invitations/{raw_token}"
     attempt = await record_email(
         to=invitation["supplier_email"], subject=f"RFQ invitation: {mission['name']}",
-        html=(f"<p>You have been invited to quote for <strong>{mission['name']}</strong>.</p>"
+        html=(f"<p>You have been invited to quote for <strong>{escape(mission['name'])}</strong>.</p>"
               f"<p><a href=\"{url}\">Open secure RFQ</a></p>"),
         kind="rfq_invitation", entity_id=invitation["id"], services=services,
     )
@@ -719,13 +720,15 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
                    "provider_id": None, "error": None, "created_at": now_iso()}
         await services.store.insert("email_dispatches", attempt)
     else:
-        lines = "".join(f"<li>{row['quantity']} x {row.get('line_description') or row['item']} at "
-                        f"${row['unit_price']} (deliver by {row['delivery_date'][:10]})</li>" for row in order["lines"])
+        # Supplier- and buyer-entered text is escaped: it must never become markup in someone's inbox.
+        lines = "".join(f"<li>{row['quantity']} x {escape(row.get('line_description') or row['item'])} at "
+                        f"${escape(str(row['unit_price']))} (deliver by {escape(row['delivery_date'][:10])})</li>"
+                        for row in order["lines"])
         attempt = await record_email(
             to=order["supplier_email"], subject=f"Purchase order {order['po_number']} from {order['buyer_organization']}",
-            html=(f"<p>{order['buyer_organization']} issued purchase order <strong>{order['po_number']}</strong> "
-                  f"for delivery to {order['delivery_location']}:</p><ul>{lines}</ul>"
-                  f"<p>Subtotal ${order['subtotal']} {order['currency']}. Accept or decline it in your "
+            html=(f"<p>{escape(order['buyer_organization'])} issued purchase order <strong>{order['po_number']}</strong> "
+                  f"for delivery to {escape(order['delivery_location'])}:</p><ul>{lines}</ul>"
+                  f"<p>Subtotal ${order['subtotal']} {escape(order['currency'])}. Accept or decline it in your "
                   f"<a href=\"{services.settings.frontend_origin}/supplier\">ReliefMesh supplier portal</a>.</p>"),
             kind="purchase_order", entity_id=order_id, services=services,
         )
