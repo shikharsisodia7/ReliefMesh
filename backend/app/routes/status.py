@@ -132,8 +132,8 @@ async def check_x402(services: Services) -> tuple[str, str, str | None]:
                    {"encoding": "jsonParsed"}]})
     accounts = ((balance.data or {}).get("result") or {}).get("value") or [] if balance.ok else []
     held = sum(a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0 for a in accounts)
-    return "ok", (f"facilitator supports exact/solana-devnet; treasury {settings.x402_pay_to[:6]}… holds "
-                  f"{held:g} devnet USDC"), "SANDBOX"
+    return "ok", (f"DEVNET TEST PAYMENTS: facilitator supports exact/solana-devnet; treasury {settings.x402_pay_to[:6]}… "
+                  f"holds {held:g} devnet USDC. No real money; suppliers are never paid through x402."), "SANDBOX"
 
 
 async def check_crs(services: Services) -> tuple[str, str, str | None]:
@@ -142,7 +142,8 @@ async def check_crs(services: Services) -> tuple[str, str, str | None]:
     settings = services.settings
     result = await crs.login(services.hub, settings.crs_base_url, secret(settings.crs_username),
                              secret(settings.crs_password))
-    return from_result(result, "sandbox login token active (TransUnion TruValidate identity verification)")
+    return from_result(result, "sponsor SANDBOX: login token active; only CRS-published test identities are ever "
+                                "sent. Not real-world supplier identity verification.")
 
 
 async def check_gemini(services: Services) -> tuple[str, str, str | None]:
@@ -167,8 +168,8 @@ CHECKS: dict[str, tuple[str, str, Check]] = {
     "usaspending": ("USAspending", "evidence", check_usaspending),
     "openfda": ("openFDA", "evidence", check_openfda),
     "apify": ("Apify", "sponsor", check_apify),
-    "crs": ("CRS Credit API sandbox", "sponsor", check_crs),
-    "x402": ("Coinbase x402 · Solana devnet", "sponsor", check_x402),
+    "crs": ("CRS Credit API (sandbox)", "sponsor", check_crs),
+    "x402": ("Coinbase x402 · Solana devnet (test)", "sponsor", check_x402),
     "gemini": ("Google Gemini", "sponsor", check_gemini),
     "resend": ("Resend email", "core", check_resend),
 }

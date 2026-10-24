@@ -18,10 +18,11 @@ authenticated RFQ link. Discovery (Apify) only produces leads. A lead carries no
 supplier only after accepting an RFQ and quoting.
 
 **Are these real suppliers?**
-The judge scenario uses four labeled TEST suppliers with synthetic quotes, so the demo is safe and repeatable. The
-workflow for real suppliers (invite → sign up → quote → withdraw/revise → accept PO → fulfill) is end-to-end tested
-in the browser (`frontend/e2e/procurement-workflow.spec.ts`). TEST suppliers' names still go through the live
-compliance sources.
+Yes, or nothing at all. The production site shows real data only: a new mission starts with 0 suppliers and 0
+quotes until a supplier accepts an emailed RFQ and submits its own binding quote (`USER_SUBMITTED`). Seeded TEST
+suppliers exist only in local/test deployments started with `RELIEFMESH_DEMO_MODE=true`; production refuses to start
+with that flag. The full real workflow (RFQ email → sign up → quote → revise/withdraw → approval → PO → fulfillment)
+was verified on production and is end-to-end tested in the browser.
 
 **What data is real?**
 NASA EONET events, NWS alerts, NASA FIRMS detections, OpenFEMA declarations, the Treasury OFAC SDN and ALT lists,
@@ -29,8 +30,10 @@ openFDA enforcement reports, USAspending awards, Apify Google Maps results, the 
 transaction. Every record shows its provenance badge and retrieval time.
 
 **What is test or sandbox?**
-TEST suppliers and their quotes (`SYNTHETIC`). x402 uses Solana devnet test USDC (`SANDBOX`). CRS returns sandbox
-personas only (`SANDBOX`). SAM.gov shows "not configured" until a SAM API key exists. We never fake it.
+x402 uses Solana devnet test USDC (`SANDBOX`, labeled DEVNET TEST PAYMENT): it proves machine-to-machine payment,
+not that a supplier was paid. CRS is a sponsor sandbox (`SANDBOX`): only CRS-published test identities are ever sent,
+so it is not real-world identity verification. SAM.gov shows "not configured" until a SAM API key exists. We never
+fake any of these. TEST/SYNTHETIC fixtures exist only in automated tests and local demo mode.
 
 **How are suppliers verified?**
 Through name-based public-record screening (OFAC SDN with aliases, SAM.gov registration, openFDA recalls, USAspending

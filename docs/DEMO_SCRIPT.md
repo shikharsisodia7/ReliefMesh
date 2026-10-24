@@ -1,44 +1,47 @@
 # ReliefMesh demo script
 
-Judging is table-side: **3 minutes to pitch, 2 minutes of questions** (Devpost). The core story fits in 2:00; the
-last minute is optional depth. Every number on screen is computed live. Nothing below is a recording or an animation.
+Judging is table-side: **3 minutes to pitch, 2 minutes of questions** (Devpost). The core story fits in 2:00. The live
+site shows **real data only**: there are no seeded suppliers and no "disrupt" button. Suppliers are real accounts
+(for the demo: teammates acting as suppliers from their own inboxes), and the disruption is a real supplier action.
 
-## Before judges arrive (2 minutes, once per session)
+## Before judges arrive (once per session, ~5 minutes)
 
-1. Open `/status`: confirm MongoDB, EONET, NWS, FIRMS, OFAC, openFDA, USAspending, x402 are green (and note honestly
-   which are "not configured").
-2. Sign in as the coordinator. Create a mission: pick a live NASA EONET event, "Shelter blankets", Oakland, CA,
-   deadline +4 days, budget $5,000, 100 blankets. Press **Seed TEST suppliers** and wait for the evidence chips.
-3. Keep a second window on ASI:One with the ReliefMesh Buyer Agent open.
+1. Open `/status`. Every row is a real request made just now; note honestly which say NOT CONFIGURED (SAM.gov).
+2. Coordinator A (you) signs up, creates the organization, and adds Coordinator B as **approver** (invite link by
+   email). B signs up and accepts. A cannot approve A's own missions (segregation of duties).
+3. A creates a mission: pick a live NASA EONET event, "Emergency shelter blankets", 100 blankets, budget $3,000.
+4. Send RFQs to two teammates' email addresses. Each receives a real email (Resend), opens the secure link, signs up
+   as a supplier, and submits a quote, e.g. Supplier A 60 @ $18.50 and Supplier B 100 @ $22.00. Supplier A can paste
+   an existing quote and press **Pre-fill with Gemini**, then review before submitting.
+5. Wait for the evidence chips (live OFAC, openFDA, USAspending). Keep ASI:One open with the ReliefMesh Buyer Agent.
 
 ## 2-minute core
 
 | Time | Say | Do |
 | --- | --- | --- |
-| 0:00–0:15 | "When a wildfire hits, emergency buyers have to source fast from suppliers they've never vetted. Then a supplier drops out and the whole purchase plan breaks." | Mission header |
-| 0:15–0:35 | "This mission is tied to a real, open NASA EONET wildfire. ReliefMesh pulls live NWS alerts, NASA FIRMS satellite fire detections, and FEMA declarations. They inform the operator but never decide what to buy." | Emergency panel: LIVE badges, FIRMS hotspot count |
-| 0:35–0:55 | "Four suppliers quoted. They're labeled TEST, but their names were screened against the live Treasury OFAC list, openFDA, and USAspending. The cheapest one, Pioneer Logistics Supply, fuzzy-matches an SDN entry, so deterministic policy holds it for human review. Missing evidence is never a pass, and no AI made this call." | Pioneer card: OFAC POTENTIAL_MATCH chip → open evidence drawer (SDN #17229) |
-| 0:55–1:15 | "The integer optimizer only sees eligible quotes. It splits the buy across Bayside and Golden Gate for $3,271, under budget and on time. The coordinator approves exactly this plan version." | Run optimization → Plan v1 → Approve |
-| 1:15–1:40 | "Now the judge breaks the supply chain." Hand the judge the mouse: **DISRUPT SUPPLY CHAIN → Bayside withdraws**. "That changed persisted state, the same path a real supplier edit takes." | Plan v1 goes STALE, approval INVALIDATED |
-| 1:40–1:55 | "With no human in the loop, ReliefMesh replans: Golden Gate plus Sierra, $3,466, +$195, and it shows exactly why it changed. The old approval can't buy anything. A human has to approve the new plan." | Before→after panel, cost delta, supplier delta |
-| 1:55–2:00 | "Approve, issue POs, and every step is in a hash-chained audit log." | Approve v2 → Generate POs → chain-verified badge |
+| 0:00–0:15 | "When a wildfire hits, emergency buyers source fast from suppliers they've never vetted. Then a supplier changes terms and the purchase plan breaks." | Mission header |
+| 0:15–0:35 | "This mission is tied to a real, open NASA EONET event, with live NWS alerts, FIRMS fire detections, and FEMA declarations. They inform the buyer; they never decide what to buy." | Emergency panel, LIVE badges |
+| 0:35–0:55 | "Two suppliers answered our emailed RFQ with binding quotes. Each was screened against the live Treasury sanctions list, openFDA, and USAspending. Missing evidence is never a pass, and no AI made the eligibility call." | Supplier cards, evidence chips, USER_SUBMITTED badges |
+| 0:55–1:15 | "The integer optimizer splits the buy for $2,070. I requested this mission, so I can't approve it; my colleague does." | Run optimization → Plan v1 → B approves |
+| 1:15–1:40 | Hand the supplier phone to the judge: "You're Supplier A. Raise your price." **Revise price → $25 → Save revision**. | Supplier portal shows Quote v2 |
+| 1:40–2:00 | "That persisted change made Plan v1 stale and invalidated its approval. ReliefMesh replanned by itself: all 100 from Supplier B, $2,240, +$170, and it says why. A human must approve the new plan before anything is bought." | Recovery panel: STALE → v2, INVALIDATED, reasons |
 
 ## Minute three (pick by judge)
 
-- **Fetch.ai / Hyphenate:** in ASI:One, type `simulate Golden Gate cutting inventory`, then `what changed?`. The agent
-  mutates real state and reports the autonomous replan, and it refuses to approve: "a human coordinator must approve."
-- **x402 / Solana / Coinbase:** press **Buy signed dossier** on Pioneer. The machine gets HTTP 402, pays 0.01 devnet
-  USDC through the x402 facilitator, and unlocks a signed dossier. Click the Solana explorer link for the settled
-  transaction.
-- **Human judgment (Hyphenate "knowing when to ask"):** clear Pioneer's finding with a reason. The plan replans to
-  Pioneer at $2,600. The clearance is audited and bound to that exact evidence ID.
-- **CRS:** (once sandbox credentials are configured) show the CRS identity/fraud evidence chip on a TEST supplier
-  contact.
+- **Purchase orders:** B approves v2, A issues and sends the PO (real email). The supplier accepts, ships, and every step
+  lands in the hash-chained audit log (`chain verified`). If a supplier **declines** a PO or marks **Cannot fulfill**,
+  ReliefMesh replans only the uncovered remainder; units already on active POs stay committed.
+- **Fetch.ai:** in ASI:One ask `show wildfire events in California`, then create a mission by chat. The agent reports only
+  real state ("no supplier quotes have been received yet") and refuses to approve: a human coordinator must.
+- **x402 / Solana (DEVNET TEST PAYMENT):** **Buy signed dossier** on a supplier: HTTP 402, 0.01 devnet USDC through the
+  x402 facilitator, settled on Solana devnet. It proves machine-to-machine payment; no supplier is paid.
+- **CRS (SANDBOX):** `/status` shows the CRS sandbox session. Only CRS-published test identities are ever sent; it is a
+  sponsor-sandbox capability, not real-world identity verification.
 
 ## If something fails live
 
 - An API outage shows `CACHED` (last-known-good, with timestamp) or `UNAVAILABLE`, and policy goes to NEEDS_REVIEW.
   Say so: "this is the fail-closed behavior."
 - A cold start on the free backend tier takes ~50 s. Open `/status` before judges arrive.
-- Backup: `backend/scripts/smoke.py <API_URL>` runs the full disruption-recovery flow headlessly on live data in
-  about 12 s.
+- If an RFQ email is not delivered, ReliefMesh says "Email NOT sent" and shows the secure link to relay by hand
+  (only the invited address can accept it).

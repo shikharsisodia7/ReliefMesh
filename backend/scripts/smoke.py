@@ -1,4 +1,6 @@
-"""End-to-end smoke test against a running ReliefMesh API using LIVE public data sources.
+"""End-to-end smoke test against a DEMO ReliefMesh API (RELIEFMESH_DEMO_MODE=true) using LIVE public data.
+
+Production has no seeded suppliers; verify production with real supplier accounts instead.
 
 Usage: python scripts/smoke.py http://127.0.0.1:8100
 Creates a coordinator + org, picks a real open NASA EONET event, seeds labeled TEST suppliers,

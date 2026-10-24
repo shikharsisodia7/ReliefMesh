@@ -33,7 +33,7 @@ changes, and leaves financial authority with a human.
 | Optimization | `backend/app/optimizer.py` | Codex's MILP, now fed only policy-eligible quotes |
 | Planning, diff, invalidation | `backend/app/planning.py` | plan hash + policy fingerprint; before/after supplier delta and reasons |
 | Background jobs | `backend/app/jobs.py`, `backend/app/workflows.py` | coalescing, attempts/backoff, stuck-job recovery |
-| Judge controls | `backend/app/routes/demo.py` | TEST suppliers + persisted disruptions through the real quote-change path |
+| Demo tooling (dev/test only) | `backend/app/routes/demo.py` | 404 unless `RELIEFMESH_DEMO_MODE=true`; production refuses to start with it |
 | Agent API | `backend/app/routes/agent.py` | scoped tokens; cannot approve, order, or move procurement money |
 | x402 payments | `backend/app/payments/x402_exchange.py`, `routes/payments.py` | official Coinbase x402 SDK, Solana devnet |
 | Fetch.ai agent | `agent/reliefmesh_agent.py` | Agent Chat Protocol, ASI:One routing, hosted or mailbox |
@@ -55,7 +55,7 @@ changes, and leaves financial authority with a human.
 
 Any material change calls `invalidate_for_change(reason)`: plans become `stale`, approvals `invalidated` (reason
 recorded), unsent PO drafts `void`, notifications are written, and a coalesced `replan` job is queued. Triggers:
-supplier quote revision or withdrawal, judge disruptions (withdraw, cut inventory, raise price, delay ETA, block),
+supplier quote revision or withdrawal, a declined PO or cancelled fulfillment (replans keep units already on active POs),
 human review decisions that change a supplier's status, and evidence refreshes that change policy inputs.
 
 ## Trust boundaries
@@ -67,8 +67,8 @@ human review decisions that change a supplier's status, and evidence refreshes t
   calls. The API validates everything, and agent tokens cannot approve, order, block suppliers, or clear findings.
 - **Agent conversations are isolated.** Each ASI:One sender only reaches missions it created (`X-Agent-Sender`,
   enforced in the API). Credit-spending actions are deny-by-default for agent senders.
-- **TEST data is labeled.** Seeded suppliers carry `is_demo` and TEST badges, and their quotes are `SYNTHETIC`. Their
-  evidence is still live: the names are screened against the real sources.
+- **Production is real data only.** No seeded suppliers, simulated disruptions, or demo organizations: those exist only
+  with `RELIEFMESH_DEMO_MODE=true` in local/test deployments, where they carry TEST/SYNTHETIC badges.
 - **Audit is tamper-evident, not immutable.** Each event hashes its predecessor. `/audit/verify` recomputes the chain.
 
 ## Provenance vocabulary

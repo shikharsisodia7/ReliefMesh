@@ -19,8 +19,9 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 
 1. A coordinator links a mission to a **live NASA EONET event** and sees live NWS alerts, NASA FIRMS fire
    detections, and OpenFEMA declarations for that location.
-2. Suppliers are discovered (**Apify** Google Maps actor → leads only) and invited by single-use RFQ links. Each
-   supplier signs up and submits a **binding quote** mapped to stable requirement IDs.
+2. Suppliers are discovered (**Apify** Google Maps actor → leads only) and invited by **real RFQ email** (Resend) with a
+   single-use secure link. Each supplier signs up and submits its own **binding quote** mapped to stable requirement IDs
+   (optionally pre-filled by **Gemini** from a pasted quote, every value grounded in the pasted text and reviewed).
 3. Every supplier's legal name is screened against the **Treasury OFAC SDN list**, **openFDA** enforcement
    reports, **USAspending** awards, and **SAM.gov**. Its authorized signer is identity-checked through the
    **CRS sandbox** (TransUnion TruValidate). Every evidence record shows provenance and retrieval time.
@@ -30,7 +31,7 @@ replans by itself when a supplier fails, and leaves financial authority with an 
    and concentration constraints.
 6. An **independent approver** approves the exact plan version. The requester cannot self-approve. Approvals are
    bound to the plan hash, expire, and work once.
-7. When a supplier withdraws, cuts inventory, raises price, slips delivery, or gets blocked, the plan goes
+7. When a supplier revises or withdraws its quote, declines a PO, cancels fulfillment, or gets blocked, the plan goes
    **stale**, the approval is **revoked**, unsent PO drafts are voided, and a background job **replans**. The UI
    shows old vs new plan, why it changed, cost delta, and supplier delta. A new approval is required.
 8. Purchase orders are issued idempotently, sent only after explicit confirmation, and accepted and fulfilled by
@@ -45,9 +46,10 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 | Data | Provenance |
 | --- | --- |
 | NASA EONET, NWS, NASA FIRMS, OpenFEMA, OFAC SDN/ALT, openFDA, USAspending, Apify results | `LIVE` (or `CACHED` last-known-good with its original timestamp) |
-| CRS identity verification | `SANDBOX`, using CRS-provided test personas only (never real personal data) |
-| x402 payments | Solana **devnet** test USDC (`SANDBOX`). No real money or procurement funds |
-| Judge-scenario suppliers and quotes | labeled `TEST` / `SYNTHETIC`. Their names still go through live screening |
+| CRS identity verification | sponsor `SANDBOX`: CRS-published test identities only, never real supplier data; not real-world verification |
+| x402 payments | **DEVNET TEST PAYMENT** (`SANDBOX`): proves machine-to-machine payment; no real money, no supplier is paid |
+| Suppliers and quotes | real accounts only (`USER_SUBMITTED`); a new mission starts with 0 suppliers and 0 quotes |
+| Demo tooling (seeded TEST suppliers, simulated disruptions) | local/test only with `RELIEFMESH_DEMO_MODE=true`; production refuses to start with it |
 | Supplier-entered quotes | `USER_SUBMITTED` |
 | SAM.gov | `NOT CONFIGURED` until a SAM API key exists (never faked) |
 
@@ -62,6 +64,8 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 - **Coinbase x402 + Solana**: official x402 Python SDK. Exact scheme on `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
   through the x402.org facilitator ([payments/x402_exchange.py](backend/app/payments/x402_exchange.py)). Example settled tx:
   [`3bd8HVQj…c87Es`](https://explorer.solana.com/tx/3bd8HVQjv5eqGCDsMUKreueZe9YygUXHxbrqBmQztrro1amRN1g9EdeVN76chKSwNfgyuUmNeP6Q7EKq45sc87Es?cluster=devnet).
+- **Google Gemini** (free tier): grounded quote-draft assistant; drafts are never stored or submitted without review.
+- **Resend**: RFQ and purchase-order email with provider message IDs recorded per delivery.
 - **MongoDB Atlas**: production system of record (M0, us-west-2).
 
 ## Run locally
@@ -86,7 +90,8 @@ Copy `backend/.env.example` for optional keys (FIRMS, SAM.gov, CRS sandbox, Apif
 cd backend && python -m pytest            # 31 tests: policy, evidence, SoD, requirement IDs, x402 guards, audit chain, abuse cases
 cd frontend && npm test && npm run lint && npm run build
 cd frontend && npx playwright test        # two-supplier flow with an independent approver + live-data judge scenario
-python backend/scripts/smoke.py https://reliefmesh-api.onrender.com   # production disruption/recovery on live data
+python backend/scripts/smoke.py http://127.0.0.1:8000                 # demo deployments only (RELIEFMESH_DEMO_MODE=true)
+python agent/test_conversation_production.py http://127.0.0.1:8000     # agent against a non-demo API: no invented data
 python agent/test_conversation.py http://localhost:8000                # agent conversation against a running API
 ```
 
