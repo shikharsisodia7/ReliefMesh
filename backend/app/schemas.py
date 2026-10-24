@@ -119,6 +119,10 @@ class QuoteCreateRequest(APIModel):
         return value.upper()
 
 
+class QuoteDraftRequest(APIModel):
+    text: str = Field(min_length=20, max_length=12_000)
+
+
 class QuoteUpdateRequest(APIModel):
     expires_at: datetime
     currency: str = Field(default="USD", min_length=3, max_length=3)

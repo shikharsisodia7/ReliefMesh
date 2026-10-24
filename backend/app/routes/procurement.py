@@ -16,17 +16,17 @@ from reportlab.pdfgen import canvas
 
 from ..auth import create_access_token, hash_password, verify_password
 from ..core import (
-    Services, audit, current_principal, current_user, get_services, invitation_from_token, new_id, notify, now_iso,
+    Services, audit, secret, current_principal, current_user, get_services, invitation_from_token, new_id, notify, now_iso,
     public_user, record_email, require_admin, require_mission_access, require_org_member, token_hash, verify_chain,
 )
-from ..integrations import emergency
+from ..integrations import emergency, gemini
 from ..jobs import enqueue
 from ..planning import compute_plan, evaluate_mission, plan_hash
 from ..requirements import assign_quote_lines, new_requirement_id
 from ..schemas import (
     CreateOrganizationRequest, FulfillmentUpdateRequest, InvitationCreateRequest, LoginRequest, MemberInviteRequest,
     MissionCreateRequest,
-    PurchaseOrderSendRequest, QuoteCreateRequest, QuoteUpdateRequest, RegisterRequest, SupplierProfileInput,
+    PurchaseOrderSendRequest, QuoteCreateRequest, QuoteDraftRequest, QuoteUpdateRequest, RegisterRequest, SupplierProfileInput,
     SupplierResponseRequest,
 )
 from ..workflows import apply_quote_change
@@ -319,6 +319,32 @@ async def accept_invitation(token: str, user: dict = Depends(current_user),
     await audit("rfq.accepted", user["id"], invitation["organization_id"], invitation["mission_id"], "invitation",
                 invitation["id"], services)
     return {"invitation_id": invitation["id"], "mission_id": invitation["mission_id"], "status": invitation["status"]}
+
+
+@router.post("/v1/supplier-invitations/{token}/quote-draft")
+async def draft_quote_from_text(token: str, payload: QuoteDraftRequest, user: dict = Depends(current_user),
+                                services: Services = Depends(get_services)) -> dict:
+    """Gemini pre-fills the quote form from pasted text. Nothing is stored; the supplier still submits."""
+    invitation = await invitation_from_token(token, services)
+    if user["role"] != "supplier" or invitation.get("accepted_by_user_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Supplier invitation access denied")
+    mission = await services.store.get("missions", invitation["mission_id"])
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    services.assist_limiter.check(f"quote-draft:{user['id']}")
+    result = await gemini.draft_quote(services.hub, secret(services.settings.gemini_api_key),
+                                      services.settings.gemini_model, payload.text, mission)
+    if result.status == "BLOCKED_EXTERNAL":
+        raise HTTPException(status_code=503, detail={"code": "GEMINI_NOT_CONFIGURED", "message": result.error})
+    if not result.ok:
+        raise HTTPException(status_code=502, detail={"code": "GEMINI_UNAVAILABLE",
+                                                     "message": "The quote assistant is unavailable; fill the form "
+                                                                "manually."})
+    await audit("quote.draft_extracted", user["id"], invitation["organization_id"], invitation["mission_id"],
+                "invitation", invitation["id"], services,
+                {"model": result.meta.get("model"), "text_chars": len(payload.text), "lines": len(result.data["lines"])})
+    return {**result.data, "model": result.meta.get("model"), "provenance": "AI_DRAFT",
+            "notice": "Draft extracted by Gemini from your text. Review every field before submitting."}
 
 
 async def apply_profile(services: Services, supplier: dict, profile: SupplierProfileInput) -> tuple[dict, bool]:

@@ -39,6 +39,8 @@ class FakeUpstream:
     ofac_down: bool = False
     fda_firms: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
+    gemini_answer: dict[str, Any] = field(default_factory=dict)
+    gemini_requests: list[dict[str, Any]] = field(default_factory=list)
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -71,6 +73,12 @@ class FakeUpstream:
                 body = json.loads(request.content)
                 messages = [{"code": "2201", "text": "SSN issued to a different name"}] if body.get("ssn") == "666701012" else []
                 return httpx.Response(200, json={"addOnProducts": [{"idManagerVerification": {"messages": messages}}]})
+        if host == "generativelanguage.googleapis.com":  # Gemini stand-in: replays the scripted structured answer
+            if request.method == "GET":
+                return httpx.Response(200, json={"name": path.split("/v1beta/")[-1]})
+            self.gemini_requests.append(json.loads(request.content))
+            return httpx.Response(200, json={"modelVersion": "gemini-test", "usageMetadata": {"totalTokenCount": 42},
+                                             "candidates": [{"content": {"parts": [{"text": json.dumps(self.gemini_answer)}]}}]})
         if host == "www.fema.gov":
             return httpx.Response(200, json={"DisasterDeclarationsSummaries": []})
         raise httpx.ConnectError(f"no network in tests: {url}", request=request)

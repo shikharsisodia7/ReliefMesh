@@ -40,15 +40,16 @@ def public_user(user: dict[str, Any]) -> dict[str, Any]:
 
 
 class RateLimiter:
-    def __init__(self, per_minute: int) -> None:
+    def __init__(self, per_minute: int, message: str = "Too many authentication attempts") -> None:
         self.per_minute = per_minute
+        self.message = message
         self.events: dict[str, list[float]] = defaultdict(list)
 
     def check(self, client_key: str) -> None:
         loop_time = asyncio.get_running_loop().time()
         events = [time for time in self.events[client_key] if loop_time - time < 60]
         if len(events) >= self.per_minute:
-            raise HTTPException(status_code=429, detail="Too many authentication attempts")
+            raise HTTPException(status_code=429, detail=self.message)
         events.append(loop_time)
         self.events[client_key] = events
 
@@ -60,6 +61,7 @@ class Services:
         self.email = email
         self.hub = hub
         self.rate_limiter = RateLimiter(settings.auth_rate_limit_per_minute)
+        self.assist_limiter = RateLimiter(settings.quote_draft_per_minute, "Too many quote drafts; try again in a minute")
         self.jobs: set[asyncio.Task] = set()
         self.audit_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.job_handlers: dict[str, Callable[[Services, dict[str, Any]], Awaitable[dict[str, Any]]]] = {}

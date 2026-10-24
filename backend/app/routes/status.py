@@ -145,6 +145,17 @@ async def check_crs(services: Services) -> tuple[str, str, str | None]:
     return from_result(result, "sandbox login token active (TransUnion TruValidate identity verification)")
 
 
+async def check_gemini(services: Services) -> tuple[str, str, str | None]:
+    from ..integrations import gemini
+
+    key, model = secret(services.settings.gemini_api_key), services.settings.gemini_model
+    if not key:
+        return "not_configured", "RELIEFMESH_GEMINI_API_KEY is not configured (quote assistant hidden)", None
+    result = await services.hub.fetch("gemini", f"{gemini.API_BASE}/models/{model}", headers={"x-goog-api-key": key},
+                                      retries=0, source_url=f"{gemini.API_BASE}/models/{model}")
+    return from_result(result, f"{model} available to the quote-draft assistant (free tier)")
+
+
 CHECKS: dict[str, tuple[str, str, Check]] = {
     "mongodb": ("MongoDB Atlas", "core", check_mongo),
     "nasa_eonet": ("NASA EONET", "open data", check_eonet),
@@ -158,6 +169,7 @@ CHECKS: dict[str, tuple[str, str, Check]] = {
     "apify": ("Apify", "sponsor", check_apify),
     "crs": ("CRS Credit API sandbox", "sponsor", check_crs),
     "x402": ("Coinbase x402 · Solana devnet", "sponsor", check_x402),
+    "gemini": ("Google Gemini", "sponsor", check_gemini),
     "resend": ("Resend email", "core", check_resend),
 }
 

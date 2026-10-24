@@ -65,7 +65,8 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-sonnet-5-5"
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"  # free tier, ~4 s; 2.5 is closed to new projects, 3.8 takes 60 s+
+    quote_draft_per_minute: int = 6
 
     # x402 paid evidence resource (Solana devnet by default; test funds only).
     x402_pay_to: str | None = None
