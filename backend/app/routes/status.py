@@ -108,12 +108,20 @@ async def check_resend(services: Services) -> tuple[str, str, str | None]:
     if not services.settings.resend_api_key:
         return "not_configured", "RELIEFMESH_RESEND_API_KEY is not configured; RFQ emails are recorded as failed", None
     dispatches = await services.store.find("email_dispatches")
-    if not dispatches:
-        return "degraded", "configured; no delivery attempted yet", None
-    last = max(dispatches, key=lambda row: row["created_at"])
-    if last["status"] == "sent":
-        return "ok", f"last delivery accepted by Resend at {last['created_at'][:19]}Z", "LIVE"
-    return "error", f"last delivery failed: {last.get('error')}", None
+    if dispatches:
+        last = max(dispatches, key=lambda row: row["created_at"])
+        if last["status"] == "sent":
+            return "ok", f"last delivery accepted by Resend at {last['created_at'][:19]}Z", "LIVE"
+        return "error", f"last delivery failed: {last.get('error')}", None
+    # No delivery yet on this deployment: authenticate without sending (a request with no recipient is rejected
+    # by validation, 422, only after the key is accepted; a bad key gets 401).
+    async with services.hub.client(timeout=15) as client:
+        response = await client.post("https://api.resend.com/emails", json={
+            "from": services.settings.email_from, "to": [], "subject": "status probe", "html": "<p>probe</p>"},
+            headers={"Authorization": f"Bearer {services.settings.resend_api_key.get_secret_value()}"})
+    if response.status_code == 422:
+        return "ok", "API key accepted by Resend (no-send probe); no email sent from this deployment yet", "LIVE"
+    return "error", f"Resend rejected the API key (HTTP {response.status_code})", None
 
 
 async def check_x402(services: Services) -> tuple[str, str, str | None]:
