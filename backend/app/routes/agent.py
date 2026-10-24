@@ -130,6 +130,17 @@ def explain_supplier(plan: dict[str, Any], query: str) -> dict[str, Any]:
         if needle in (row.get("legal_name") or "").lower() or needle in (row.get("email") or "").lower() or needle == sid
     ]
     if not matches:
+        # Fall back to the supplier sharing the most meaningful words with the query.
+        stop = {"the", "a", "an", "supplier", "vendor", "allocation", "allocated", "quote", "why", "was", "is", "co",
+                "inc", "llc", "company", "supply", "supplies"}
+        words = {w for w in needle.replace("'s", "").split() if w not in stop and len(w) > 2}
+        scored = sorted(
+            ((len(words & set((row.get("legal_name") or "").lower().split())), sid, row) for sid, row in suppliers.items()),
+            key=lambda entry: -entry[0],
+        )
+        if scored and scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+            matches = [(scored[0][1], scored[0][2])]
+    if not matches:
         return {"found": False, "message": f"No supplier matching '{query}' participates in plan v{plan['version']}."}
     sid, row = matches[0]
     name = row.get("legal_name") or row.get("email")

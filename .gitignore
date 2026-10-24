@@ -17,3 +17,8 @@ backend/*.log
 backend/.env
 frontend/.env.local
 Thumbs.db
+
+# Agent runtime
+agent/.venv/
+agent/**/__pycache__/
+agent/*.log
