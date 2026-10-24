@@ -14,7 +14,7 @@ export function AppHeader({ email, home, label }: { email?: string; home: string
         <div className="flex items-center gap-5">
           <Link className="font-mono text-sm font-bold tracking-[0.2em]" href={home}>RELIEF<span className="text-live">MESH</span></Link>
           {label && <span className="hidden text-xs uppercase tracking-[0.16em] text-muted-foreground sm:inline">{label}</span>}
-          <nav className="flex items-center gap-3 text-sm text-muted-foreground"><Link className="hover:text-foreground" href={home}>Missions</Link><Link className="hover:text-foreground" href="/status">System status</Link></nav>
+          <nav className="flex items-center gap-3 text-sm text-muted-foreground"><Link className="hover:text-foreground" href={home}>Missions</Link>{home === "/dashboard" && <Link className="hover:text-foreground" href="/settings/integrations">Integrations</Link>}<Link className="hover:text-foreground" href="/status">System status</Link></nav>
         </div>
         <div className="flex items-center gap-3 text-sm">
           {email && <span className="hidden text-muted-foreground md:block">{email}</span>}
