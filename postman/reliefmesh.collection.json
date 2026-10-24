@@ -1,0 +1,49 @@
+{
+  "info": {
+    "name": "ReliefMesh Procurement API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Runnable regression requests for the procurement vertical slice. The authoritative HTTP schema is available from the running FastAPI service at /openapi.json."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "coordinatorToken", "value": "" },
+    { "key": "organizationId", "value": "" },
+    { "key": "missionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('reports healthy', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json().status).to.eql('ok');"] } }]
+    },
+    {
+      "name": "Register coordinator",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"coordinator@example.com\",\n  \"password\": \"correct horse battery staple\",\n  \"role\": \"coordinator\"\n}" },
+        "url": "{{baseUrl}}/v1/auth/register"
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns a bearer session', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('coordinatorToken', pm.response.json().access_token);"] } }]
+    },
+    {
+      "name": "Create organization",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{coordinatorToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"name\": \"Harbor Response\" }" },
+        "url": "{{baseUrl}}/v1/organizations"
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('creates an organization', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('organizationId', pm.response.json().id);"] } }]
+    },
+    {
+      "name": "Run optimization",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{coordinatorToken}}" }],
+        "url": "{{baseUrl}}/v1/missions/{{missionId}}/optimize"
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('accepts a deterministic planning run', () => pm.response.to.have.status(202));", "pm.expect(pm.response.json()).to.have.property('plan_id');"] } }]
+    }
+  ]
+}

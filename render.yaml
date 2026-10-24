@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: reliefmesh-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: RELIEFMESH_APP_ENV
+        value: production
+      - key: RELIEFMESH_STORAGE_MODE
+        value: mongo
+      - key: RELIEFMESH_MONGODB_URI
+        sync: false
+      - key: RELIEFMESH_JWT_SECRET
+        generateValue: true
+      - key: RELIEFMESH_FRONTEND_ORIGIN
+        sync: false
+      - key: RELIEFMESH_CORS_ORIGINS
+        sync: false
+      - key: RELIEFMESH_RESEND_API_KEY
+        sync: false
+      - key: RELIEFMESH_EMAIL_FROM
+        sync: false

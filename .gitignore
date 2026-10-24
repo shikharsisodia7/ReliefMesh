@@ -1,0 +1,19 @@
+# JavaScript
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+
+# Python
+backend/.venv/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.log
+
+# Environment and operating-system files
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+Thumbs.db
