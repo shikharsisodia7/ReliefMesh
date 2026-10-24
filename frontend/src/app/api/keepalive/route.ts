@@ -1,8 +1,19 @@
 import { connection } from "next/server";
 
-// Vercel Cron target: keeps the free-tier Render API warm so judges never hit a cold start.
+// Vercel Cron target: keeps the free-tier Render API and Fetch.ai agent warm so judges never hit a cold start.
 // Vercel sends `Authorization: Bearer $CRON_SECRET` to cron routes; anything else is refused.
 const noStore = { "Cache-Control": "no-store, private" };
+
+async function ping(url: string) {
+  const started = Date.now();
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(55_000) });
+    return { status: response.status, ms: Date.now() - started };
+  } catch (error) {
+    console.error("keepalive: unreachable", url, error);
+    return { status: "unreachable", ms: Date.now() - started };
+  }
+}
 
 export async function GET(request: Request) {
   await connection(); // always evaluated per request, never cached
@@ -11,12 +22,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401, headers: noStore });
   }
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-  const started = Date.now();
-  try {
-    const response = await fetch(`${base}/health`, { cache: "no-store", signal: AbortSignal.timeout(55_000) });
-    return Response.json({ api: response.status, ms: Date.now() - started }, { headers: noStore });
-  } catch (error) {
-    console.error("keepalive: API unreachable", error);
-    return Response.json({ api: "unreachable", ms: Date.now() - started }, { status: 502, headers: noStore });
-  }
+  const agent = process.env.AGENT_HEALTH_URL;
+  const [api, agentStatus] = await Promise.all([ping(`${base}/health`), agent ? ping(agent) : Promise.resolve(null)]);
+  return Response.json({ api, agent: agentStatus }, { status: api.status === 200 ? 200 : 502, headers: noStore });
 }
