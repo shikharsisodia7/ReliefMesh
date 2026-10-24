@@ -1,5 +1,4 @@
 // Vercel Cron target: keeps the free-tier Render API warm so judges never hit a cold start.
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
