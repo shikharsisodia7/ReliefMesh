@@ -22,6 +22,7 @@ from ..core import (
 from ..integrations import emergency
 from ..jobs import enqueue
 from ..planning import compute_plan, evaluate_mission, plan_hash
+from ..requirements import assign_quote_lines, new_requirement_id
 from ..schemas import (
     CreateOrganizationRequest, FulfillmentUpdateRequest, InvitationCreateRequest, LoginRequest, MissionCreateRequest,
     PurchaseOrderSendRequest, QuoteCreateRequest, QuoteUpdateRequest, RegisterRequest, SupplierProfileInput,
@@ -105,9 +106,13 @@ async def create_mission_record(services: Services, payload: MissionCreateReques
     if payload.delivery_deadline <= datetime.now(UTC):
         raise HTTPException(status_code=422, detail="Delivery deadline must be in the future")
     snapshot, event_error = await resolve_event_snapshot(services, payload.emergency_event_id)
+    body = payload.model_dump(mode="json")
+    body["requirements"] = [{**row, "id": row.get("id") or new_requirement_id()} for row in body["requirements"]]
+    if len({row["id"] for row in body["requirements"]}) != len(body["requirements"]):
+        raise HTTPException(status_code=422, detail="Requirement IDs must be unique")
     mission = {
         "id": new_id(),
-        **payload.model_dump(mode="json"),
+        **body,
         "emergency_event": snapshot,
         "emergency_event_error": event_error,
         "delivery_state": emergency.state_code(payload.delivery_location),
@@ -273,6 +278,10 @@ async def submit_quote(payload: QuoteCreateRequest, user: dict = Depends(current
         raise HTTPException(status_code=422, detail="Quote expiration must be in the future")
     if await services.store.find("quotes", invitation_id=invitation["id"]):
         raise HTTPException(status_code=409, detail="Use the quote update endpoint to revise this submission")
+    mission = await services.store.get("missions", invitation["mission_id"])
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    lines = assign_quote_lines([line.model_dump(mode="json") for line in payload.lines], mission)
     supplier = await ensure_supplier(services, user)
     if payload.supplier_profile:
         supplier, _ = await apply_profile(services, supplier, payload.supplier_profile)
@@ -287,15 +296,15 @@ async def submit_quote(payload: QuoteCreateRequest, user: dict = Depends(current
         "status": "submitted",
         "version": 1,
         "provenance": "SYNTHETIC" if supplier.get("is_demo") else "USER_SUBMITTED",
-        **payload.model_dump(mode="json", exclude={"invitation_token", "supplier_profile"}),
+        **payload.model_dump(mode="json", exclude={"invitation_token", "supplier_profile", "lines"}),
+        "lines": lines,
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
     await services.store.insert("quotes", quote)
     await audit("quote.submitted", user["id"], quote["organization_id"], quote["mission_id"], "quote", quote["id"],
                 services)
-    mission = await services.store.get("missions", quote["mission_id"])
-    if mission and supplier.get("legal_name"):
+    if supplier.get("legal_name"):
         await enqueue(services, "evidence_refresh", mission,
                       trigger={"kind": "quote_submitted", "supplier_id": user["id"], "at": now_iso()})
     return quote
@@ -350,8 +359,10 @@ async def update_quote(quote_id: str, payload: QuoteUpdateRequest, user: dict = 
     assert mission
     supplier = await services.store.get("suppliers", user["id"])
     label = (supplier or {}).get("legal_name") or user["email"]
+    updates = payload.model_dump(mode="json")
+    updates["lines"] = assign_quote_lines(updates["lines"], mission)
     quote, job = await apply_quote_change(services, quote, mission, user["id"], kind="updated",
-                                          summary=f"{label} revised its quote", updates=payload.model_dump(mode="json"))
+                                          summary=f"{label} revised its quote", updates=updates)
     await audit("quote.updated", user["id"], quote["organization_id"], quote["mission_id"], "quote", quote_id, services,
                 {"job_id": job["id"]})
     return {**quote, "replan_job_id": job["id"]}

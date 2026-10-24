@@ -210,7 +210,9 @@ async def test_budget_and_deadline_make_plan_honestly_infeasible(client: httpx.A
     result = await client.post(f"/v1/missions/{mission.json()['id']}/optimize", headers=auth(coordinator))
     plan = await client.get(f"/v1/plans/{result.json()['plan_id']}", headers=auth(coordinator))
     assert plan.json()["status"] == "infeasible"
-    assert plan.json()["shortages"] == [{"item": "masks", "required": 5, "available": 5, "shortage": 0, "reason": "budget"}]
+    requirement_id = mission.json()["requirements"][0]["id"]
+    assert plan.json()["shortages"] == [{"item": "masks", "requirement_id": requirement_id, "required": 5, "available": 5,
+                                         "shortage": 0, "reason": "budget"}]
 
 
 @pytest.mark.anyio

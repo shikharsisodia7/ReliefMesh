@@ -33,6 +33,7 @@ class CreateOrganizationRequest(APIModel):
 
 
 class RequirementInput(APIModel):
+    id: str | None = Field(default=None, pattern=r"^req_[a-z0-9]{6,32}$")
     item: str = Field(min_length=1, max_length=160)
     quantity: int = Field(gt=0, le=1_000_000)
 
@@ -65,6 +66,7 @@ class InvitationCreateRequest(APIModel):
 
 
 class QuoteLineInput(APIModel):
+    requirement_id: str | None = Field(default=None, max_length=80)
     item: str = Field(min_length=1, max_length=160)
     unit_price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     available_quantity: int = Field(gt=0, le=1_000_000)

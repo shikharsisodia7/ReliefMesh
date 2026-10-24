@@ -107,6 +107,7 @@ async def seed_demo_suppliers(mission_id: str, user: dict = Depends(current_prin
         for requirement in mission["requirements"]:
             quantity = max(1, int((Decimal(requirement["quantity"]) * Decimal(spec["share"])).to_integral_value()))
             lines.append({
+                "requirement_id": requirement.get("id"),
                 "item": requirement["item"], "unit_price": f"{cents(base * Decimal(spec['price'])):.2f}",
                 "available_quantity": quantity, "delivery_date": delivery.isoformat(), "restrictions": None,
                 "evidence_url": None,

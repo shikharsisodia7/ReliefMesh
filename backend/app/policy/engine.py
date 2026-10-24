@@ -223,9 +223,10 @@ def _money(value: Any) -> Decimal | None:
 
 
 def quote_decisions(quote: dict[str, Any], mission: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
+    from ..requirements import line_requirement
+
     qid = quote["id"]
     out: list[dict[str, Any]] = []
-    requirements = {row["item"]: int(row["quantity"]) for row in mission["requirements"]}
     deadline = _dt(mission["delivery_deadline"])
     budget = _money(mission["budget"]) or Decimal("0")
 
@@ -243,7 +244,13 @@ def quote_decisions(quote: dict[str, Any], mission: dict[str, Any], now: datetim
     if shipping is None or shipping < 0 or shipping > MAX_UNIT_PRICE:
         out.append(decision("INVALID_SHIPPING", "BLOCK", "HIGH", "Shipping cost is invalid.", "quote", qid))
 
-    relevant = [line for line in quote.get("lines", []) if line.get("item") in requirements]
+    lines = quote.get("lines", [])
+    relevant = [line for line in lines if line_requirement(line, mission)]
+    unmapped = [index + 1 for index, line in enumerate(lines) if not line_requirement(line, mission)]
+    if unmapped:
+        out.append(decision("QUOTE_LINE_REQUIREMENT_MISMATCH", "BLOCK", "HIGH",
+                            f"Quote line(s) {', '.join(map(str, unmapped))} do not map to a mission requirement ID.",
+                            "quote", qid))
     if not relevant:
         out.append(decision("NO_REQUIRED_ITEMS", "BLOCK", "MEDIUM", "Quote offers none of the required items.",
                             "quote", qid))

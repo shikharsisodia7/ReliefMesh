@@ -7,6 +7,8 @@ from typing import Any
 
 import pulp
 
+from .requirements import line_requirement, requirement_map
+
 
 def cents(value: str | Decimal) -> int:
     amount = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -27,7 +29,10 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
 
     now = datetime.now(UTC)
     deadline = _dt(mission["delivery_deadline"])
-    requirements = {row["item"]: int(row["quantity"]) for row in mission["requirements"]}
+    # Coverage is keyed by stable requirement IDs, never by free-text item descriptions.
+    requirement_rows = requirement_map(mission)
+    requirements = {key: int(row["quantity"]) for key, row in requirement_rows.items()}
+    item_name = {key: row["item"] for key, row in requirement_rows.items()}
     rejected: list[dict[str, str]] = []
     candidates: list[tuple[dict[str, Any], int, dict[str, Any]]] = []
 
@@ -40,18 +45,19 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
             continue
         usable_lines = 0
         for index, line in enumerate(quote["lines"]):
-            if line["item"] not in requirements:
-                continue
+            key = line_requirement(line, mission)
+            if key is None:
+                continue  # policy blocks quotes with unmapped lines before they reach the solver
             if _dt(line["delivery_date"]) > deadline:
                 continue
-            candidates.append((quote, index, line))
+            candidates.append((quote, index, {**line, "_requirement": key}))
             usable_lines += 1
         if not usable_lines:
             rejected.append({"quote_id": quote["id"], "reason": "no line meets the delivery requirement"})
 
     available_by_item: dict[str, int] = defaultdict(int)
     for _, _, line in candidates:
-        available_by_item[line["item"]] += int(line["available_quantity"])
+        available_by_item[line["_requirement"]] += int(line["available_quantity"])
 
     problem = pulp.LpProblem("reliefmesh_procurement", pulp.LpMinimize)
     quantities: dict[tuple[str, int], pulp.LpVariable] = {}
@@ -72,9 +78,9 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
         item_variables = [
             quantities[(quote["id"], index)]
             for quote, index, line in candidates
-            if line["item"] == item
+            if line["_requirement"] == item
         ]
-        problem += pulp.lpSum(item_variables) == required, f"coverage_{item}"
+        problem += pulp.lpSum(item_variables) == required, f"coverage_{item.replace(':', '_').replace('-', '_')}"
 
     procurement_cost = pulp.lpSum(
         cents(line["unit_price"]) * quantities[(quote["id"], index)]
@@ -110,14 +116,15 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
         for item, required in requirements.items():
             available = available_by_item[item]
             cheapest = sorted(
-                [cents(line["unit_price"]) for _, _, line in candidates if line["item"] == item]
+                [cents(line["unit_price"]) for _, _, line in candidates if line["_requirement"] == item]
             )
             reason = "inventory" if available < required else "budget"
             if not cheapest:
                 reason = "delivery_or_quote_validity"
             shortages.append(
                 {
-                    "item": item,
+                    "item": item_name[item],
+                    "requirement_id": item,
                     "required": required,
                     "available": available,
                     "shortage": max(0, required - available),
@@ -154,7 +161,9 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
                     "quote_id": quote["id"],
                     "supplier_id": quote["supplier_id"],
                     "supplier_email": quote["supplier_email"],
-                    "item": line["item"],
+                    "item": item_name[line["_requirement"]],
+                    "requirement_id": line["_requirement"],
+                    "line_description": line["item"],
                     "quantity": quantity,
                     "unit_price": line["unit_price"],
                     "line_cost": money(landed),
@@ -167,7 +176,8 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
         for supplier_id, cost in sorted(supplier_costs.items())
     ]
     coverage = [
-        {"item": item, "required": required, "allocated": required} for item, required in requirements.items()
+        {"item": item_name[item], "requirement_id": item, "required": required, "allocated": required}
+        for item, required in requirements.items()
     ]
     binding = []
     if total == cents(mission["budget"]):
