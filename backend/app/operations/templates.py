@@ -56,6 +56,18 @@ def supplier_changes(plan: dict[str, Any]) -> tuple[list[str], list[str]]:
     return removed, added
 
 
+def shortage_text(row: dict[str, Any]) -> str:
+    """One shortage line. A budget shortage has units available but unaffordable, so its count is 0."""
+
+    if row.get("reason") == "budget":
+        return (f"{row['item']}: {row.get('required')} needed and {row.get('available')} quoted, "
+                "but the spending ceiling cannot cover them")
+    return f"{row['item']}: short {row.get('shortage')} ({row.get('reason') or 'no eligible quote'})"
+
+
+INFEASIBLE = "No combination of policy-eligible quotes meets the requirements within the budget and deadline."
+
+
 def supplier_count(plan: dict[str, Any]) -> int:
     return len({row["supplier_id"] for row in plan.get("allocations") or []})
 
@@ -140,11 +152,10 @@ def replan_email(mission: dict[str, Any], plan: dict[str, Any], review_url: str,
     removed, added = supplier_changes(plan)
     if plan["status"] == "infeasible":
         subject = f"Action Required — ReliefMesh Replan V{plan['version']} Is Infeasible"
-        shortages = "<br>".join(esc(f"{s['item']}: short {s.get('shortage')} ({s.get('reason')})")
-                                for s in plan.get("shortages") or []) or "—"
+        shortages = "<br>".join(esc(shortage_text(s)) for s in plan.get("shortages") or []) or "—"
         rows = [("Mission", esc(mission["name"])), ("Plan version", f"V{plan['version']}"),
                 ("Shortages", shortages), ("Reason", esc("; ".join(diff.get("why") or []) or "—"))]
-        intro = "After the disruption no policy-eligible combination of quotes covers the requirements."
+        intro = f"After the disruption: {INFEASIBLE}"
         html_body = _email("Replan is infeasible", intro, rows, ("Open mission", review_url), tone="#b91c1c")
         return subject, html_body, _text(subject, [(k, html.unescape(v)) for k, v in rows], ("Mission", review_url))
     subject = "New Procurement Plan Ready for Approval"
@@ -231,12 +242,11 @@ def slack_disruption(mission: dict[str, Any], disruption: dict[str, Any],
 def slack_replan(mission: dict[str, Any], plan: dict[str, Any], review_url: str) -> tuple[str, list[dict[str, Any]]]:
     diff = plan.get("difference") or {}
     if plan["status"] == "infeasible":
-        shortages = "\n".join(f"• {slack_esc(s['item'])}: short {s.get('shortage')} ({slack_esc(s.get('reason'))})"
-                              for s in plan.get("shortages") or [])
+        shortages = "\n".join(f"• {slack_esc(shortage_text(s))}" for s in plan.get("shortages") or [])
         text = f"⛔ ReliefMesh replan V{plan['version']} is infeasible — {mission['name']}"
         return text, slack_blocks("⛔ Replan is infeasible", [("Mission", slack_esc(mission["name"])),
                                                          ("Plan", f"V{plan['version']}")],
-                             f"No policy-eligible quotes cover the requirements.\n{shortages}",
+                             f"{INFEASIBLE}\n{shortages}",
                              ("Open mission", review_url))
     removed, added = supplier_changes(plan)
     body = (f"Old plan: {money(diff.get('total_cost_before'))}\nNew plan: {money(plan['total_cost'])}\n"
@@ -374,8 +384,7 @@ def calendar_approval(mission: dict[str, Any], plan: dict[str, Any], due: str, u
                   "This event will be replaced when the new plan is ready."],
         "approved": [f"Plan {version} was approved for {money(plan['total_cost'])}.",
                      "Purchase orders can now be issued in ReliefMesh."],
-        "infeasible": ["No policy-eligible quotes cover the requirements after the disruption.",
-                       *[f"  • {s['item']}: short {s.get('shortage')}" for s in plan.get("shortages") or []]],
+        "infeasible": [INFEASIBLE, *[f"  • {shortage_text(s)}" for s in plan.get("shortages") or []]],
     }
     colors = {"stale": "8", "approved": "10", "infeasible": "11"}
     return _calendar_body(titles[state], start, end, details[state], url, mission["delivery_location"],

@@ -712,3 +712,16 @@ def test_allowlist_matches_exact_mailboxes_plus_addresses_and_domains() -> None:
     assert recipient_allowed(settings, "buyer@county.gov")
     for blocked in ("ops@relief.org.evil.com", "other@relief.org", "ops+x@evil.org"):
         assert not recipient_allowed(settings, blocked)
+
+
+def test_budget_infeasibility_is_described_not_reported_as_short_zero() -> None:
+    plan = sample_plan(2, status="infeasible", shortages=[
+        {"item": "blankets", "required": 400, "available": 400, "shortage": 0, "reason": "budget"},
+        {"item": "water", "required": 200, "available": 50, "shortage": 150, "reason": "inventory"}])
+    body = templates.calendar_approval(sample_mission(), plan, "2026-10-29T10:00:00+00:00", "https://rm.app/x",
+                                       "infeasible")
+    assert "short 0" not in body["description"]
+    assert "400 needed and 400 quoted, but the spending ceiling cannot cover them" in body["description"]
+    assert "water: short 150 (inventory)" in body["description"]
+    _, _, text = templates.replan_email(sample_mission(), plan, "https://rm.app/x", None)
+    assert "short 0" not in text and "spending ceiling" in text

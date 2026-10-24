@@ -90,7 +90,7 @@ suppliers = {name: (alias(name), account(alias(name), "supplier")) for name in (
 print("1. Coordinator creates mission -> Calendar delivery deadline")
 mission = call("POST", "/v1/missions", coordinator, json={
     "organization_id": org_id, "name": f"Oakland Shelter Supplies {RUN}", "delivery_location": "Oakland, CA",
-    "delivery_deadline": (datetime.now(UTC) + timedelta(days=4)).isoformat(), "budget": "5000.00",
+    "delivery_deadline": (datetime.now(UTC) + timedelta(days=4)).isoformat(), "budget": "8000.00",
     "currency": "USD", "requirements": [{"item": "blankets", "quantity": 400}, {"item": "water cases", "quantity": 200}]})
 mission_id = mission["id"]
 report(settled(coordinator, mission_id), {"mission_created"})
