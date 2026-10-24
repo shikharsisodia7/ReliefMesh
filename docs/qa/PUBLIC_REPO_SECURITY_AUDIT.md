@@ -1,6 +1,6 @@
 # Public repository security audit
 
-Audited commit set: all 11 reachable commits from `git rev-list --all`, plus the current QA worktree.
+Audited commit set: reachable implementation history through `643a4c1`, plus the current QA worktree.
 
 ## Method
 

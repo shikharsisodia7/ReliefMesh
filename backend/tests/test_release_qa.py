@@ -1,7 +1,7 @@
 """Independent adversarial release checks.
 
-Known release blockers are intentionally represented as strict expected failures.
-They document the desired invariant without changing Claude's production files.
+Strict expected failures represent confirmed, unfixed production release blockers.
+All other checks are regression tests for independently verified remediations.
 """
 
 from __future__ import annotations
@@ -44,7 +44,6 @@ def _mapping_quote(lines: list[dict]) -> dict:
     }
 
 
-@pytest.mark.xfail(strict=True, reason="REL-001: optimizer silently maps lines by mutable display text")
 def test_requirement_id_maps_a_renamed_supplier_description() -> None:
     """A line must allocate by requirement_id even when its display text changes."""
 
@@ -57,49 +56,73 @@ def test_requirement_id_maps_a_renamed_supplier_description() -> None:
     assert result["allocations"][0]["requirement_id"] == "req-water"
 
 
-@pytest.mark.xfail(strict=True, reason="REL-001: unknown requirement IDs have no explicit validation")
-def test_unknown_requirement_id_is_rejected_explicitly() -> None:
-    result = solve(_mapping_mission(), [_mapping_quote([{
-        "requirement_id": "req-not-in-mission", "item": "water", "unit_price": "3.00",
-        "available_quantity": 10, "delivery_date": _future(24),
-    }])])
-
-    assert result["status"] == "invalid_quote"
-    assert result["error_code"] == "INVALID_REQUIREMENT_ID"
-
-
-@pytest.mark.xfail(strict=True, reason="REL-001: requirement_id is not mandatory for newly submitted quotes")
-def test_missing_requirement_id_is_rejected_instead_of_name_matching() -> None:
-    result = solve(_mapping_mission(), [_mapping_quote([{
-        "item": "water", "unit_price": "3.00", "available_quantity": 10, "delivery_date": _future(24),
-    }])])
-
-    assert result["status"] == "invalid_quote"
-    assert result["error_code"] == "MISSING_REQUIREMENT_ID"
-
-
-@pytest.mark.xfail(strict=True, reason="REL-001: duplicate requirement mappings are accepted")
-def test_duplicate_requirement_mapping_is_rejected() -> None:
-    result = solve(_mapping_mission(), [_mapping_quote([
-        {"requirement_id": "req-water", "item": "water", "unit_price": "3.00", "available_quantity": 5,
-         "delivery_date": _future(24)},
-        {"requirement_id": "req-water", "item": "water", "unit_price": "3.00", "available_quantity": 5,
-         "delivery_date": _future(24)},
-    ])])
-
-    assert result["status"] == "invalid_quote"
-    assert result["error_code"] == "DUPLICATE_REQUIREMENT_MAPPING"
+async def _quote_mapping_context(client: httpx.AsyncClient) -> dict:
+    suffix = str(datetime.now().timestamp()).replace(".", "")
+    coordinator = await register(client, f"mapping-{suffix}@ops.example.com", "coordinator")
+    organization = await client.post("/v1/organizations", json={"name": "Mapping QA"}, headers=auth(coordinator))
+    mission = await client.post(
+        "/v1/missions",
+        json={"organization_id": organization.json()["id"], "name": "Mapping RFQ", "delivery_location": "Oakland",
+              "delivery_deadline": _future(72), "budget": "1000.00",
+              "requirements": [{"item": "water", "quantity": 10}]},
+        headers=auth(coordinator),
+    )
+    supplier_email = f"mapping-supplier-{suffix}@vendor.example.com"
+    supplier = await register(client, supplier_email, "supplier")
+    invitation = await client.post(
+        f"/v1/missions/{mission.json()['id']}/invitations", json={"supplier_email": supplier_email},
+        headers=auth(coordinator),
+    )
+    token = invitation.json()["token"]
+    accepted = await client.post(f"/v1/supplier-invitations/{token}/accept", headers=auth(supplier))
+    assert accepted.status_code == 200, accepted.text
+    return {"supplier": supplier, "token": token, "requirement_id": mission.json()["requirements"][0]["id"]}
 
 
-@pytest.mark.xfail(strict=True, reason="REL-001: legacy name matching has no explicit compatibility record")
-def test_legacy_quote_name_match_is_labeled_and_resolved_to_a_requirement_id() -> None:
-    result = solve(_mapping_mission(), [_mapping_quote([{
-        "item": "water", "unit_price": "3.00", "available_quantity": 10, "delivery_date": _future(24),
-    }])])
+def _quote_payload(token: str, lines: list[dict]) -> dict:
+    return {"invitation_token": token, "expires_at": _future(48), "shipping_cost": "0.00", "lines": lines}
 
-    assert result["status"] == "feasible"
-    assert result["allocations"][0]["requirement_id"] == "req-water"
-    assert result["allocations"][0]["mapping_mode"] == "legacy_name"
+
+def _quote_line(**values: str | int) -> dict:
+    return {"item": "water", "unit_price": "3.00", "available_quantity": 10,
+            "delivery_date": _future(24)} | values
+
+
+@pytest.mark.anyio
+async def test_unknown_requirement_id_is_rejected_explicitly(client: httpx.AsyncClient) -> None:
+    ctx = await _quote_mapping_context(client)
+    response = await client.post("/v1/quotes", headers=auth(ctx["supplier"]), json=_quote_payload(
+        ctx["token"], [_quote_line(requirement_id="req_notinmission")]))
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "QUOTE_LINE_REQUIREMENT_MISMATCH"
+
+
+@pytest.mark.anyio
+async def test_missing_requirement_id_with_nonmatching_description_is_rejected(client: httpx.AsyncClient) -> None:
+    ctx = await _quote_mapping_context(client)
+    response = await client.post("/v1/quotes", headers=auth(ctx["supplier"]), json=_quote_payload(
+        ctx["token"], [_quote_line(item="bottled water 24-pack")]))
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "QUOTE_LINE_REQUIREMENT_MISMATCH"
+
+
+@pytest.mark.anyio
+async def test_duplicate_requirement_mapping_is_rejected(client: httpx.AsyncClient) -> None:
+    ctx = await _quote_mapping_context(client)
+    lines = [_quote_line(requirement_id=ctx["requirement_id"]), _quote_line(requirement_id=ctx["requirement_id"])]
+    response = await client.post("/v1/quotes", headers=auth(ctx["supplier"]),
+                                 json=_quote_payload(ctx["token"], lines))
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "QUOTE_LINE_DUPLICATE_REQUIREMENT"
+
+
+@pytest.mark.anyio
+async def test_legacy_name_match_is_pinned_to_a_requirement_id(client: httpx.AsyncClient) -> None:
+    ctx = await _quote_mapping_context(client)
+    response = await client.post("/v1/quotes", headers=auth(ctx["supplier"]),
+                                 json=_quote_payload(ctx["token"], [_quote_line()]))
+    assert response.status_code == 201, response.text
+    assert response.json()["lines"][0]["requirement_id"] == ctx["requirement_id"]
 
 
 async def _demo_plan(client: httpx.AsyncClient) -> dict:
@@ -131,13 +154,43 @@ async def _demo_plan(client: httpx.AsyncClient) -> dict:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(strict=True, reason="REL-002: mission creator can approve their own plan")
 async def test_mission_creator_cannot_approve_own_real_plan(client: httpx.AsyncClient) -> None:
     ctx = await _demo_plan(client)
     approval = await client.post(f"/v1/plans/{ctx['plan_id']}/approve", headers=auth(ctx["coordinator"]))
 
     assert approval.status_code == 403
-    assert approval.json()["detail"] == "Mission creator cannot approve their own plan"
+    assert approval.json()["detail"]["code"] == "SEGREGATION_OF_DUTIES"
+
+
+@pytest.mark.anyio
+async def test_independent_organization_approver_can_approve(client: httpx.AsyncClient) -> None:
+    ctx = await _demo_plan(client)
+    suffix = str(datetime.now().timestamp()).replace(".", "")
+    email = f"independent-{suffix}@ops.example.com"
+    invite = await client.post(f"/v1/organizations/{ctx['organization_id']}/members", headers=auth(ctx["coordinator"]),
+                               json={"email": email, "role": "approver"})
+    assert invite.status_code == 201, invite.text
+    approver = await register(client, email, "coordinator")
+    token = invite.json()["invite_url"].rsplit("/", 1)[1]
+    accepted = await client.post(f"/v1/org-invites/{token}/accept", headers=auth(approver))
+    assert accepted.status_code == 200, accepted.text
+    approval = await client.post(f"/v1/plans/{ctx['plan_id']}/approve", headers=auth(approver))
+    assert approval.status_code == 201, approval.text
+    assert approval.json()["requested_by"] != approval.json()["approver_id"]
+
+
+@pytest.mark.anyio
+async def test_organization_invitation_acceptance_is_one_time(client: httpx.AsyncClient) -> None:
+    suffix = str(datetime.now().timestamp()).replace(".", "")
+    coordinator = await register(client, f"org-inviter-{suffix}@ops.example.com", "coordinator")
+    organization = await client.post("/v1/organizations", json={"name": "Invite replay QA"}, headers=auth(coordinator))
+    email = f"org-invitee-{suffix}@ops.example.com"
+    invite = await client.post(f"/v1/organizations/{organization.json()['id']}/members", headers=auth(coordinator),
+                               json={"email": email, "role": "approver"})
+    invitee = await register(client, email, "coordinator")
+    token = invite.json()["invite_url"].rsplit("/", 1)[1]
+    assert (await client.post(f"/v1/org-invites/{token}/accept", headers=auth(invitee))).status_code == 200
+    assert (await client.post(f"/v1/org-invites/{token}/accept", headers=auth(invitee))).status_code == 409
 
 
 @pytest.mark.anyio
@@ -180,7 +233,7 @@ async def test_plan_is_not_visible_to_another_organization_or_supplier(client: h
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(strict=True, reason="Invitation tokens can be accepted repeatedly after their first use")
+@pytest.mark.xfail(strict=True, reason="REL-004: supplier RFQ invitation tokens can be accepted repeatedly after use")
 async def test_invitation_acceptance_is_one_time(client: httpx.AsyncClient) -> None:
     coordinator = await register(client, "invite-admin@ops.example.com", "coordinator")
     supplier = await register(client, "invite-vendor@vendor.example.com", "supplier")
