@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-async function registerSupplier(context: BrowserContext, email: string, inviteUrl: string, unitPrice: string): Promise<Page> {
+async function registerSupplier(context: BrowserContext, email: string, inviteUrl: string, unitPrice: string, legalName: string): Promise<Page> {
   const page = await context.newPage();
   await page.goto("/sign-up?role=supplier");
   await page.getByLabel("Email").fill(email);
@@ -9,6 +9,7 @@ async function registerSupplier(context: BrowserContext, email: string, inviteUr
   await expect(page).toHaveURL(/\/supplier/);
   await page.goto(inviteUrl);
   await page.getByRole("button", { name: "Accept RFQ" }).click();
+  await page.getByLabel("Legal business name").fill(legalName);
   await page.getByLabel("Item").fill("blankets");
   await page.getByLabel("Available quantity").fill("10");
   await page.getByLabel("Unit price (USD)").fill(unitPrice);
@@ -20,7 +21,8 @@ async function registerSupplier(context: BrowserContext, email: string, inviteUr
   return page;
 }
 
-test("coordinator and two suppliers complete quote, disruption recovery, approval, and PO acceptance", async ({ browser }) => {
+test("coordinator and two suppliers complete quote, screening, disruption recovery, approval, PO acceptance, and fulfillment", async ({ browser }) => {
+  test.setTimeout(120_000);
   const runId = Date.now();
   const coordinatorEmail = `coordinator-${runId}@e2e.example.com`;
   const supplierOneEmail = `first-supplier-${runId}@e2e.example.com`;
@@ -54,19 +56,22 @@ test("coordinator and two suppliers complete quote, disruption recovery, approva
   };
   const firstInvite = await invite(supplierOneEmail);
   const secondInvite = await invite(supplierTwoEmail);
-  const supplierOne = await registerSupplier(await browser.newContext(), supplierOneEmail, firstInvite, "7");
-  const supplierTwo = await registerSupplier(await browser.newContext(), supplierTwoEmail, secondInvite, "9");
+  const supplierOne = await registerSupplier(await browser.newContext(), supplierOneEmail, firstInvite, "7", "Northwind Blanket Company");
+  const supplierTwo = await registerSupplier(await browser.newContext(), supplierTwoEmail, secondInvite, "9", "Harbor Textile Supply");
 
+  // Live OFAC screening must finish before either quote is eligible.
+  await expect(coordinator.getByText(/OFAC NO_MATCH/)).toHaveCount(2, { timeout: 45_000 });
   await coordinator.getByRole("button", { name: "Run optimization" }).click();
-  await expect(coordinator.getByText("Plan v1")).toBeVisible();
+  await expect(coordinator.getByRole("heading", { name: "Plan v1" })).toBeVisible();
   await expect(coordinator.getByText(/Total \$80\.00/)).toBeVisible();
   await coordinator.getByRole("button", { name: "Approve plan" }).click();
-  await expect(coordinator.getByText("approved").first()).toBeVisible();
+  await expect(coordinator.getByText("approved", { exact: true }).first()).toBeVisible();
 
   await supplierOne.getByRole("button", { name: "Withdraw quote" }).click();
-  await expect(supplierOne.getByText("withdrawn")).toBeVisible();
-  await expect(coordinator.getByText("Plan v2")).toBeVisible({ timeout: 15_000 });
+  await expect(supplierOne.getByText("withdrawn", { exact: true })).toBeVisible();
+  await expect(coordinator.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
   await expect(coordinator.getByText(/Total \$90\.00/)).toBeVisible();
+  await expect(coordinator.getByText("INVALIDATED", { exact: true })).toBeVisible();
   await coordinator.getByRole("button", { name: "Approve plan" }).click();
   await coordinator.getByRole("button", { name: "Generate POs" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
@@ -76,5 +81,8 @@ test("coordinator and two suppliers complete quote, disruption recovery, approva
   await supplierTwo.reload();
   await expect(supplierTwo.getByRole("button", { name: "Accept" })).toBeVisible();
   await supplierTwo.getByRole("button", { name: "Accept" }).click();
-  await expect(supplierTwo.getByText("supplier_accepted")).toBeVisible();
+  await expect(supplierTwo.getByText("supplier_accepted", { exact: true })).toBeVisible();
+  await supplierTwo.getByRole("button", { name: "Mark delivered" }).click();
+  await expect(supplierTwo.getByText("completed", { exact: true })).toBeVisible();
+  await expect(coordinator.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

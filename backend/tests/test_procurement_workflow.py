@@ -217,6 +217,7 @@ async def test_budget_and_deadline_make_plan_honestly_infeasible(client: httpx.A
 async def test_unconfigured_email_is_recorded_as_a_failed_delivery() -> None:
     app = create_app(
         Settings(
+            _env_file=None,
             app_env="development",
             storage_mode="memory",
             jwt_secret="development-secret-that-is-long-enough",

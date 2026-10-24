@@ -566,12 +566,20 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
     plan = await services.store.get("plans", order["plan_id"])
     if not plan or plan["status"] != "approved":
         raise HTTPException(status_code=409, detail="The plan behind this draft is no longer approved")
-    attempt = await record_email(
-        to=order["supplier_email"], subject=f"Purchase order {order['po_number']}",
-        html=f"<p>Purchase order {order['po_number']} is ready for your acceptance.</p>",
-        kind="purchase_order", entity_id=order_id, services=services,
-    )
-    if attempt["status"] != "sent":
+    supplier = await services.store.get("suppliers", order["supplier_id"])
+    if supplier and supplier.get("is_demo"):
+        # TEST suppliers have reserved example.com addresses; record the skip instead of emailing.
+        attempt = {"id": new_id(), "to": order["supplier_email"], "subject": f"Purchase order {order['po_number']}",
+                   "kind": "purchase_order", "entity_id": order_id, "status": "skipped_test_supplier",
+                   "provider_id": None, "error": None, "created_at": now_iso()}
+        await services.store.insert("email_dispatches", attempt)
+    else:
+        attempt = await record_email(
+            to=order["supplier_email"], subject=f"Purchase order {order['po_number']}",
+            html=f"<p>Purchase order {order['po_number']} is ready for your acceptance.</p>",
+            kind="purchase_order", entity_id=order_id, services=services,
+        )
+    if attempt["status"] not in {"sent", "skipped_test_supplier"}:
         order["send_error"] = attempt["error"]
         await services.store.replace("purchase_orders", order_id, order)
         raise HTTPException(status_code=502, detail="Purchase order email was not delivered; the failure was recorded")

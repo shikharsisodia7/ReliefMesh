@@ -73,7 +73,8 @@ def make_settings(**overrides: Any) -> Settings:
     values = dict(app_env="test", storage_mode="memory", jwt_secret="test-secret-that-is-long-enough-to-be-safe",
                   expose_invitation_links=True, frontend_origin="http://localhost:3000")
     values.update(overrides)
-    return Settings(**values)
+    # Never read the developer's local .env (real keys) inside tests.
+    return Settings(_env_file=None, **values)
 
 
 @pytest.fixture

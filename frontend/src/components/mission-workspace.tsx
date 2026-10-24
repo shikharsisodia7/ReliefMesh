@@ -1,47 +1,83 @@
 "use client";
 
-import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AppHeader } from "@/components/app-header";
+import { EmergencyPanel } from "@/components/mission/emergency-panel";
+import { MarketPanel } from "@/components/mission/market-panel";
+import { DisruptionConsole, OptimizerPanel, OrdersPanel, PlanComparison, PlanVersions, Timeline } from "@/components/mission/planning-panels";
+import { SupplierEvidence } from "@/components/mission/supplier-evidence";
+import { useMissionData } from "@/components/mission/use-mission-data";
+import { ProvenanceBadge, money, when } from "@/components/status-badges";
 import { api } from "@/lib/api";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
-type Mission = { id: string; organization_id: string; name: string; delivery_location: string; delivery_deadline: string; budget: string; requirements: { item: string; quantity: number }[] };
-type Quote = { id: string; supplier_email: string; status: string; shipping_cost: string; lines: { item: string; unit_price: string; available_quantity: number; delivery_date: string }[] };
-type Plan = { id: string; version: number; status: string; total_cost: string; shipping_cost: string; remaining_budget: string; allocations: { supplier_id: string; supplier_email: string; item: string; quantity: number; unit_price: string; line_cost: string }[]; shortages: { item: string; required: number; available: number; shortage: number; reason: string }[]; difference: { total_cost_before: string | null; allocation_changed: boolean }; rejected_quotes: { quote_id: string; reason: string }[] };
-type PurchaseOrder = { id: string; po_number: string; supplier_email: string; status: string };
+type Organization = { id: string; membership_role: string };
 
 export function MissionWorkspace({ missionId }: { missionId: string }) {
   const router = useRouter();
-  const client = useQueryClient();
   const session = useSession();
-  const [supplierEmail, setSupplierEmail] = useState("");
+  const hydrated = useHydrated();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const hydrated = useHydrated();
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
-  const mission = useQuery({ queryKey: ["mission", missionId], enabled: Boolean(session), queryFn: () => api<Mission>(`/v1/missions/${missionId}`, { token: session!.token }) });
-  const quotes = useQuery({ queryKey: ["quotes", missionId], enabled: Boolean(session), refetchInterval: 2000, queryFn: () => api<Quote[]>(`/v1/missions/${missionId}/quotes`, { token: session!.token }) });
-  const plans = useQuery({ queryKey: ["plans", missionId], enabled: Boolean(session), refetchInterval: 2000, queryFn: () => api<Plan[]>(`/v1/missions/${missionId}/plans`, { token: session!.token }) });
-  const orders = useQuery({ queryKey: ["orders", mission?.data?.organization_id], enabled: Boolean(session && mission.data), queryFn: () => api<PurchaseOrder[]>(`/v1/purchase-orders?organization_id=${mission.data!.organization_id}`, { token: session!.token }) });
-  const refresh = async () => { await Promise.all([client.invalidateQueries({ queryKey: ["quotes", missionId] }), client.invalidateQueries({ queryKey: ["plans", missionId] }), client.invalidateQueries({ queryKey: ["orders"] })]); };
-  const latest = plans.data?.[0];
-  if (!session || !mission.data) return <main className="grid min-h-screen place-items-center">Loading procurement record…</main>;
-  const run = async (operation: () => Promise<void>) => { setError(null); setNotice(null); try { await operation(); await refresh(); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Request failed"); } };
-  return <main className="min-h-screen bg-slate-50"><header className="border-b bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"><Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground">← All missions</Link><span className="font-semibold">RELIEFMESH</span></div></header><div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-    <section><p className="text-sm font-medium text-cyan-700">MISSION · {mission.data.delivery_location}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.data.name}</h1><p className="mt-2 text-muted-foreground">Need {mission.data.requirements.map((item) => `${item.quantity} ${item.item}`).join(", ")} by {new Date(mission.data.delivery_deadline).toLocaleString()} · Budget ${mission.data.budget}</p></section>
-    {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}{notice && <p className="rounded-md bg-cyan-50 p-3 text-sm text-cyan-950">{notice}</p>}
-    <div className="grid gap-6 lg:grid-cols-2"><Card><CardHeader><CardTitle>Invite a supplier</CardTitle><CardDescription>RFQs are emailed with a signed, expiring supplier link. Delivery failures are recorded; they are never reported as sent.</CardDescription></CardHeader><CardContent><form className="flex gap-3" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<{ delivery_status: string; invitation_url?: string }>(`/v1/missions/${missionId}/invitations`, { method: "POST", token: session.token, body: JSON.stringify({ supplier_email: supplierEmail }) }); setNotice(response.invitation_url ? `Development invitation: ${response.invitation_url}` : `RFQ delivery status: ${response.delivery_status}`); setSupplierEmail(""); }); }}><div className="flex-1"><Label className="sr-only" htmlFor="supplier-email">Supplier email</Label><Input id="supplier-email" type="email" required value={supplierEmail} onChange={(event) => setSupplierEmail(event.target.value)} placeholder="supplier@example.com" /></div><Button type="submit">Send RFQ</Button></form></CardContent></Card>
-      <Card><CardHeader><CardTitle>Optimization</CardTitle><CardDescription>Runs an integer solver against valid, persisted quotes. A supplier disruption causes a separate durable replanning job.</CardDescription></CardHeader><CardContent className="flex items-center justify-between"><div><p className="font-medium">{quotes.data?.length ?? 0} submitted quote{quotes.data?.length === 1 ? "" : "s"}</p><p className="text-sm text-muted-foreground">Latest plan: {latest ? `v${latest.version} · ${latest.status}` : "not calculated"}</p></div><Button onClick={() => void run(async () => { const response = await api<{ plan_id: string }>(`/v1/missions/${missionId}/optimize`, { method: "POST", token: session.token }); setNotice(`Plan ${response.plan_id.slice(0, 8)} computed from current quotes.`); })}>Run optimization</Button></CardContent></Card></div>
-    <Card><CardHeader><CardTitle>Supplier quotes</CardTitle><CardDescription>Private quote details are visible only to this organization’s members; suppliers cannot view competitors’ submissions.</CardDescription></CardHeader><CardContent>{quotes.data?.length ? <div className="space-y-3">{quotes.data.map((quote) => <div key={quote.id} className="rounded-lg border p-4"><div className="flex items-center justify-between"><span className="font-medium">{quote.supplier_email}</span><Badge variant={quote.status === "submitted" ? "default" : "destructive"}>{quote.status}</Badge></div><p className="mt-2 text-sm text-muted-foreground">Shipping ${quote.shipping_cost} · {quote.lines.map((line) => `${line.available_quantity} ${line.item} at $${line.unit_price}`).join("; ")}</p></div>)}</div> : <p className="text-sm text-muted-foreground">No submitted quotes yet.</p>}</CardContent></Card>
-    <Card><CardHeader><CardTitle>Plan versions</CardTitle><CardDescription>Each plan is immutable input/output evidence. A stale plan cannot be approved or ordered.</CardDescription></CardHeader><CardContent className="space-y-4">{plans.data?.length ? plans.data.map((plan) => <div key={plan.id} className="rounded-xl border p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-semibold">Plan v{plan.version}</h3><Badge variant={plan.status === "approved" || plan.status === "feasible" ? "default" : "secondary"}>{plan.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">Total ${plan.total_cost} · Shipping ${plan.shipping_cost} · Remaining ${plan.remaining_budget}{plan.difference.total_cost_before && ` · Prior total $${plan.difference.total_cost_before}`}</p></div><div className="flex gap-2">{plan.status === "feasible" && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/plans/${plan.id}/approve`, { method: "POST", token: session.token }); setNotice(`Plan v${plan.version} is approved.`); })}>Approve plan</Button>}{plan.status === "approved" && <Button size="sm" onClick={() => void run(async () => { const created = await api<PurchaseOrder[]>(`/v1/plans/${plan.id}/purchase-orders`, { method: "POST", token: session.token, headers: { "Idempotency-Key": crypto.randomUUID() } }); setNotice(`${created.length} purchase order draft${created.length === 1 ? "" : "s"} generated. Confirm each send below.`); })}>Generate POs</Button>}</div></div>{plan.status === "infeasible" ? <ul className="mt-4 list-disc pl-5 text-sm text-destructive">{plan.shortages.map((shortage) => <li key={shortage.item}>{shortage.item}: shortage {shortage.shortage}; constraint: {shortage.reason}</li>)}</ul> : <ul className="mt-4 grid gap-1 text-sm">{plan.allocations.map((allocation) => <li key={`${allocation.supplier_id}-${allocation.item}`}>{allocation.supplier_email}: {allocation.quantity} {allocation.item} × ${allocation.unit_price} = ${allocation.line_cost}</li>)}</ul>}</div>) : <p className="text-sm text-muted-foreground">Run optimization after suppliers submit quotes.</p>}</CardContent></Card>
-    <Card><CardHeader><CardTitle>Purchase orders</CardTitle><CardDescription>Drafts are not binding. Sending requires this separate confirmation; supplier response drives fulfillment state.</CardDescription></CardHeader><CardContent>{orders.data?.length ? <div className="space-y-3">{orders.data.map((order) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4" key={order.id}><div><p className="font-medium">{order.po_number}</p><p className="text-sm text-muted-foreground">{order.supplier_email}</p></div><div className="flex items-center gap-3"><Badge variant="secondary">{order.status}</Badge>{order.status === "draft" && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/purchase-orders/${order.id}/send`, { method: "POST", token: session.token, body: JSON.stringify({ confirm: true }) }); setNotice(`${order.po_number} sent to supplier.`); })}>Confirm & send</Button>}</div></div>)}</div> : <p className="text-sm text-muted-foreground">No purchase orders generated.</p>}</CardContent></Card>
-  </div></main>;
+  const data = useMissionData(missionId, session?.token);
+  const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
+  const supplierOrder = useMemo(() => {
+    const order: string[] = [];
+    for (const plan of [...(data.plans.data ?? [])].reverse()) for (const row of plan.allocations) if (!order.includes(row.supplier_id)) order.push(row.supplier_id);
+    for (const row of data.suppliers.data ?? []) if (!order.includes(row.supplier.id)) order.push(row.supplier.id);
+    return order;
+  }, [data.plans.data, data.suppliers.data]);
+  const mission = data.mission.data;
+  if (!session || !mission) return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground">{data.mission.error ? data.mission.error.message : "Loading procurement record…"}</main>;
+  const token = session.token;
+  const run = async (operation: () => Promise<void>) => { setError(null); setNotice(null); try { await operation(); await data.refresh(); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Request failed"); } };
+  const plans = data.plans.data ?? [];
+  const latest = plans[0];
+  const quotes = data.quotes.data ?? [];
+  const suppliers = data.suppliers.data ?? [];
+  const jobs = data.jobs.data ?? [];
+  const eligible = suppliers.flatMap((row) => row.quotes).filter((quote) => quote.policy.eligible).length;
+  const isAdmin = organizations.data?.find((organization) => organization.id === mission.organization_id)?.membership_role === "admin";
+  const checking = jobs.some((job) => job.type === "evidence_refresh" && (job.status === "queued" || job.status === "running"));
+  const replanning = jobs.some((job) => job.type === "replan" && (job.status === "queued" || job.status === "running"));
+  return (
+    <main className="min-h-screen bg-background">
+      <AppHeader email={session.user.email} home="/dashboard" label="Coordinator" />
+      <div className="mx-auto max-w-7xl space-y-5 px-5 py-6">
+        <section className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-live">Mission · {mission.delivery_location}</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.name}</h1>
+            <p className="mt-1 text-muted-foreground">Need {mission.requirements.map((item) => `${item.quantity} ${item.item}`).join(", ")} by {when(mission.delivery_deadline)} · Budget {money(mission.budget)}{mission.created_via === "agent" ? " · created by Fetch.ai agent" : ""}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 font-mono text-xs">
+            <span className="rounded border px-2 py-1">quotes <span className="text-telemetry">{quotes.filter((quote) => quote.status === "submitted").length}</span></span>
+            <span className="rounded border px-2 py-1">eligible <span className="text-ok">{eligible}</span></span>
+            <span className="rounded border px-2 py-1">plan <span className="text-live">{latest ? `v${latest.version} ${latest.status}` : "—"}</span></span>
+            {replanning && <span className="rounded border border-live/50 px-2 py-1 text-live">replanning…</span>}
+            {checking && <span className="rounded border border-telemetry/50 px-2 py-1 text-telemetry">evidence checks…</span>}
+          </div>
+        </section>
+        {error && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+        {notice && <p className="rounded-md border border-live/30 bg-live/10 p-3 text-sm text-live">{notice}</p>}
+
+        <EmergencyPanel mission={mission} context={data.context.data} loading={data.context.isLoading} />
+        <div className="grid gap-5 xl:grid-cols-[1fr_1.4fr]">
+          <MarketPanel mission={mission} token={token} leads={data.leads.data ?? []} invitations={data.invitations.data ?? []} jobs={jobs} run={run} setNotice={setNotice} hasDemo={suppliers.some((row) => row.supplier.is_demo)} />
+          <SupplierEvidence missionId={missionId} token={token} rows={suppliers} quotes={quotes} run={run} canReview={isAdmin} checking={checking} />
+        </div>
+        <OptimizerPanel mission={mission} plan={latest} eligibleCount={eligible} quoteCount={quotes.filter((quote) => quote.status === "submitted").length} busy={replanning} onOptimize={() => void run(async () => { const response = await api<{ plan_id: string; version: number }>(`/v1/missions/${missionId}/optimize`, { method: "POST", token }); setNotice(`Plan v${response.version} computed from current policy-eligible quotes.`); })} />
+        {isAdmin && suppliers.length > 0 && <DisruptionConsole missionId={missionId} token={token} rows={suppliers} plan={latest} run={run} disruptions={data.disruptions.data ?? []} setNotice={setNotice} />}
+        <PlanComparison plans={plans} approvals={data.approvals.data ?? []} order={supplierOrder} />
+        <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={isAdmin} />
+        <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
+        <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
+        <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo fixtures</p>
+      </div>
+    </main>
+  );
 }
