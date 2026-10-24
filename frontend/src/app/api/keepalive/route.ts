@@ -24,5 +24,6 @@ export async function GET(request: Request) {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
   const agent = process.env.AGENT_HEALTH_URL;
   const [api, agentStatus] = await Promise.all([ping(`${base}/health`), agent ? ping(agent) : Promise.resolve(null)]);
+  console.log("keepalive", JSON.stringify({ api, agent: agentStatus })); // one line per cron run, visible in runtime logs
   return Response.json({ api, agent: agentStatus }, { status: api.status === 200 ? 200 : 502, headers: noStore });
 }
