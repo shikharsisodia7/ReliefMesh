@@ -1,26 +1,93 @@
 # ReliefMesh
 
-ReliefMesh is an emergency-procurement workflow: organizations source supplier quotes, solve an auditable purchasing allocation, invalidate stale approvals after supplier disruption, and issue confirmed purchase orders.
+![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
+![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
 
-## Local product run
+**An evidence-backed autonomous procurement network that rebuilds its own purchasing plan when the supply
+chain changes.** Coordinators buy emergency supplies from real supplier quotes. ReliefMesh screens every supplier
+against public records, decides eligibility with deterministic policy, allocates with integer optimization,
+replans by itself when a supplier fails, and leaves financial authority with an independent human approver.
 
-Use MongoDB for a persistent local product run:
+| | |
+| --- | --- |
+| Web app | https://reliefmesh-calhacks.vercel.app |
+| API | https://reliefmesh-api.onrender.com ([/health](https://reliefmesh-api.onrender.com/health), [/docs](https://reliefmesh-api.onrender.com/docs)) |
+| Live integration status | https://reliefmesh-calhacks.vercel.app/status |
+| Fetch.ai agent | `reliefmesh-buyer-agent` · `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x` · [Agentverse](https://agentverse.ai/agents/details/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x/profile) · [Chat on ASI:One](https://asi1.ai/ai/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x) |
 
-```powershell
-docker compose up --build
-cd frontend
-Copy-Item .env.example .env.local
-npm install
-npm run dev
+## What happens, end to end
+
+1. A coordinator links a mission to a **live NASA EONET event** and sees live NWS alerts, NASA FIRMS fire
+   detections, and OpenFEMA declarations for that location.
+2. Suppliers are discovered (**Apify** Google Maps actor → leads only) and invited by single-use RFQ links. Each
+   supplier signs up and submits a **binding quote** mapped to stable requirement IDs.
+3. Every supplier's legal name is screened against the **Treasury OFAC SDN list**, **openFDA** enforcement
+   reports, **USAspending** awards, and **SAM.gov**. Its authorized signer is identity-checked through the
+   **CRS sandbox** (TransUnion TruValidate). Every evidence record shows provenance and retrieval time.
+4. A **deterministic policy engine** (no LLM) decides PASS / WARN / NEEDS_REVIEW / BLOCK. Missing or failed
+   screening is never a pass, and a fuzzy sanctions match always goes to a human.
+5. A **PuLP/CBC mixed-integer optimizer** allocates across eligible quotes only, under budget, inventory, deadline,
+   and concentration constraints.
+6. An **independent approver** approves the exact plan version. The requester cannot self-approve. Approvals are
+   bound to the plan hash, expire, and work once.
+7. When a supplier withdraws, cuts inventory, raises price, slips delivery, or gets blocked, the plan goes
+   **stale**, the approval is **revoked**, unsent PO drafts are voided, and a background job **replans**. The UI
+   shows old vs new plan, why it changed, cost delta, and supplier delta. A new approval is required.
+8. Purchase orders are issued idempotently, sent only after explicit confirmation, and accepted and fulfilled by
+   suppliers. Every step lands in a **SHA-256 hash-chained audit log** with a verification endpoint.
+9. Premium evidence can be bought machine-to-machine over **HTTP 402 with Coinbase x402**, settled in USDC on
+   **Solana devnet**. Receipts include the on-chain signature.
+10. The whole buyer workflow is also available from an **ASI:One** conversation through the **Fetch.ai** agent. It
+    can never approve spending.
+
+## What is real, sandbox, and test
+
+| Data | Provenance |
+| --- | --- |
+| NASA EONET, NWS, NASA FIRMS, OpenFEMA, OFAC SDN/ALT, openFDA, USAspending, Apify results | `LIVE` (or `CACHED` last-known-good with its original timestamp) |
+| CRS identity verification | `SANDBOX`, using CRS-provided test personas only (never real personal data) |
+| x402 payments | Solana **devnet** test USDC (`SANDBOX`). No real money or procurement funds |
+| Judge-scenario suppliers and quotes | labeled `TEST` / `SYNTHETIC`. Their names still go through live screening |
+| Supplier-entered quotes | `USER_SUBMITTED` |
+| SAM.gov | `NOT CONFIGURED` until a SAM API key exists (never faked) |
+
+## Sponsor integrations (verified against live services)
+
+- **Fetch.ai**: uAgents mailbox agent on Agentverse, Agent Chat Protocol (manifest published), usable from ASI:One.
+  Real tool execution against the API ([agent/](agent/README.md)). Per-conversation isolation; it can't approve, order,
+  or block.
+- **CRS**: TransUnion TruValidate identity checks of supplier signers ([integrations/crs.py](backend/app/integrations/crs.py)).
+  A failed check holds a supplier for review even after its sanctions false-positive is cleared.
+- **Apify**: supplier discovery via `compass/crawler-google-places`, storing actor, run, and dataset IDs ([integrations/apify.py](backend/app/integrations/apify.py)).
+- **Coinbase x402 + Solana**: official x402 Python SDK. Exact scheme on `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
+  through the x402.org facilitator ([payments/x402_exchange.py](backend/app/payments/x402_exchange.py)). Example settled tx:
+  [`3bd8HVQj…c87Es`](https://explorer.solana.com/tx/3bd8HVQjv5eqGCDsMUKreueZe9YygUXHxbrqBmQztrro1amRN1g9EdeVN76chKSwNfgyuUmNeP6Q7EKq45sc87Es?cluster=devnet).
+- **MongoDB Atlas**: production system of record (M0, us-west-2).
+
+## Run locally
+
+```bash
+# API (memory store, no credentials needed; live public data still works)
+cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # or bin/ on macOS/Linux
+RELIEFMESH_APP_ENV=test RELIEFMESH_EXPOSE_INVITATION_LINKS=true .venv/Scripts/python -m uvicorn app.main:app --port 8000
+
+# Web
+cd frontend && npm install && NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev
+
+# Agent (optional; needs an org agent token from POST /v1/organizations/{id}/agent-tokens)
+cd agent && pip install -r requirements.txt && RELIEFMESH_API_URL=http://localhost:8000 RELIEFMESH_AGENT_TOKEN=... python reliefmesh_agent.py
 ```
 
-Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` in `frontend/.env.local`. Copy `backend/.env.example` to `backend/.env` and supply Atlas + Resend values for a production-equivalent run.
+Copy `backend/.env.example` for optional keys (FIRMS, SAM.gov, CRS sandbox, Apify, x402 devnet wallets).
 
-## Verification
+## Tests
 
-```powershell
-cd backend; .\.venv\Scripts\python.exe -m pytest
-cd frontend; npm test; npm run lint; npm run build; npm run test:e2e
+```bash
+cd backend && python -m pytest            # 31 tests: policy, evidence, SoD, requirement IDs, x402 guards, audit chain, abuse cases
+cd frontend && npm test && npm run lint && npm run build
+cd frontend && npx playwright test        # two-supplier flow with an independent approver + live-data judge scenario
+python backend/scripts/smoke.py https://reliefmesh-api.onrender.com   # production disruption/recovery on live data
+python agent/test_conversation.py http://localhost:8000                # agent conversation against a running API
 ```
 
-The browser test uses separate coordinator and supplier browser contexts and verifies quote withdrawal, autonomous replanning, approval invalidation, purchase-order confirmation, and supplier acceptance.
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

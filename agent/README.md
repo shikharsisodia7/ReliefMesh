@@ -40,5 +40,7 @@ finding or change an allocation.
 ## Agent
 
 - Name: `reliefmesh-buyer-agent`
-- Address: see the repository root README (published after registration)
+- Address: `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x`
+- Agentverse: https://agentverse.ai/agents/details/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x/profile
+- ASI:One: https://asi1.ai/ai/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x
 - Protocol: AgentChatProtocol v0.3.0 (manifest published)
