@@ -253,7 +253,7 @@ async def compute_plan(services: Services, mission_id: str, trigger: str,
 
 
 async def invalidate_for_change(services: Services, mission: dict[str, Any], actor_id: str | None,
-                                reason: str, cause: dict[str, Any] | None = None) -> list[int]:
+                                reason: str, cause: dict[str, Any] | None = None, emit: bool = True) -> list[int]:
     """Mark every current plan stale, invalidate its approvals, and void unsent POs.
 
     ``cause`` (supplier_id/supplier/failure_type) only enriches the operations alert.
@@ -294,7 +294,7 @@ async def invalidate_for_change(services: Services, mission: dict[str, Any], act
                 order["plan_stale"] = True
                 flagged += 1
                 await services.store.replace("purchase_orders", order["id"], order)
-    if affected:
+    if affected and emit:
         details = cause or {}
         await ops_events.emit(services, ops_events.SUPPLIER_DISRUPTED, mission,
                               subject_id=details.get("supplier_id") or "policy",

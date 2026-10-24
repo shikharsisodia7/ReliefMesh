@@ -270,6 +270,30 @@ def slack_fulfillment(order: dict[str, Any], mission: dict[str, Any], supplier: 
                          slack_esc(note), ("Open mission", review_url))
 
 
+
+def slack_deadline_change(mission: dict[str, Any], change: dict[str, Any],
+                          review_url: str) -> tuple[str, list[dict[str, Any]]]:
+    stale = ", ".join(f"V{v}" for v in change.get("stale_versions") or [])
+    lines = [f"Delivery deadline moved from {slack_esc(when(change.get('before')))} to "
+             f"*{slack_esc(when(change.get('after')))}*."]
+    if stale:
+        lines.append(f"Plan {stale} is now *STALE*; its approval no longer applies and ReliefMesh is replanning.")
+    text = f"📅 Delivery deadline changed — {mission['name']}"
+    return text, slack_blocks("📅 Delivery deadline changed", [("Mission", slack_esc(mission["name"]))],
+                              "\n".join(lines), ("Open mission", review_url))
+
+
+def slack_mission_cancelled(mission: dict[str, Any], cancellation: dict[str, Any],
+                            review_url: str) -> tuple[str, list[dict[str, Any]]]:
+    lines = [f"Reason: {slack_esc(cancellation.get('reason') or '—')}"]
+    if cancellation.get("open_orders"):
+        lines.append("Still-open purchase orders (cancel them with the supplier): "
+                     + slack_esc(", ".join(cancellation["open_orders"])))
+    text = f"⛔ Mission cancelled — {mission['name']}"
+    return text, slack_blocks("⛔ Mission cancelled", [("Mission", slack_esc(mission["name"]))], "\n".join(lines),
+                              ("Open mission", review_url))
+
+
 def slack_superseded(original_text: str, reason: str) -> tuple[str, list[dict[str, Any]]]:
     text = f"STALE — {original_text}"
     return text, [{"type": "section", "text": {"type": "mrkdwn", "text": f"~{slack_esc(original_text)}~"}},

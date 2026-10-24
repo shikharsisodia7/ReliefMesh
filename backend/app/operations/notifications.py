@@ -159,16 +159,20 @@ class OperationsService:
         if kind in {events.MISSION_CREATED, events.MISSION_UPDATED}:
             body = templates.calendar_deadline(mission, url)
             specs.append(self._calendar(mission, "deadline", "upsert", body, body["summary"]))
+            if kind == events.MISSION_UPDATED:
+                specs += await self._stale_approval_specs(mission, data.get("stale_versions") or [],
+                                                          data.get("reason"), url)
+                specs.append(self._slack(*templates.slack_deadline_change(mission, data, url)))
         elif kind == events.MISSION_CANCELLED:
             specs.append(self._calendar(mission, "deadline", "cancel", None, "Cancel delivery deadline"))
             specs.append(self._calendar(mission, "approval", "cancel", None, "Cancel approval window"))
+            open_orders = set(data.get("open_orders") or [])
             for order in await self.store.find("purchase_orders", mission_id=mission["id"]):
-                specs.append(self._calendar(mission, f"eta:{order['id']}", "cancel", None,
-                                            f"Cancel ETA {order['po_number']}"))
-            text = f"⛔ Mission cancelled — {mission['name']}"
-            specs.append(self._slack(text, templates.slack_blocks("⛔ Mission cancelled", [
-                ("Mission", templates.slack_esc(mission["name"]))], templates.slack_esc(data.get("reason") or ""),
-                ("Open mission", url))))
+                # An issued order is still a supplier commitment, so its delivery reminder stays.
+                if order["po_number"] not in open_orders:
+                    specs.append(self._calendar(mission, f"eta:{order['id']}", "cancel", None,
+                                                f"Cancel ETA {order['po_number']}"))
+            specs.append(self._slack(*templates.slack_mission_cancelled(mission, data, url)))
         elif kind in {events.APPROVAL_REQUIRED, events.PLAN_REPLANNED}:
             specs += await self._plan_specs(kind, mission, data, url)
         elif kind == events.SUPPLIER_DISRUPTED:
@@ -249,16 +253,21 @@ class OperationsService:
         specs = self._emails(recipients, subject, html, text, "supplier_disrupted", "No organization member to notify")
         slack_text, blocks = templates.slack_disruption(mission, data, url)
         specs.append(self._slack(slack_text, blocks, supersede=data.get("stale_versions")))
-        stale_versions = data.get("stale_versions") or []
-        if stale_versions:
-            plans = {p["version"]: p for p in await self.store.find("plans", mission_id=mission["id"])}
-            plan = plans.get(max(stale_versions))
-            if plan:
-                quotes = await self.store.find("quotes", mission_id=mission["id"])
-                due = templates.approval_due(mission, quotes, plan)
-                body = templates.calendar_approval(mission, plan, due, url, "stale", data.get("reason"))
-                specs.append(self._calendar(mission, "approval", "upsert", body, body["summary"]))
+        specs += await self._stale_approval_specs(mission, data.get("stale_versions") or [], data.get("reason"), url)
         return specs
+
+    async def _stale_approval_specs(self, mission: dict[str, Any], stale_versions: list[int], reason: str | None,
+                                    url: str) -> list[dict[str, Any]]:
+        if not stale_versions:
+            return []
+        plans = {p["version"]: p for p in await self.store.find("plans", mission_id=mission["id"])}
+        plan = plans.get(max(stale_versions))
+        if not plan:
+            return []
+        quotes = await self.store.find("quotes", mission_id=mission["id"])
+        due = templates.approval_due(mission, quotes, plan)
+        body = templates.calendar_approval(mission, plan, due, url, "stale", reason)
+        return [self._calendar(mission, "approval", "upsert", body, body["summary"])]
 
     async def _supplier_name(self, order: dict[str, Any]) -> str:
         supplier = await self.store.get("suppliers", order["supplier_id"]) or {}

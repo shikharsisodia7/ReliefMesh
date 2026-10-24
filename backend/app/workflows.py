@@ -56,6 +56,8 @@ async def handle_replan(services: Services, job: dict[str, Any]) -> dict[str, An
     mission = await services.store.get("missions", job["mission_id"])
     if not mission:
         raise RuntimeError("mission no longer exists")
+    if mission.get("status") == "cancelled":
+        return {"status": "skipped", "reason": "mission cancelled"}
     triggers = job.get("triggers") or []
     await notify(services, mission, "replan_started",
                  f"Replanning started after {len(triggers) or 1} change(s).", "info", {"job_id": job["id"]})

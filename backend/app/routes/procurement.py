@@ -527,6 +527,8 @@ async def optimize_mission(mission_id: str, principal: dict = Depends(current_pr
     mission, _ = await require_mission_access(mission_id, principal, services)
     if principal["role"] not in {"coordinator", "agent"}:
         raise HTTPException(status_code=403, detail="Only coordinators can run the optimizer")
+    if mission.get("status") == "cancelled":
+        raise HTTPException(status_code=409, detail="This mission is cancelled")
     plan = await compute_plan(services, mission["id"], "manual" if principal["role"] == "coordinator" else "agent")
     return {"plan_id": plan["id"], "status": plan["status"], "version": plan["version"]}
 

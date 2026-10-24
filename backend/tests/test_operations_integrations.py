@@ -604,26 +604,88 @@ async def test_email_modes_disabled_and_allowlist(providers) -> None:
 
 
 @pytest.mark.anyio
-async def test_mission_deadline_change_and_cancellation_update_the_same_calendar_events(ops_client, providers) -> None:
+async def test_deadline_change_endpoint_updates_calendar_in_place_and_replans(ops_client, providers) -> None:
     app, client = ops_client
-    ops, store = app.state.services.ops, app.state.services.store
+    store = app.state.services.store
+    ctx = await build_mission(client)
+    await connect_google(client, ctx["coordinator"], ctx["organization_id"])
+    await connect_slack(client, ctx["coordinator"], ctx["organization_id"])
+    mission_id = await create_mission(client, ctx)
+    _, plan_id = await quote_and_plan(client, ctx, mission_id)
+    assert (await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(ctx["approver"]))).status_code == 201
+    await settle_deliveries(app, mission_id)
+    deadline_id = google_calendar.event_id(ctx["organization_id"], mission_id, "deadline")
+    approval_id = google_calendar.event_id(ctx["organization_id"], mission_id, "approval")
+    inserts_before = providers.calendar_inserts
+
+    for forbidden in (ctx["suppliers"][0], ctx["approver"]):  # suppliers and approvers cannot move the deadline
+        denied = await client.patch(f"/v1/missions/{mission_id}/deadline", headers=auth(forbidden),
+                                    json={"delivery_deadline": (datetime.now(UTC) + timedelta(days=5)).isoformat()})
+        assert denied.status_code == 403
+    past = await client.patch(f"/v1/missions/{mission_id}/deadline", headers=auth(ctx["coordinator"]),
+                              json={"delivery_deadline": (datetime.now(UTC) - timedelta(hours=1)).isoformat()})
+    assert past.status_code == 422
+    new_deadline = (datetime.now(UTC) + timedelta(days=6)).replace(microsecond=0)
+    changed = await client.patch(f"/v1/missions/{mission_id}/deadline", headers=auth(ctx["coordinator"]),
+                                 json={"delivery_deadline": new_deadline.isoformat(), "reason": "Shelter opens later"})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["stale_plan_versions"] == [1] and changed.json()["replan_job_id"]
+    await settle_jobs(client, ctx["coordinator"], mission_id)
+    rows = await settle_deliveries(app, mission_id)
+    assert providers.calendar_events[deadline_id]["end"]["dateTime"] == new_deadline.isoformat()
+    # One event per slot: the deadline and approval events were updated, never re-created.
+    assert providers.calendar_inserts == inserts_before
+    assert not [r for r in rows if r["event_type"] == "supplier_disrupted"]  # not mislabeled as a supplier failure
+    assert any("Delivery deadline changed" in p["text"] for p in providers.slack_posts)
+    approvals = (await client.get(f"/v1/missions/{mission_id}/approvals", headers=auth(ctx["coordinator"]))).json()
+    assert approvals[0]["status"] == "invalidated"
+    plans = sorted(await store.find("plans", mission_id=mission_id), key=lambda p: p["version"])
+    assert [p["status"] for p in plans] == ["stale", "feasible"]
+    assert providers.calendar_events[approval_id]["summary"].endswith("(Plan V2)")
+
+
+@pytest.mark.anyio
+async def test_cancel_endpoint_cancels_future_events_but_keeps_issued_order_eta(ops_client, providers) -> None:
+    app, client = ops_client
+    store = app.state.services.store
     ctx = await build_mission(client)
     await connect_google(client, ctx["coordinator"], ctx["organization_id"])
     mission_id = await create_mission(client, ctx)
+    _, plan_id = await quote_and_plan(client, ctx, mission_id)
+    assert (await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(ctx["approver"]))).status_code == 201
+    orders = (await client.post(f"/v1/plans/{plan_id}/purchase-orders",
+                                headers={**auth(ctx["coordinator"]), "Idempotency-Key": "cancel-po"})).json()
+    order = orders[0]
+    await client.post(f"/v1/purchase-orders/{order['id']}/send", json={"confirm": True},
+                      headers=auth(ctx["coordinator"]))
+    supplier = ctx["suppliers"][0] if order["supplier_email"].startswith("bayside") else ctx["suppliers"][1]
+    await client.post(f"/v1/purchase-orders/{order['id']}/supplier-response", json={"accepted": True},
+                      headers=auth(supplier))
     await settle_deliveries(app, mission_id)
+    eta_id = google_calendar.event_id(ctx["organization_id"], mission_id, f"eta:{order['id']}")
     deadline_id = google_calendar.event_id(ctx["organization_id"], mission_id, "deadline")
-    mission = await store.get("missions", mission_id)
-    mission["delivery_deadline"] = (datetime.now(UTC) + timedelta(days=4)).replace(microsecond=0).isoformat()
-    await store.replace("missions", mission_id, mission)
-    await ops.emit("mission_updated", mission, subject_id=mission_id, version=mission["delivery_deadline"])
-    await settle_deliveries(app, mission_id)
-    assert providers.calendar_events[deadline_id]["end"]["dateTime"] == mission["delivery_deadline"]
-    assert providers.calendar_inserts == 1  # updated in place, not re-created
-    await ops.emit("mission_cancelled", mission, subject_id=mission_id, data={"reason": "Shelter consolidated"})
-    rows = await settle_deliveries(app, mission_id)
-    assert providers.calendar_events[deadline_id]["status"] == "cancelled"
-    assert all(r["status"] in {"SENT", "NOT_CONFIGURED"} for r in rows if r["event_type"] == "mission_cancelled")
+    assert providers.calendar_events[eta_id].get("status") != "cancelled"
 
+    cancelled = await client.post(f"/v1/missions/{mission_id}/cancel", headers=auth(ctx["coordinator"]),
+                                  json={"reason": "Shelter consolidated with Berkeley site"})
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled" and cancelled.json()["open_purchase_orders"] == [order["po_number"]]
+    await settle_deliveries(app, mission_id)
+    assert providers.calendar_events[deadline_id]["status"] == "cancelled"
+    assert providers.calendar_events[google_calendar.event_id(ctx["organization_id"], mission_id, "approval")][
+        "status"] == "cancelled"
+    assert providers.calendar_events[eta_id].get("status") != "cancelled"  # the supplier commitment is real
+    again = await client.post(f"/v1/missions/{mission_id}/cancel", headers=auth(ctx["coordinator"]),
+                              json={"reason": "again"})
+    assert again.status_code == 409
+    assert (await client.post(f"/v1/missions/{mission_id}/optimize",
+                              headers=auth(ctx["coordinator"]))).status_code == 409
+    plans_before = len(await store.find("plans", mission_id=mission_id))
+    withdraw = await client.post(f"/v1/quotes/{(await store.find('quotes', mission_id=mission_id))[0]['id']}/withdraw",
+                                 headers=auth(ctx["suppliers"][0]))
+    assert withdraw.status_code in {202, 409}
+    await settle_jobs(client, ctx["coordinator"], mission_id)
+    assert len(await store.find("plans", mission_id=mission_id)) == plans_before  # no replan for a cancelled mission
 
 @pytest.mark.anyio
 async def test_stale_calendar_update_cannot_overwrite_a_newer_one(ops_client, providers) -> None:
