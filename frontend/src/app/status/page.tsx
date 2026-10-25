@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 
 import { Page, PageHeader } from "@/components/layout/page-header";
+import { readableMessage } from "@/components/mission/audit-tab";
 import { Provenance, StatusText, ago, clock, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Table } from "@/components/ui/table";
@@ -39,7 +40,7 @@ function CheckRow({ check, breaker }: { check: IntegrationCheck; breaker?: { fai
         </td>
         <td className="py-2.5 pr-4"><StatusText tone={tone[check.status]} value={check.status}>{label[check.status]}</StatusText></td>
         <td className="py-2.5 pr-4">{check.provenance ? <Provenance value={check.provenance} /> : <span className="text-muted-foreground">—</span>}</td>
-        <td className="py-2.5 pr-4 text-muted-foreground">{check.detail}</td>
+        <td className="py-2.5 pr-4 text-muted-foreground">{readableMessage(check.detail)}</td>
         <td className="py-2.5 text-right whitespace-nowrap tabular">{configured ? `${check.latency_ms.toLocaleString("en-US")} ms` : "—"}</td>
       </tr>
       {open && (
@@ -50,7 +51,7 @@ function CheckRow({ check, breaker }: { check: IntegrationCheck; breaker?: { fai
               <dt className="text-muted-foreground">Checked at</dt><dd className="tabular">{when(check.checked_at)} · {clock(check.checked_at)}</dd>
               <dt className="text-muted-foreground">Result</dt><dd>{label[check.status]}</dd>
               <dt className="text-muted-foreground">Duration</dt><dd className="tabular">{configured ? `${check.latency_ms.toLocaleString("en-US")} ms` : "No request made"}</dd>
-              <dt className="text-muted-foreground">Detail</dt><dd>{check.detail}</dd>
+              <dt className="text-muted-foreground">Detail</dt><dd>{readableMessage(check.detail)}</dd>
               {breaker && <><dt className="text-muted-foreground">Circuit breaker</dt><dd>{breaker.open ? "Open, requests paused" : "Closed"} · {breaker.failures} recent failure{breaker.failures === 1 ? "" : "s"}</dd></>}
             </dl>
             <p className="mt-2 text-xs text-muted-foreground">Earlier checks aren&apos;t stored yet, so only the current one is shown.</p>

@@ -34,7 +34,7 @@ export function DeliveryList({ deliveries, token, canRetry, onChanged, showMissi
   return (
     <div className="mt-2">
       {error && <p role="alert" className="mb-2 text-sm text-critical">{error}</p>}
-      <ol className="max-h-[28rem] overflow-y-auto">
+      <ol tabIndex={0} aria-label="Deliveries, scrollable" className="max-h-[28rem] overflow-y-auto">
         {deliveries.map((row) => {
           const Icon = icons[row.channel];
           return (
@@ -45,9 +45,10 @@ export function DeliveryList({ deliveries, token, canRetry, onChanged, showMissi
                 <p className="truncate text-xs text-muted-foreground">
                   {row.channel} → {row.target}{row.operation ? ` (${row.operation})` : ""} · {when(row.created_at)} · attempt {row.attempts}/{row.max_attempts}
                   {row.provider_id ? ` · id ${row.provider_id.slice(0, 18)}` : ""}
-                  {showMission && row.mission_id && <> · <Link className="underline" href={`/missions/${row.mission_id}`}>mission</Link></>}
+                  {showMission && row.mission_id && <> · <Link className="font-medium text-foreground hover:underline" href={`/missions/${row.mission_id}`}>mission</Link></>}
                 </p>
-                {row.last_error && <p className="text-xs text-critical">{row.last_error}</p>}
+                {/* Red only for a delivery that actually failed; a provider that isn't set up is a state, not an error. */}
+                {row.last_error && <p className={`text-xs ${row.status === "FAILED" || row.status === "RETRYING" ? "text-critical" : "text-muted-foreground"}`}>{row.last_error}</p>}
               </div>
               <div className="flex items-center gap-2 sm:justify-end">
                 <StatusText tone={tone[row.status]} value={row.status} className="text-xs tracking-wide">{row.status.replace("_", " ")}</StatusText>

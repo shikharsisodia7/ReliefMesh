@@ -34,7 +34,8 @@ export function OperationsPanel({ missionId, organizationId, token, isAdmin }: {
             {(rows.length > 0 || notConnected.length === 0) && <DeliveryList deliveries={rows} token={token} canRetry={isAdmin} onChanged={() => void deliveries.refetch()} />}
             {notConnected.length > 0 && (
               <details className="mt-2 text-sm">
-                <summary className="cursor-pointer text-muted-foreground">{notConnected.length} notification{notConnected.length === 1 ? "" : "s"} not sent: {channels.join(", ")} {channels.length === 1 ? "is" : "are"} not connected for this organization. <Link className="font-medium text-foreground hover:underline" href={settings}>Connect</Link>, then retry.</summary>
+                <summary className="cursor-pointer text-muted-foreground">{notConnected.length} notification{notConnected.length === 1 ? "" : "s"} not sent: {channels.join(", ")} {channels.length === 1 ? "is" : "are"} not connected for this organization.</summary>
+                <p className="mt-1 text-muted-foreground"><Link className="font-medium text-foreground hover:underline" href={settings}>Connect them in Settings</Link>, then retry.</p>
                 <DeliveryList deliveries={notConnected} token={token} canRetry={isAdmin} onChanged={() => void deliveries.refetch()} />
               </details>
             )}

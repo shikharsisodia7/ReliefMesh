@@ -11,7 +11,7 @@ import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MissionMenu } from "@/components/mission/lifecycle-controls";
 import { LeadsSection, MarketActions } from "@/components/mission/market-panel";
 import { OrdersTab } from "@/components/mission/orders-tab";
-import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
+import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds, secondsText } from "@/components/mission/plan-tab";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { showToast } from "@/components/patterns/toast";
@@ -61,7 +61,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
     seenVersion.current = latest.version;
     if (seen === null || latest.version <= seen || !isReplan(latest)) return;
     const seconds = rebuildSeconds(latest);
-    showToast(`Plan v${latest.version} ready${seconds ? ` · rebuilt in ${seconds} s` : ""}`);
+    showToast(`Plan v${latest.version} ready${seconds !== null ? ` · rebuilt in ${secondsText(seconds)} s` : ""}`);
     router.replace(`${pathname}?tab=plan`, { scroll: false });
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [latest, pathname, router]);

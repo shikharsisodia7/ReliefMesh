@@ -26,7 +26,13 @@ export function JoinClient({ token }: { token: string }) {
   if (!invite.data) {
     return (
       <CenteredColumn title="Organization invitation">
-        {invite.isError ? <p className="text-sm text-critical">{invite.error.message}</p> : <p className="text-sm text-muted-foreground">Loading invitation…</p>}
+        {invite.isError ? (
+          <>
+            <p role="alert" className="text-sm text-critical">{invite.error.message}</p>
+            {/* A used, expired, or mistyped link is a dead end without a next step. */}
+            <p className="mt-3 text-sm text-muted-foreground">Invite links work once and expire after 7 days. Ask your organization&apos;s administrator for a new one, or <Link className="font-medium text-foreground hover:underline" href="/sign-in">sign in</Link> if you already joined.</p>
+          </>
+        ) : <p className="text-sm text-muted-foreground">Loading invitation…</p>}
       </CenteredColumn>
     );
   }

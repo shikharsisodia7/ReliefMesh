@@ -1,191 +1,136 @@
-# Devpost submission: ReliefMesh (final)
+# Devpost submission: ReliefMesh
 
-Every claim below was verified on production (`https://reliefmesh.us`, release `9bbe49d`) on 2026-10-25. Fields
-marked **OWNER** need information only the team has; nothing has been invented for them.
+> Production SHA: **TO BE RECONCILED**. Hosted-feature claims are **PENDING MERGE** unless the release
+> reconciliation confirms them. This copy is ready to paste after those fields are resolved.
 
-## Basics
+## Project name
 
-- **Project name:** ReliefMesh
-- **Tagline:** Emergency procurement that proves whether its plan can break, and rebuilds the plan when reality changes.
-- **Elevator pitch:** ReliefMesh buys emergency relief supplies from real supplier quotes for disaster response.
-  Before anyone signs off, its Continuity Engine stress-tests the exact plan against losing each supplier, price
-  shocks, delays and capacity cuts, names the single point of failure, and prices a resilient alternative. When a
-  supplier really changes its quote, the plan goes stale, the approval is revoked, and a new plan is computed for a
-  fresh human approval.
-- **Live app:** https://reliefmesh.us · **Judge guide:** https://reliefmesh.us/judge ·
-  **Live integration status:** https://reliefmesh.us/status
-- **Code:** https://github.com/shikharsisodia7/calhacks (default branch `release/final`)
-- **Fetch.ai agent:** `reliefmesh-buyer-agent` ·
-  `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x`
-- **OWNER:** team name, table number, teammates on Devpost, demo video URL (YouTube/Vimeo, unlisted is fine),
-  gallery image.
+ReliefMesh
+
+## Tagline
+
+The procurement continuity engine for emergency relief.
 
 ## Inspiration
 
-When a disaster is declared, a relief organization has to buy blankets, tarps and hygiene kits within hours, often
-from suppliers it has never used, under a fixed budget and federal documentation rules. The plan that gets approved
-is the cheapest one on paper, and nobody checks whether it survives the first supplier who sells out or raises a
-price. By the time that happens, the approval still points at a plan that no longer exists.
+Emergency procurement plans are written against facts that can change in minutes: a supplier sells out, raises a
+price, misses a delivery window, or becomes ineligible. Most tools help make a plan; they do not prove whether that
+plan survives the first failure or revoke an approval when its inputs are no longer true.
 
-We wanted two things: a plan that says up front how it can break, and an approval that dies the moment the facts
-under it change.
-
-**OWNER (optional):** add one or two sentences of your own experience if you have one. Do not invent one.
+We built ReliefMesh to make emergency purchasing resilient. It finds the best valid plan from supplier-submitted
+quotes, tells a coordinator how that plan can fail, and rebuilds it when the real world changes—without letting an
+agent or requester authorize spending.
 
 ## What it does
 
-1. **A mission from a live disaster.** The coordinator links the mission to an open NASA EONET event and sees NWS
-   alerts, NASA FIRMS fire detections and OpenFEMA declarations for that location.
-2. **Real suppliers, real quotes.** Apify finds public supplier leads (leads only, never trusted as inventory).
-   Suppliers get an RFQ email with a single-use link, sign up, and submit their own binding quote. Gemini can draft
-   the quote from pasted text; every value is cited from that text and the supplier reviews it before submitting.
-3. **Evidence and deterministic policy.** Every supplier is screened against the Treasury OFAC SDN list, SAM.gov
-   registration, USAspending awards and openFDA enforcement reports. A rule engine (no LLM) decides PASS / WARN /
-   NEEDS_REVIEW / BLOCK, and missing evidence is never a pass.
-4. **Optimization.** A mixed-integer program (PuLP/CBC) picks the cheapest plan that covers every unit within budget,
-   inventory, deadline and concentration limits.
-5. **Continuity Engine.** For that exact plan, ReliefMesh removes each allocated supplier in turn and re-solves (N-1),
-   binary-searches the exact price, delay and capacity shock that breaks the plan, and computes a resilient
-   alternative with no supplier above 50% of the order, along with what that resilience costs. Every result is
-   labeled **HYPOTHETICAL STRESS TEST** and never changes a quote, plan, approval or order.
-6. **Independent human approval.** An approver who is not the requester approves the exact plan version. The
-   approval is bound to the plan hash, expires and works once.
-7. **Autonomous recovery.** When a supplier revises or withdraws its quote, the plan goes STALE, the approval is
-   revoked, the old stress test goes STALE, and a background job builds the next plan version. The UI shows the old
-   plan beside the new one with the reason, cost delta and supplier changes, and compares the earlier
-   **PREDICTED COUNTERFACTUAL** with the **ACTUAL USER-SUBMITTED CHANGE**.
-8. **Purchase orders and fulfillment.** POs are generated idempotently, sent only after explicit confirmation, with a
-   PDF, and then accepted, shipped and delivered by the supplier.
-9. **Tamper-evident audit.** Every step lands in a per-mission SHA-256 hash chain with an HMAC-signed head, which
-   the app verifies.
-10. **Agents, safely.** The Fetch.ai agent runs the buyer workflow from ASI:One and answers continuity questions from
-    the stored analysis. Its token is rejected on approval and purchase-order endpoints, and it may buy paid evidence
-    only from an allow-listed conversation; production allows none. Premium evidence can be bought
-    machine-to-machine over HTTP 402 (Coinbase x402) and settled in test USDC on Solana devnet.
+1. A coordinator enters the need, destination, deadline, budget, and disaster context.
+2. ReliefMesh discovers public supplier leads, sends RFQs, and accepts supplier-submitted binding quotes.
+3. It evaluates public evidence and applies a deterministic eligibility policy.
+4. PuLP/CBC solves the constrained procurement problem: coverage, inventory, deadline, budget, and concentration.
+5. The Continuity Engine re-runs that same deterministic model under supplier loss, price, delay, and capacity
+   shocks. Its output is always labeled **HYPOTHETICAL STRESS TEST**.
+6. An authorized human approves the exact plan version. The requester and agent cannot self-approve.
+7. A real supplier quote change makes the plan stale, revokes its approval, and queues an automatic replan.
+8. A new plan requires a new human approval before purchase orders are issued.
 
-## The production run judges can inspect
+## Why it matters
 
-Mission "San Diego HENDERSON fire shelter blankets" on `reliefmesh.us`, with real accounts and nothing seeded:
+ReliefMesh treats a procurement plan as a living decision, not a static spreadsheet. In the latest verified recovery
+run, V1 was approved, a supplier changed price, V1 became stale, approval was revoked, and V2 was built
+automatically. Continuity ran again, a fresh approval was required, and two purchase orders completed. The
+tamper-evident audit chain verified, and replaying delivery work created zero duplicates.
 
-- Two suppliers quoted 100 blankets at $32 and 80 at $35. **Plan V1 cost $3,200**, all from one supplier.
-- The Continuity Engine flagged that supplier as the **single point of failure** (N-1 0/1) and showed the plan
-  breaks at a +243.76% price rise, a 30 h delay or an 81-unit capacity cut. It priced a resilient alternative at
-  $3,350 (+$150).
-- An independent approver approved V1. The supplier then **really raised its price** in the supplier portal
-  ($32 → $38). V1 went stale, its approval was revoked, and **Plan V2 ($3,560, +$360)** was rebuilt automatically,
-  splitting the order 80/20.
-- The V2 stress test shows that losing the larger supplier is recoverable and losing the smaller one is not (N-1 1/2).
-  The earlier prediction and the actual change are shown side by side: "Outcome matches the earlier stress test".
-- A fresh approval issued two POs ($760 + $2,800) through the organization's Gmail with PDFs. The first supplier
-  accepted, shipped and delivered its order.
-- The audit chain verifies (29 events). Replaying every application event and delivery job twice created zero
-  duplicate emails, Slack posts, Calendar events or Drive files, and the PO and payment counts did not change.
+Verified run totals: **2 total POs, 2 delivered POs, 32 audit events, 29 / 29 idempotency keys before and after
+replay, and zero duplicate Gmail, Slack, Calendar, Drive, PO, or x402 records.**
 
 ## How we built it
 
-- **Backend:** Python, FastAPI, Pydantic v2, MongoDB Atlas, PuLP + COIN-OR CBC, an httpx integration hub (timeouts,
-  retries, caching, LIVE / CACHED / UNAVAILABLE provenance), ReportLab PDFs, durable background jobs.
-- **Continuity Engine:** the same MILP re-run on deep copies of the saved quote snapshot, with binary-searched
-  breakpoints and an input hash that binds each analysis to the exact plan, quote versions, policy and evidence.
-- **Frontend:** Next.js, TypeScript, Tailwind, TanStack Query, React Hook Form + Zod.
-- **Agent:** Fetch.ai uAgents with the Agent Chat Protocol, mailbox on Agentverse, usable in ASI:One.
-- **Operations integrations:** each organization connects its own Gmail, Google Calendar, Google Drive and Slack.
-  Deliveries are idempotent and never block procurement. Resend sends from `procurement@reliefmesh.us` for
-  organizations without Gmail.
-- **Deploy:** Vercel (web), Render (API and agent, manual deploys), MongoDB Atlas, domain `reliefmesh.us`.
-- **Testing:** 145 backend tests (38 continuity guarantees), agent tests, Vitest, Playwright end to end, Semgrep and a
-  secret scan of the full history.
-- **Tooling:** built with Claude Code and Codex as coding agents.
-
-## What is real, sandbox and hypothetical
-
-| Data | Label |
-| --- | --- |
-| Disasters (EONET, NWS, FIRMS, OpenFEMA) and screening (OFAC, SAM.gov, USAspending, openFDA) | `LIVE`, or truthful `CACHED` / `UNAVAILABLE` |
-| Suppliers, quotes and quote changes | `USER_SUBMITTED` by real supplier accounts |
-| Apify results | Public leads only |
-| CRS identity checks | `SANDBOX`, CRS test identities only |
-| x402 / Solana payments | `DEVNET TEST PAYMENT`; no real money, no supplier is paid |
-| Continuity results | `HYPOTHETICAL STRESS TEST` |
+- **Web:** Next.js, React, TypeScript, Tailwind, TanStack Query, React Hook Form, and Zod.
+- **API:** FastAPI, Python, Pydantic, MongoDB Atlas, ReportLab, and durable background jobs.
+- **Decision system:** a deterministic policy engine plus PuLP/CBC mixed-integer optimization.
+- **Continuity:** snapshot-bound N-1, price, delay, and capacity stress tests plus a constrained resilient
+  alternative. Real changes invalidate stale results instead of overwriting history.
+- **Evidence and disaster context:** NASA EONET, NASA FIRMS, NWS, OpenFEMA, OFAC, SAM.gov, openFDA, and
+  USAspending. Failed providers are surfaced as `CACHED` or `UNAVAILABLE`, never invented as healthy data.
+- **Operations:** Gmail, Google Calendar, Google Drive, Slack, and Resend. Deliveries are idempotent and do not
+  grant approval authority.
+- **Agent and AI:** Fetch.ai / uAgents / Agentverse / ASI:One for operational questions; Gemini for
+  supplier-reviewable quote drafting. Claude: **PENDING MERGE**.
+- **Payments:** Coinbase x402 with Solana devnet test USDC for machine-paid evidence only; no supplier is paid.
+- **Deploy:** Vercel, Render, MongoDB Atlas, and `reliefmesh.us`.
 
 ## Challenges we ran into
 
-- **Our own production test caught an engine bug.** The resilient alternative showed 0/2 survivable supplier losses
-  when the correct answer was 1/2, because its scenarios were judged under stricter rules than the current plan's.
-  We fixed it, added a regression test, redeployed, and re-ran the same production mission to confirm 1/2.
-- **Time zones in AI-drafted quotes.** A delivery time with no zone was being shifted to UTC; it now keeps the
-  supplier's wall-clock time, with tests on both sides.
-- **Real data only.** We refused to seed production with demo suppliers, so every production proof had to be a real
-  two-party run with separate requester, approver and supplier accounts.
-- **Exactly-once notifications.** Retries and replans could have sent duplicate emails or Slack posts, so every
-  delivery carries an idempotency key and Calendar events update in place.
-- **Deploy discipline.** An early auto-deploy pushed unreviewed code to production. We rolled back and switched to
-  manual deploys of a single tested release commit.
+- We had to separate useful autonomy from financial authority. The system can invalidate, explain, and replan, but
+  only a human can approve a plan or commit a purchase order.
+- A continuity result is only useful if it is bound to the same quotes, policy, evidence, and plan version that a
+  human sees. We added explicit input bindings and stale-state handling instead of presenting a plausible but old
+  answer.
+- Real integrations need truthful failure behavior. We use provenance, caching, retries, and fail-closed policy
+  rather than replacing unavailable data with mock success.
 
 ## Accomplishments that we're proud of
 
-- The plan tells you how it breaks before it breaks, and the prediction is checked against what actually happened.
-- A real supplier change on production revoked an approval and rebuilt the plan with no human trigger.
-- Every number on screen comes from a stored record or a live provider, with its provenance shown.
+- A procurement plan can be stress-tested before an emergency supplier fails.
+- A real input change automatically invalidates the old financial authorization.
+- The complete recovery loop is auditable: V1 → change → stale → V2 → new approval → POs.
+- Replayed operational delivery jobs produce no duplicate notifications, files, orders, or receipts.
+- AI assistance stays on the assistive side of a firm human and deterministic boundary.
 
 ## What we learned
 
-- In finance workflows the approval is the product: it has to point at one immutable plan, expire, and die when
-  inputs change.
-- Being honest about data (LIVE vs CACHED vs SANDBOX vs HYPOTHETICAL) is a feature judges and users can check.
-- LLMs belong at the edges (drafting, explaining); eligibility, allocation and approval stay deterministic and human.
+Trust is a product feature. Showing whether data is live, cached, user-submitted, sandboxed, or hypothetical is as
+important as computing a recommendation. We also learned that a resilient plan is not necessarily the cheapest plan,
+and a correct answer must include the cost of that resilience.
 
 ## What's next
 
-- SAM.gov exclusions (2 CFR 180) and more regulated-goods checks.
-- Multi-supplier failure scenarios (N-2) and delay or risk terms in the objective.
-- Spending thresholds with multi-approver chains and ERP export.
-- A pilot with a county emergency office or a regional relief NGO.
+- Reconcile the final deployment SHA and hosted-feature branch before submission.
+- Add final redacted production screenshots and a Figma artifact link.
+- Continue validating the workflow with emergency-response partners and policy owners.
+- Expand supplier participation while preserving the same evidence, approval, and audit boundaries.
 
 ## Built with
 
-`python` `fastapi` `pydantic` `pulp` `coin-or-cbc` `mongodb-atlas` `next.js` `typescript` `tailwindcss`
-`tanstack-query` `zod` `reportlab` `playwright` `pytest` `vitest` `fetch.ai` `uagents` `asi-one` `apify` `gemini`
-`coinbase-x402` `solana` `crs-credit-api` `gmail-api` `google-calendar-api` `google-drive-api` `slack-api` `resend`
-`nasa-eonet` `nws` `nasa-firms` `openfema` `ofac` `sam-gov` `usaspending` `openfda` `vercel` `render`
+Next.js, React, FastAPI, Python, MongoDB Atlas, PuLP, CBC, Vercel, Render, Fetch.ai, uAgents, Agentverse, ASI:One,
+Gemini, Apify, CRS / TransUnion TruValidate sandbox, OFAC, SAM.gov, openFDA, USAspending, NASA EONET, NASA FIRMS,
+NWS, OpenFEMA, Coinbase x402, Solana devnet, Gmail, Google Calendar, Google Drive, Slack, and Resend.
 
-## Prize tracks
+## Live demo
 
-Opt into these, using the exact names on the Devpost prize list (`cal-hacks-13-0.devpost.com`, checked
-2026-10-25 08:50 UTC; see `docs/qa/TRACK_ELIGIBILITY.md`):
-- Cal Hacks First/Second/Third Overall, Cal Hacks Most Creative Hack, Cal Hacks Most Technically Complex Hack,
-  Cal Hacks Best People-First Social Impact Hack, Cal Hacks Hacker's Choice;
-- [Hyphenate] The Hyphenated Enterprise: Autonomous Systems for Finance;
-- [Microsoft] Built for the Real World (1st), Customer Impact Award (2nd);
-- [Fetch.ai] Best Use of Fetch.ai;
-- [CRS] Best Use of CRS API;
-- [Apify] Best Use of Apify;
-- [MLH] Best Use of Gemini API;
-- [MLH] Best Use of Solana;
-- [MLH] Best Domain Name from GoDaddy Registry.
+https://reliefmesh.us
 
-MLH Best Use of MongoDB Atlas and MLH Best Use of Gen AI are on the Hive live list but **not** on the Devpost prize
-list, so they can't be selected there. Ask MLH at their table whether they judge them separately.
+## GitHub
 
-Do **not** claim:
-- **Coinbase x402** as fully eligible. The track asks for the Coinbase MCP for Agents, which ReliefMesh does not use.
-  Enter it only as an honest partial, after each member has a verified Coinbase account.
-- **Armadin** until its criteria are published.
-- **[Anthropic] Claude for Public Benefit.** ReliefMesh was built with Claude Code, but the product does not use
-  Claude at runtime (its AI feature uses Gemini).
-- **Any category marked SKIP** in the audit.
+https://github.com/shikharsisodia7/calhacks
 
-## Track-specific fields
+## Judge guide
 
-- **Hyphenate, "seats it fills":** ReliefMesh fills the emergency buyer and purchasing-clerk seats: it sources,
-  screens, stress-tests and re-plans, and it never approves or pays.
-- **Hyphenate, "the moment":** a real supplier raises its price after approval; the approval dies, the plan rebuilds
-  itself, and the earlier stress test is checked against what actually happened.
-- **Fetch.ai:** agent name and address above; Agentverse profile
-  https://agentverse.ai/agents/details/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x/profile.
-  **OWNER:** ASI:One shared-chat URL and the 3–5 minute agent video; register the team in the ASI:One Submission
-  agent with the Devpost URL.
-- **Apify:** actor `compass/crawler-google-places` (https://apify.com/compass/crawler-google-places); production run
-  `UzUWPV9bx3pecTERA`, dataset `QvXc5W61SgngKrC4i`.
-- **CRS:** live sandbox proof at https://reliefmesh.us/status (test identity P01 verified, P12 flagged).
-- **MLH GoDaddy Registry:** `reliefmesh.us`.
+https://reliefmesh.us/judge
+
+## Figma
+
+**PENDING** — add the final artifact URL only after it exists.
+
+## Demo video
+
+**PENDING** — add the final YouTube or Vimeo URL.
+
+## Sponsor track notes
+
+| Track / sponsor | Submission note |
+| --- | --- |
+| Hyphenate | Autonomous procurement recovery with human financial authority. |
+| Microsoft | A deployed operational workflow with responsible-AI boundaries. |
+| Fetch.ai | Agentverse / ASI:One procurement agent that explains stored results without spending authority. |
+| CRS | Sandbox signer identity and fraud verification; label `SANDBOX`. |
+| Apify | Public supplier-lead discovery; leads are not quotes or inventory. |
+| Gemini | Grounded supplier quote drafting with review before submission. |
+| Solana | Devnet settlement; label `DEVNET TEST PAYMENT`. |
+| GoDaddy | `reliefmesh.us`. |
+| Armadin | Authority boundaries, replay protection, and tamper-evident audit. |
+| Coinbase x402 | Machine-paid evidence over x402; eligibility remains conditional. |
+| Figma | **PENDING** final artifact. |
+| Bright Data | **PENDING MERGE**; do not claim until reconciled and live. |
+
+For submission eligibility, use [the conservative track audit](qa/TRACK_ELIGIBILITY.md), not this summary table.

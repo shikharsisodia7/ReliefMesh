@@ -34,9 +34,10 @@ export default function LeafletMap({ markers, center, zoom, height, label }: { m
   // Starts on the caller's center when given, otherwise fitted to every marker.
   const view = center || markers.length < 2
     ? { center: [center?.lat ?? markers[0]?.lat ?? 0, center?.lon ?? markers[0]?.lon ?? 0] as [number, number], zoom }
-    : { bounds: L.latLngBounds(markers.map((marker) => [marker.lat, marker.lon] as [number, number])), boundsOptions: { paddingTopLeft: [40, 48] as [number, number], paddingBottomRight: [150, 40] as [number, number], maxZoom: 10 } };
+    : { bounds: L.latLngBounds(markers.map((marker) => [marker.lat, marker.lon] as [number, number])), boundsOptions: { paddingTopLeft: [markers.some((marker) => marker.labelLeft) ? 170 : 40, 48] as [number, number], paddingBottomRight: [150, 40] as [number, number], maxZoom: 10 } };
   return (
-    <div role="region" aria-label={label} className="relative overflow-hidden rounded-md border bg-muted" style={{ height }}>
+    // `isolate` keeps Leaflet's internal z-indexes (400–1000) inside the map, below drawers and dialogs.
+    <div role="region" aria-label={label} className="relative isolate overflow-hidden rounded-md border bg-muted" style={{ height }}>
       <MapContainer
         {...view}
         className="map-gray h-full w-full"

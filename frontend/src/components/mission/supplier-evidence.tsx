@@ -105,7 +105,8 @@ function EvidenceDrawer({ open, record, row, blocking, canReview, onClose, onRev
 
       {why.length > 0 && (
         <section className="mt-6 border-t pt-5">
-          <h3 className="text-sm font-semibold">Why allocation is blocked</h3>
+          {/* NEEDS_REVIEW holds a supplier until a human decides; only BLOCK excludes it outright. */}
+          <h3 className="text-sm font-semibold">{why.some((decision) => decision.status === "BLOCK") ? "Why allocation is blocked" : "Why allocation is on hold"}</h3>
           <ul className="mt-2 space-y-2 text-sm">{why.map((decision) => <li key={decision.rule_id}>{decision.reason}</li>)}</ul>
           <p className="mt-2 text-xs text-muted-foreground">Rules decide eligibility; price never overrides it. Clear the finding only after a documented human review.</p>
         </section>

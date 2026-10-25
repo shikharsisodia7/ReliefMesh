@@ -146,6 +146,13 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft, assistan
       <aside aria-label="Draft from an existing quote">
         <h2 className="text-base font-semibold">Draft from an existing quote</h2>
         <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-muted-foreground"><Sparkles className="size-3.5" aria-hidden />AI · Gemini · pasted text</p>
+        {/* The whole workflow in four lines, so it's clear who does what. */}
+        <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-muted-foreground marker:tabular-nums">
+          <li>Paste the text of a quote you already wrote.</li>
+          <li>Gemini drafts the fields and marks each one &ldquo;AI draft&rdquo;.</li>
+          <li>You check and edit them. An edited field is yours.</li>
+          <li>You confirm the review and submit. Gemini never submits or decides eligibility.</li>
+        </ol>
         {onDraft ? (
           <div className="mt-4 grid gap-3">
             <Label htmlFor="pasted-quote">Paste an existing quote (optional)</Label>

@@ -32,8 +32,11 @@ export function rebuildSeconds(plan: Plan) {
   const at = plan.trigger_detail.find((detail) => detail.at)?.at;
   if (!at) return null;
   const seconds = (new Date(plan.computed_at).getTime() - new Date(at).getTime()) / 1000;
-  return seconds >= 0 ? seconds.toFixed(1) : null;
+  return seconds >= 0 ? seconds : null;
 }
+
+// An in-process replan can finish within the timestamps' rounding; "0.0 s" reads like a bug.
+export const secondsText = (seconds: number) => (seconds < 0.1 ? "under 0.1" : seconds.toFixed(1));
 
 function planSentence(plan: Plan, previous: Plan | undefined, revoked: Approval | undefined) {
   if (!isReplan(plan)) {
@@ -44,7 +47,7 @@ function planSentence(plan: Plan, previous: Plan | undefined, revoked: Approval 
   const parts = [`Rebuilt automatically at ${timeOnly(plan.computed_at)}${reasons.length ? ` after ${reasons.join("; ")}` : ""}.`];
   if (previous) parts.push(revoked ? `Plan v${previous.version} and its approval no longer apply.` : `Plan v${previous.version} no longer applies.`);
   const seconds = rebuildSeconds(plan);
-  if (seconds) parts.push(`Replanned in ${seconds} s.`);
+  if (seconds !== null) parts.push(`Replanned in ${secondsText(seconds)} s.`);
   return parts.join(" ");
 }
 
@@ -103,7 +106,8 @@ function Step({ done, children }: { done: boolean; children: ReactNode }) {
   return (
     <li className="relative flex gap-3 pb-5 text-sm last:pb-0 before:absolute before:top-6 before:bottom-1 before:left-[9.5px] before:w-px before:bg-border last:before:hidden">
       <Icon className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-      <span className={done ? "text-muted-foreground" : ""}>{children}</span>
+      {/* Emails are long unbroken strings; let them wrap inside the rail. */}
+      <span className={`min-w-0 [overflow-wrap:anywhere] ${done ? "text-muted-foreground" : ""}`}>{children}</span>
     </li>
   );
 }
