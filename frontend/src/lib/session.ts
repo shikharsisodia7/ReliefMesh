@@ -28,6 +28,11 @@ export function readSession(): { token: string; user: SessionUser } | null {
   }
 }
 
+/** Where to go after signing in: only same-site paths, so a crafted link cannot bounce users off-site. */
+export function safeNext(value: string | null | undefined): string | null {
+  return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : null;
+}
+
 export function clearSession() {
   localStorage.removeItem(key);
   cachedRaw = null;

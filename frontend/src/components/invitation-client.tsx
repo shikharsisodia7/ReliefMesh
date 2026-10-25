@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAppConfig } from "@/hooks/use-config";
 import { useSession } from "@/hooks/use-session";
 import { api } from "@/lib/api";
+import { clearSession } from "@/lib/session";
 import type { QuoteDraft } from "@/lib/types";
 
 type Invitation = { supplier_email: string; status: string; mission: { id: string; name: string; delivery_location: string; delivery_deadline: string; requirements: { id?: string; item: string; quantity: number }[] } };
@@ -28,6 +29,7 @@ export function InvitationClient({ token }: { token: string }) {
   if (invitation.isLoading) return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading RFQ…</main>;
   if (!invitation.data) return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground">{invitation.error?.message ?? "This RFQ invitation is unavailable."}</main>;
   const active = accepted || invitation.data.status === "accepted";
+  const next = encodeURIComponent(`/invitations/${token}`);
   return (
     <main className="min-h-screen bg-background px-5 py-12"><div className="mx-auto max-w-2xl space-y-5">
       <Link href="/" className="font-mono text-sm font-bold tracking-[0.2em]">RELIEF<span className="text-live">MESH</span></Link>
@@ -35,8 +37,8 @@ export function InvitationClient({ token }: { token: string }) {
         <ul className="mb-6 list-disc pl-5 text-sm">{invitation.data.mission.requirements.map((requirement) => <li key={requirement.item}>{requirement.quantity} {requirement.item}</li>)}</ul>
         {error && <p className="mb-4 rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
         {notice && <p className="mb-4 rounded-md border border-live/30 bg-live/10 p-3 text-sm text-live">{notice}</p>}
-        {!session ? <p className="text-sm">Sign in with <strong>{invitation.data.supplier_email}</strong> to securely accept this RFQ. <Link className="underline" href="/sign-in">Sign in</Link> or <Link className="underline" href="/sign-up?role=supplier">register as supplier</Link>.</p>
-          : session.user.role !== "supplier" ? <p className="text-sm text-critical">This link must be accepted with a supplier account.</p>
+        {!session ? <p className="text-sm">Sign in with <strong>{invitation.data.supplier_email}</strong> to securely accept this RFQ. <Link className="underline" href={`/sign-in?next=${next}`}>Sign in</Link> or <Link className="underline" href={`/sign-up?role=supplier&next=${next}`}>register as supplier</Link>.</p>
+          : session.user.role !== "supplier" ? <div className="space-y-3"><p className="text-sm text-critical">This link must be accepted with a supplier account. You are signed in as {session.user.email ?? "a coordinator"}.</p><Button variant="outline" onClick={() => { clearSession(); router.push(`/sign-up?role=supplier&next=${next}`); }}>Sign out and continue as {invitation.data.supplier_email}</Button></div>
           : !active ? <Button onClick={() => void (async () => { try { await api(`/v1/supplier-invitations/${token}/accept`, { method: "POST", token: session.token }); setAccepted(true); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Could not accept invitation"); } })()}>Accept RFQ</Button>
           : <QuoteForm key={profile.data?.legal_name ?? "new"} requirements={invitation.data.mission.requirements} legalName={profile.data?.legal_name} onDraft={config.data?.quote_assistant ? (text) => api<QuoteDraft>(`/v1/supplier-invitations/${token}/quote-draft`, { method: "POST", token: session.token, body: JSON.stringify({ text }) }) : undefined} onSubmit={async (values) => { try {
               await api("/v1/quotes", { method: "POST", token: session.token, body: JSON.stringify({ invitation_token: token, expires_at: new Date(values.expires_at).toISOString(), currency: "USD", shipping_cost: values.shipping_cost.toFixed(2), supplier_profile: { legal_name: values.legal_name, website: values.website || null }, lines: values.lines.map((line) => ({ requirement_id: line.requirement_id || null, item: line.item, unit_price: line.unit_price.toFixed(2), available_quantity: line.available_quantity, delivery_date: new Date(line.delivery_date).toISOString() })) }) });
