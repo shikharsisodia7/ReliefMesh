@@ -110,7 +110,7 @@ function Step({ done, children }: { done: boolean; children: ReactNode }) {
 
 const linkClass = "text-sm font-medium hover:underline";
 
-function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, requester, ttlMinutes, token, run, setNotice, onTab }: {
+export function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, requester, ttlMinutes, token, run, setNotice, onTab }: {
   plan: Plan; approvals: Approval[]; canApprove: boolean; approvalBlocked: string | null; requester: string; ttlMinutes: number;
   token: string; run: Run; setNotice: (value: string) => void; onTab: (tab: string) => void;
 }) {

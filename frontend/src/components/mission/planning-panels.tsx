@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Hash, Link2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Link2 } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "@/components/patterns/overlays";
@@ -9,43 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Notification, Payment, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
+import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Notification, Payment, Plan, SupplierRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Run = (operation: () => Promise<void>) => Promise<void>;
-
-const PALETTE = ["#00d4ff", "#ffb800", "#26de81", "#a78bfa", "#ff9f43", "#f472b6", "#60a5fa"];
-
-export function colorFor(order: string[], supplierId: string) {
-  const index = order.indexOf(supplierId);
-  return PALETTE[(index < 0 ? order.length : index) % PALETTE.length];
-}
-
-function supplierName(plan: Plan, supplierId: string) {
-  const row = plan.policy?.suppliers?.[supplierId];
-  return row?.legal_name || row?.email || supplierId.slice(0, 8);
-}
-
-function shares(plan: Plan) {
-  const total = plan.allocations.reduce((sum, row) => sum + row.quantity, 0) || 1;
-  const map = new Map<string, { units: number; cost: number }>();
-  for (const row of plan.allocations) {
-    const entry = map.get(row.supplier_id) ?? { units: 0, cost: 0 };
-    entry.units += row.quantity;
-    entry.cost += Number(row.line_cost);
-    map.set(row.supplier_id, entry);
-  }
-  return [...map.entries()].map(([supplierId, value]) => ({ supplierId, ...value, share: value.units / total }));
-}
-
-export function AllocationBar({ plan, order }: { plan: Plan; order: string[] }) {
-  if (plan.status === "infeasible") return <div className="h-3 rounded bg-critical/20" aria-label="No feasible allocation" />;
-  return (
-    <div className="flex h-3 overflow-hidden rounded bg-muted" role="img" aria-label={`Allocation for plan v${plan.version}`}>
-      {shares(plan).map((entry) => <div key={entry.supplierId} style={{ width: `${entry.share * 100}%`, background: colorFor(order, entry.supplierId) }} title={`${supplierName(plan, entry.supplierId)} ${Math.round(entry.share * 100)}%`} />)}
-    </div>
-  );
-}
 
 const DISRUPTIONS = [
   { kind: "withdraw", label: "Supplier withdraws quote" },
@@ -147,49 +114,6 @@ export function CompareView({ latest, previous, approvals, onClose }: { latest: 
         <dt className="text-muted-foreground">Approval</dt>
         <dd>{invalidated ? <><span className="font-medium">Approval revoked</span> · v{previous.version} approval for {money(invalidated.amount)}: {invalidated.invalidation_reason}</> : <span className="text-muted-foreground">Plan v{previous.version} was not approved.</span>}</dd>
       </dl>
-    </section>
-  );
-}
-
-export function PlanVersions({ plans, approvals, token, run, setNotice, order, isAdmin, approvalBlocked }: { plans: Plan[]; approvals: Approval[]; token: string; run: Run; setNotice: (value: string) => void; order: string[]; isAdmin: boolean; approvalBlocked?: string | null }) {
-  return (
-    <section aria-label="Plan versions" className="rounded-xl border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Plan versions</h2>
-      <p className="mb-3 text-xs text-tertiary">Each version is kept as append-only, tamper-evident evidence (inputs, policy fingerprint, hash). A stale plan cannot be approved; an approval authorizes exactly one plan version, expires, and is single-use.</p>
-      {plans.length === 0 ? <p className="text-sm text-muted-foreground">Run optimization after suppliers submit quotes.</p> : (
-        <div className="space-y-3">
-          {plans.map((plan) => {
-            const approval = approvals.find((row) => row.plan_id === plan.id);
-            return (
-              <article key={plan.id} className="rounded-lg border p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2"><h3 className="font-semibold">Plan v{plan.version}</h3><PlanStatusText value={plan.status} /><span className="font-mono text-[10px] text-tertiary">{plan.trigger} · {ago(plan.computed_at)}</span></div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">Total {money(plan.total_cost)} · Shipping {money(plan.shipping_cost)} · Remaining {money(plan.remaining_budget)}{plan.committed_cost ? ` · Committed on POs ${money(plan.committed_cost)} · New spend ${money(plan.new_spend ?? "0")}` : ""}{plan.difference.total_cost_before ? ` · Prior total ${money(plan.difference.total_cost_before)}` : ""}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    {plan.status === "feasible" && !isAdmin && approvalBlocked && <span className="max-w-xs text-right text-xs text-telemetry">{approvalBlocked}</span>}
-                    {plan.status === "feasible" && isAdmin && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/plans/${plan.id}/approve`, { method: "POST", token }); setNotice(`Plan v${plan.version} is approved.`); })}><ShieldCheck className="size-3.5" />Approve plan</Button>}
-                    {plan.status === "approved" && approval?.status === "active" && <Button size="sm" onClick={() => void run(async () => { const created = await api<PurchaseOrder[]>(`/v1/plans/${plan.id}/purchase-orders`, { method: "POST", token, headers: { "Idempotency-Key": crypto.randomUUID() } }); setNotice(`${created.length} purchase order draft${created.length === 1 ? "" : "s"} generated. Confirm each send below.`); })}>Generate POs</Button>}
-                  </div>
-                </div>
-                <div className="mt-2"><AllocationBar plan={plan} order={order} /></div>
-                {plan.status === "infeasible" ? (
-                  <ul className="mt-2 list-disc pl-5 text-sm text-critical">{plan.shortages.map((shortage) => <li key={shortage.item}>{shortage.item}: shortage {shortage.shortage}; constraint: {shortage.reason}</li>)}</ul>
-                ) : (
-                  <ul className="mt-2 grid gap-0.5 text-sm">{plan.allocations.map((allocation) => <li key={`${allocation.supplier_id}-${allocation.item}-${allocation.po_number ?? "new"}`} className="flex items-center gap-1.5"><span className="inline-block size-2 rounded-sm" style={{ background: colorFor(order, allocation.supplier_id) }} />{supplierName(plan, allocation.supplier_id)}: {allocation.quantity} {allocation.item} × {money(allocation.unit_price)} = {money(allocation.line_cost)}{allocation.committed && <span className="rounded border px-1 font-mono text-[10px] text-muted-foreground" title="Already on an active purchase order; kept fixed while replanning">on {allocation.po_number}</span>}</li>)}</ul>
-                )}
-                {plan.rejected_quotes.some((row) => row.reason.startsWith("policy")) && (
-                  <details className="mt-2 text-xs"><summary className="cursor-pointer text-telemetry">Withheld by policy ({plan.rejected_quotes.filter((row) => row.reason.startsWith("policy")).length})</summary>
-                    <ul className="mt-1 space-y-1">{plan.rejected_quotes.filter((row) => row.reason.startsWith("policy")).map((row) => <li key={row.quote_id}><span className="font-medium">{row.supplier_id ? supplierName(plan, row.supplier_id) : row.supplier_email}</span>: {row.rules?.join(", ")}</li>)}</ul>
-                  </details>
-                )}
-                <p className="mt-2 flex flex-wrap items-center gap-x-3 font-mono text-[10px] text-tertiary"><span className="inline-flex items-center gap-1"><Hash className="size-3" />{plan.plan_hash?.slice(0, 16)}</span>{plan.binding_constraints.length > 0 && <span>binding: {plan.binding_constraints.join(", ")}</span>}{approval && <span>approval {approval.status}{approval.expires_at ? ` · expires ${when(approval.expires_at)}` : ""}</span>}{plan.stale_reason && <span className="text-warn">stale: {plan.stale_reason}</span>}</p>
-              </article>
-            );
-          })}
-        </div>
-      )}
     </section>
   );
 }

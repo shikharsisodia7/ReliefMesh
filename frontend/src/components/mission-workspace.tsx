@@ -2,15 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Page, PageHeader } from "@/components/layout/page-header";
+import { ApprovalTab } from "@/components/mission/approval-tab";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MissionMenu } from "@/components/mission/lifecycle-controls";
 import { LeadsSection, MarketActions } from "@/components/mission/market-panel";
 import { OrdersTab } from "@/components/mission/orders-tab";
 import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
-import { PaymentsPanel, PlanVersions, Timeline } from "@/components/mission/planning-panels";
+import { PaymentsPanel, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { showToast } from "@/components/patterns/toast";
@@ -46,12 +47,6 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
     queryKey: ["members", mission?.organization_id], enabled: Boolean(session && mission),
     queryFn: () => api<{ members: { user_id: string; email: string | null }[] }>(`/v1/organizations/${mission!.organization_id}/members`, { token: session!.token }),
   });
-  const supplierOrder = useMemo(() => {
-    const order: string[] = [];
-    for (const plan of [...(data.plans.data ?? [])].reverse()) for (const row of plan.allocations) if (!order.includes(row.supplier_id)) order.push(row.supplier_id);
-    for (const row of data.suppliers.data ?? []) if (!order.includes(row.supplier.id)) order.push(row.supplier.id);
-    return order;
-  }, [data.plans.data, data.suppliers.data]);
   const latest = data.plans.data?.[0];
   const setTab = (next: string) => router.replace(`${pathname}?tab=${next}`, { scroll: false });
   const setNotice = (text: string) => setNoticeState({ text, version: latest?.version });
@@ -145,7 +140,10 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
                 busy={replanning} continuityRunning={continuityRunning} eligibleCount={eligible} quoteCount={submitted}
               />
             </TabPanel>
-            <TabPanel value="approval"><PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} /></TabPanel>
+            <TabPanel value="approval">
+              <ApprovalTab plans={plans} approvals={data.approvals.data ?? []} demoOrg={Boolean(organization?.is_demo)} canApprove={canApprove} approvalBlocked={approvalBlocked} requester={requester} ttlMinutes={approvalTtlMinutes}
+                token={token} run={run} setNotice={setNotice} onTab={setTab} />
+            </TabPanel>
             <TabPanel value="orders">
               <OrdersTab missionId={missionId} organizationId={mission.organization_id} plans={plans} approvals={data.approvals.data ?? []} orders={data.orders.data ?? []} quotes={quotes} suppliers={suppliers}
                 token={token} run={run} setNotice={setNotice} isAdmin={isAdmin} onTab={setTab} />
