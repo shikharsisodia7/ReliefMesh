@@ -38,6 +38,17 @@ database, so production holds no test records.
 Found and fixed during verification: the supplier portal's "Save revision" never submitted (Base UI buttons default to
 `type="button"`), and the mission email log omitted PO emails.
 
+## Later hardening (same day)
+
+- Codex QA findings fixed: REL-003 (agent plan read skipped conversation isolation) and REL-004 (replayable RFQ
+  acceptance); their strict-xfail regressions now pass. Pending org invites no longer leak to non-admins.
+- Status page: live CRS sandbox proof on CRS-published test identities (P01 verified, P12 flagged, labeled SANDBOX);
+  read-only Resend key check; forced refreshes are floored and locked so the public page cannot amplify upstream calls;
+  no account usernames shown.
+- Keepalive cron verified in production runtime logs (API and Fetch agent warm every 10 minutes).
+- Sender branded "ReliefMesh Procurement"; the sending domain lives only in deployment env (see EMAIL_DOMAIN.md).
+- Tests: 58 backend, 3 Playwright E2E, deployed QA smoke check; secret-value scan clean across all branches.
+
 ## Known limits
 
 - RFQ emails are delivered (Resend "Delivered"), but inbox placement can suffer until ReliefMesh sends from its own
