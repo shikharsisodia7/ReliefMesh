@@ -151,20 +151,28 @@ Mission "San Diego HENDERSON fire shelter blankets" on `reliefmesh.us`, with rea
 
 ## Prize tracks
 
-Opt into (real and live, see `docs/qa/TRACK_ELIGIBILITY.md`):
-- Cal Hacks Overall, Most Technically Complex, Most Creative, Best People-First, Hacker's Choice;
-- Hyphenate: Autonomous Systems for Finance;
-- Microsoft Grand Prize: Built for the Real World, and Microsoft Customer Impact Award;
-- Best Use of Fetch.ai;
-- CRS Financial Intelligence Challenge (Identity / Fraud Innovation);
-- Best use of Apify;
-- MLH: Best Use of Gemini API, Best Use of Gen AI, Best Use of Solana, Best Use of MongoDB Atlas, Best Domain Name
-  from GoDaddy Registry.
+Opt into these, using the exact names on the Devpost prize list (`cal-hacks-13-0.devpost.com`, checked
+2026-10-25 08:50 UTC; see `docs/qa/TRACK_ELIGIBILITY.md`):
+- Cal Hacks First/Second/Third Overall, Cal Hacks Most Creative Hack, Cal Hacks Most Technically Complex Hack,
+  Cal Hacks Best People-First Social Impact Hack, Cal Hacks Hacker's Choice;
+- [Hyphenate] The Hyphenated Enterprise: Autonomous Systems for Finance;
+- [Microsoft] Built for the Real World (1st), Customer Impact Award (2nd);
+- [Fetch.ai] Best Use of Fetch.ai;
+- [CRS] Best Use of CRS API;
+- [Apify] Best Use of Apify;
+- [MLH] Best Use of Gemini API;
+- [MLH] Best Use of Solana;
+- [MLH] Best Domain Name from GoDaddy Registry.
+
+MLH Best Use of MongoDB Atlas and MLH Best Use of Gen AI are on the Hive live list but **not** on the Devpost prize
+list, so they can't be selected there. Ask MLH at their table whether they judge them separately.
 
 Do **not** claim:
 - **Coinbase x402** as fully eligible. The track asks for the Coinbase MCP for Agents, which ReliefMesh does not use.
   Enter it only as an honest partial, after each member has a verified Coinbase account.
 - **Armadin** until its criteria are published.
+- **[Anthropic] Claude for Public Benefit.** ReliefMesh was built with Claude Code, but the product does not use
+  Claude at runtime (its AI feature uses Gemini).
 - **Any category marked SKIP** in the audit.
 
 ## Track-specific fields

@@ -42,9 +42,9 @@ actions that have not happened; 🟢 means the technology is real and live on pr
 | Coinbase — Best Use of x402 (Payment Agents) | 🟡 | Official x402 SDK, HTTP 402 → Solana devnet USDC settlement | Settled devnet tx from the HENDERSON mission | No | **Coinbase MCP for Agents is not implemented** (the track names it); verified Coinbase account per member; builder-feedback write-up |
 | Apify — Best use of Apify | 🟢 | `compass/crawler-google-places` supplier discovery (leads only) | Newest prod run `UzUWPV9bx3pecTERA` / dataset `QvXc5W61SgngKrC4i` (historical: `6LFVdn73xb0TMjtrW`) | No | Show discovery in demo |
 | MLH Best Use of Gemini API | 🟢 | Grounded, schema-constrained quote-draft assistant | Real Gemini draft in the HENDERSON run + e2e test with real Gemini | No | Free tier ~20 drafts/day; MLH form |
-| MLH Best Use of Gen AI | 🟢 | Same Gemini feature | Same | No | MLH form |
+| MLH Best Use of Gen AI | 🟢 | Same Gemini feature | Same | No | Not on the Devpost prize list (only on Hive); ask MLH |
 | MLH Best Use of Solana | 🟢 | x402 settlement in USDC on Solana devnet | Newest devnet tx `3xYUqjWe…Crddq` (HENDERSON dossier; historical: `jbsGqZmk…`) | No | MLH form; label DEVNET |
-| MLH Best Use of MongoDB Atlas | 🟢 | Production system of record (M0) | Prod API `storage: mongo` | No | MLH form |
+| MLH Best Use of MongoDB Atlas | 🟢 | Production system of record (M0) | Prod API `storage: mongo` | No | Not on the Devpost prize list (only on Hive); ask MLH |
 | MLH Best Domain Name from GoDaddy Registry | 🟢 | `reliefmesh.us` via the MLH × GoDaddy Registry cart (code MLHCH2681) | `https://reliefmesh.us` live, Let's Encrypt cert | No | MLH form |
 | Armadin — Best Security Hack | 🟡 | Tenant break-in suite, signed audit heads, agent authority limits | Tests + prod | No | Criteria still "Coming soon!" in the official list (re-checked 08:20 UTC) |
 | Anthropic | ⚫ | Product does not use Claude at runtime | — | — | Requires thoughtful use of Claude |
@@ -52,6 +52,23 @@ actions that have not happened; 🟢 means the technology is real and live on pr
 | Bright Data | ⚫ | Not integrated | — | — | Bright Data must be essential |
 | Visa — Reimagining Shopping | ⚫ | B2B emergency procurement, not shopping | — | — | Forced fit |
 | All other categories (listed below) | ⚫ | Not integrated | — | — | — |
+
+## Devpost prize list cross-check
+
+Submissions opt into prizes on Devpost (`cal-hacks-13-0.devpost.com`, checked 2026-10-25 08:50 UTC), and its list
+differs from the Hive live list in the following ways. The mapping is below; the full submission text, with the exact
+Devpost names to tick, is in `docs/DEVPOST.md`.
+
+| Devpost name | Same as (Hive) | Note |
+| --- | --- | --- |
+| [Anthropic] Claude for Public Benefit | Anthropic | Still ⚫: the product does not use Claude at runtime |
+| [Microsoft] Built for the Real World (1st), Customer Impact Award (2nd) | Microsoft Grand Prize + Customer Impact | One Devpost entry for both |
+| [CRS] Best Use of CRS API (1st $2,000, 2nd $1,000) | CRS Financial Intelligence Challenge | Devpost lists two cash places |
+| [Elastic] Best use of the Elastic Agent Builder on a Serverless Instance | Elastic | ⚫ |
+| [Figma] Best Figma Workflow Hack | Figma in the Workflow | ⚫ |
+| [SpaceXSI] Make it Legendary with SpaceXSI | SpaceXAI | ⚫ |
+| Not on Devpost | MLH Best Use of MongoDB Atlas, MLH Best Use of Gen AI | 🟢 technically, but not selectable on Devpost; ask MLH |
+| Not on Devpost | MLH ElevenLabs, Presage, Backboard, DigitalOcean, Auth0, .Tech; AfterQuery; Annapurna Labs | ⚫ either way |
 
 ## Viable tracks in detail
 
