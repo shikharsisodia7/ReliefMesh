@@ -9,8 +9,8 @@ https://reliefmesh-calhacks.vercel.app/status
 
 | Track | Exact evidence observed | Live proof | Missing requirement | Verdict |
 | --- | --- | --- | --- | --- |
-| Cal Hacks core | Public repo; deployed web + API; real workflow verified on production (RFQ email → quotes → evidence → plan → independent approval → supplier revision → replan → PO → fulfillment) | Yes | Devpost submission, project image, demo video (owner) | CONDITIONAL |
-| Fetch.ai / ASI:One | Mailbox agent `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x` registered on Agentverse (Active, ASI Available), AgentChatProtocol manifest published, address + badges in README; Agentverse chat-protocol test run answered with live NASA EONET data and refused demo actions | Partial | One end-to-end ASI:One chat session from the owner's account (needs ASI:One onboarding), 3–5 min video | CONDITIONAL |
+| Cal Hacks core | Public repo; deployed web + API; real workflow verified twice on production through the UI (RFQ email → quotes incl. Gemini draft → live evidence → plan → independent approval → supplier revision → replan → PO email with PDF → acceptance → fulfillment → signed audit chain) | Yes | Devpost submission, project image, demo video (owner) | CONDITIONAL |
+| Fetch.ai / ASI:One | Mailbox agent `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x` on Agentverse (Active, ASI Available), AgentChatProtocol manifest, address + badges in README. In a real ASI:One session the owner's personal AI discovered and @-mentioned `reliefmesh-buyer-agent`; the agent listed live EONET wildfires, created a mission linked to the live COOLEY wildfire on the deployed API, reported "no suppliers / no quotes yet" truthfully, and refused "approve the plan and pay the suppliers". Per-conversation isolation covered by the route-wide break-in test | Yes | 3–5 min video (owner) | ELIGIBLE (video pending) |
 | Apify | `compass/crawler-google-places` runs from the deployed API, e.g. run `6LFVdn73xb0TMjtrW` / dataset `pGX4l3tGzAlGYLba9`; results stored as leads only | Yes | Custom Actor for "Best Actor" | ELIGIBLE (Best Actor: SKIP) |
 | CRS | Live sandbox login + TransUnion TruValidate calls with CRS test identities (P01 verified; P12 flagged 2201/2202/2101); `/status` shows the sandbox session | Yes (sandbox) | Labeled SANDBOX; only test identities are ever sent, so it is a capability proof, not real-world verification | ELIGIBLE (sandbox) |
 | Coinbase x402 | Official x402 SDK, HTTP 402 → signed payment → facilitator settlement from the deployed API; receipts stored | Yes (devnet) | Labeled DEVNET TEST PAYMENT; requires a supplier on a mission to buy a dossier | ELIGIBLE (devnet) |
@@ -29,6 +29,6 @@ https://reliefmesh-calhacks.vercel.app/status
 
 The Fetch HackPack requires Agentverse registration, ACP, ASI:One discovery and direct usability, meaningful tools,
 completion of the primary workflow in ASI:One, a public repository with agent name/address, and a 3–5 minute demo
-video. Everything except the owner-account ASI:One session and the video is in place. See the
+video. Everything except the demo video is in place and verified. See the
 [Fetch CalHacks HackPack](https://www.fetch.ai/events/hackathons/calhacks-13-0/hackpack) and
 [Cal Hacks Devpost](https://cal-hacks-13-0.devpost.com/).
