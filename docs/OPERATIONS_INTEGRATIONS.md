@@ -12,6 +12,25 @@ emergency-management team already uses; none of them can approve, order, or pay.
 | Google Drive (`drive.file`) | **Verified with real calls** | `ReliefMesh/Missions/<mission>/` with `Plan-V1.pdf`, `Plan-V2.pdf`, PO PDF, `Audit-Export.json`; one file per artifact |
 | Slack (`chat:write`, `chat:write.public`, `incoming-webhook`) | **Verified with real calls** | Installed through ReliefMesh's own OAuth flow into a dedicated single-member workspace; approval, disruption (old approval post struck through as STALE), Plan V2, PO issued and fulfillment posts delivered to `#relief-operations`; revoked-token failure recorded as FAILED/BLOCKED and recovered by retry |
 
+### Production run (2026-10-24, https://reliefmesh.us)
+
+All four were connected from the production Integrations page (production OAuth callbacks, tokens encrypted in
+Atlas) and exercised by one real mission: Mendocino COOLEY wildfire (NASA EONET), RFQ by Gmail, a supplier quote
+through the supplier portal, Plan V1 approved by an independent approver, the supplier's real price change
+($32 → $38) making V1 stale and revoking its approval, Plan V2 rebuilt automatically and approved, PO with PDF
+by Gmail, supplier acceptance and delivery.
+
+- Gmail: RFQ, approval request V1, disruption alerts (coordinator + approver), Plan V2 approval request, PO with
+  `RM-…pdf` attached.
+- Calendar: exactly three events: deadline, one approval event updated in place (V1 → STALE → approved V2), and
+  the supplier ETA updated to Delivered.
+- Slack `#relief-operations`: approval V1 (rewritten as STALE), disruption, Plan V2 (+$600), PO issued, Delivered.
+- Drive: mission folder with `Plan-V1.pdf`, `Plan-V2.pdf`, PO PDF and `Audit-Export.json`, one file each.
+- Idempotency (production database, production code): replaying 9 application events created 0 deliveries
+  (21 → 21); re-attempting all 21 SENT deliveries sent nothing twice; the calendar replay updated the same event.
+- Controlled failure: a revoked Google token makes the Gmail check FAILED and `/status` BLOCKED while the API stays
+  healthy (procurement email falls back to Resend); restore + retry → SENT and LIVE. Same for a revoked Slack token.
+
 ## How it works
 
 - The procurement core emits application events (`mission_created`, `mission_updated`, `mission_cancelled`,
