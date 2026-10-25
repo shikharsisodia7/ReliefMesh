@@ -27,7 +27,7 @@ from .procurement import create_mission_record
 
 router = APIRouter()
 AGENT_SCOPES = ["missions:create", "missions:read", "evidence:run", "discovery:run", "plans:optimize",
-                "plans:explain"]
+                "plans:explain", "continuity:read"]
 
 
 @router.post("/v1/organizations/{organization_id}/agent-tokens", status_code=status.HTTP_201_CREATED)

@@ -103,9 +103,12 @@ class MongoStore:
         await self.database.agent_tokens.create_index([("token_hash", ASCENDING)], unique=True)
         for collection in (
             "quotes", "plans", "approvals", "notifications", "supplier_leads",
-            "supplier_reviews", "disruptions", "payments",
+            "supplier_reviews", "disruptions", "payments", "continuity_analyses",
         ):
             await self.database[collection].create_index([("mission_id", ASCENDING)])
+        await self.database.continuity_analyses.create_index(
+            [("mission_id", ASCENDING), ("plan_id", ASCENDING), ("input_hash", ASCENDING)]
+        )
         for collection in ("organizations", "users", "missions", "quotes", "plans", "suppliers", "evidence"):
             await self.database[collection].create_index([("id", ASCENDING)], unique=True)
         # Operations integrations: ids are idempotency hashes, so a duplicate insert is the dedupe signal.

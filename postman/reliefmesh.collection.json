@@ -8,7 +8,8 @@
     { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
     { "key": "coordinatorToken", "value": "" },
     { "key": "organizationId", "value": "" },
-    { "key": "missionId", "value": "" }
+    { "key": "missionId", "value": "" },
+    { "key": "planId", "value": "" }
   ],
   "item": [
     {
@@ -44,6 +45,26 @@
         "url": "{{baseUrl}}/v1/missions/{{missionId}}/optimize"
       },
       "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('accepts a deterministic planning run', () => pm.response.to.have.status(202));", "pm.expect(pm.response.json()).to.have.property('plan_id');"] } }]
+    },
+    {
+      "name": "Get current Continuity Engine result",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{coordinatorToken}}" }],
+        "url": "{{baseUrl}}/v1/missions/{{missionId}}/continuity",
+        "description": "Reads the plan-bound Procurement Digital Twin and deterministic HYPOTHETICAL stress-test result. A stale result must never be treated as current."
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns a continuity view', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('state');", "pm.expect(pm.response.json()).to.have.property('digital_twin');"] } }]
+    },
+    {
+      "name": "Queue Continuity Engine analysis",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{coordinatorToken}}" }],
+        "url": "{{baseUrl}}/v1/plans/{{planId}}/continuity",
+        "description": "Queues a non-mutating deterministic analysis for the exact feasible or approved plan. Only buyer coordinators can enqueue it; agents and suppliers cannot."
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('queues a hypothetical analysis', () => pm.response.to.have.status(202));", "pm.expect(pm.response.json().provenance).to.eql('HYPOTHETICAL');", "pm.expect(pm.response.json()).to.have.property('job_id');"] } }]
     }
   ]
 }

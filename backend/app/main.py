@@ -16,7 +16,7 @@ from .jobs import recover_jobs
 from .operations.notifications import OperationsService
 from .payments import x402_exchange
 from .routes import (
-    agent, demo, evidence, integrations, intel, market, mission_lifecycle, payments, procurement, status,
+    agent, continuity, demo, evidence, integrations, intel, market, mission_lifecycle, payments, procurement, status,
 )
 from .settings import Settings, get_settings
 from .store import MemoryStore, MongoStore, Store
@@ -80,7 +80,7 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
     async def health() -> dict[str, str]:
         return {"status": "ok", "storage": runtime_settings.storage_mode}
 
-    for module in (procurement, mission_lifecycle, intel, evidence, market, demo, agent, payments, x402_exchange,
+    for module in (procurement, mission_lifecycle, continuity, intel, evidence, market, demo, agent, payments, x402_exchange,
                    integrations, status):
         app.include_router(module.router)
     return app

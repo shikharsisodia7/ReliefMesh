@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 from .core import Services, audit, new_id, notify, now_iso
+from .continuity import build_continuity_analysis
 from .integrations.http import canonical_json
 from .operations import events as ops_events
 from .optimizer import cents, money, solve
@@ -18,6 +19,174 @@ _mission_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 REPLAN_TRIGGERS = {"supplier_disruption", "policy_change"}
 # Purchase orders a supplier has received and not declined/cancelled: their units are already bought.
 ACTIVE_ORDER_STATUSES = {"sent", "supplier_accepted", "in_fulfillment", "completed"}
+
+
+async def continuity_input_snapshot(services: Services, mission: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    """Freeze every material input used by a continuity run.
+
+    The policy fingerprint detects quote/evidence status changes.  The separate evidence
+    and optimizer fingerprints make the binding inspectable instead of relying on a
+    broad "current" flag.  No counterfactual input is persisted back into a quote.
+    """
+
+    report, quotes = await evaluate_mission(services, mission)
+    supplier_ids = sorted({quote["supplier_id"] for quote in quotes})
+    evidence_rows = []
+    for supplier_id in supplier_ids:
+        for record in await services.store.find(
+            "evidence", organization_id=mission["organization_id"], subject_id=supplier_id
+        ):
+            evidence_rows.append({
+                "id": record["id"], "supplier_id": supplier_id, "type": record.get("type"),
+                "status": record.get("status"), "provenance": record.get("provenance"),
+                "retrieved_at": record.get("retrieved_at"), "expires_at": record.get("expires_at"),
+            })
+    evidence_fingerprint = hashlib.sha256(canonical_json(sorted(evidence_rows, key=lambda row: row["id"])).encode()).hexdigest()
+    quote_versions = sorted(
+        [{"quote_id": quote["id"], "supplier_id": quote["supplier_id"], "version": quote.get("version", 1),
+          "status": quote["status"], "provenance": quote.get("provenance")} for quote in quotes],
+        key=lambda row: row["quote_id"],
+    )
+    eligible = [quote for quote in quotes if report["quotes"][quote["id"]]["eligible"]]
+    optimizer_inputs = {
+        "constraints": {
+            "budget": mission["budget"], "delivery_deadline": mission["delivery_deadline"],
+            "requirements": mission["requirements"], "max_supplier_share": mission.get("max_supplier_share"),
+            "single_source_only": mission.get("single_source_only", False),
+        },
+        "eligible_quotes": [
+            {"id": quote["id"], "version": quote.get("version", 1), "shipping_cost": quote["shipping_cost"],
+             "lines": quote["lines"]}
+            for quote in sorted(eligible, key=lambda row: row["id"])
+        ],
+    }
+    optimizer_input_fingerprint = hashlib.sha256(canonical_json(optimizer_inputs).encode()).hexdigest()
+    binding = {
+        "mission_id": mission["id"], "plan_id": plan["id"], "plan_version": plan["version"],
+        "plan_hash": plan["plan_hash"], "quote_versions": quote_versions,
+        "policy_fingerprint": report["fingerprint"], "evidence_fingerprint": evidence_fingerprint,
+        "optimizer_input_fingerprint": optimizer_input_fingerprint,
+    }
+    return {
+        "report": report, "quotes": quotes, "eligible_quotes": eligible, "quote_versions": quote_versions,
+        "policy_fingerprint": report["fingerprint"], "evidence_fingerprint": evidence_fingerprint,
+        "optimizer_input_fingerprint": optimizer_input_fingerprint,
+        "input_hash": hashlib.sha256(canonical_json(binding).encode()).hexdigest(),
+    }
+
+
+async def compute_continuity_analysis(services: Services, mission_id: str, plan_id: str) -> dict[str, Any]:
+    """Persist a counterfactual analysis only if its pinned inputs remain current.
+
+    The same mission lock serializes plan construction and continuity snapshots.  A
+    final input re-check protects the record from concurrent supplier edits, which do
+    not take this lock because they must remain responsive.
+    """
+
+    async with _mission_locks[mission_id]:
+        mission = await services.store.get("missions", mission_id)
+        plan = await services.store.get("plans", plan_id)
+        if not mission or not plan or plan["mission_id"] != mission_id:
+            raise RuntimeError("continuity analysis target no longer exists")
+        if plan["status"] not in {"feasible", "approved"}:
+            return {"status": "skipped", "reason": "plan is not current", "plan_id": plan_id}
+        snapshot = await continuity_input_snapshot(services, mission, plan)
+        cached = [row for row in await services.store.find("continuity_analyses", mission_id=mission_id)
+                  if row.get("plan_id") == plan_id and row.get("input_hash") == snapshot["input_hash"]
+                  and row.get("status") == "COMPLETE"]
+        if cached:
+            return {"status": "cached", "analysis_id": cached[-1]["id"], "plan_id": plan_id}
+        analysis = build_continuity_analysis(
+            mission, plan, snapshot["eligible_quotes"], input_hash=snapshot["input_hash"],
+            quote_versions=snapshot["quote_versions"], policy_fingerprint=snapshot["policy_fingerprint"],
+            evidence_fingerprint=snapshot["evidence_fingerprint"],
+            optimizer_input_fingerprint=snapshot["optimizer_input_fingerprint"], created_at=now_iso(),
+        )
+        current = await continuity_input_snapshot(services, mission, plan)
+        if current["input_hash"] != snapshot["input_hash"]:
+            return {"status": "stale_before_persist", "reason": "quote, evidence, or policy changed", "plan_id": plan_id}
+        analysis["id"] = new_id()
+        analysis["organization_id"] = mission["organization_id"]
+        await services.store.insert("continuity_analyses", analysis)
+        await audit("continuity.computed", None, mission["organization_id"], mission_id, "continuity_analysis",
+                    analysis["id"], services, {
+                        "plan_id": plan_id, "plan_version": plan["version"], "input_hash": analysis["input_hash"],
+                        "provenance": analysis["provenance"],
+                        "n1": analysis["metrics"]["n1_survivability"],
+                    })
+        return {"status": "complete", "analysis_id": analysis["id"], "plan_id": plan_id,
+                "plan_version": plan["version"]}
+
+
+async def mark_continuity_stale(services: Services, mission: dict[str, Any], actor_id: str | None, reason: str) -> int:
+    """Invalidate visible continuity output after a real input changes.
+
+    Historical analyses remain available as historical *HYPOTHETICAL* work, but never
+    present themselves as the current plan's resilience posture.
+    """
+
+    changed = 0
+    for analysis in await services.store.find("continuity_analyses", mission_id=mission["id"]):
+        if analysis.get("status") != "COMPLETE":
+            continue
+        analysis.update(status="STALE", stale_at=now_iso(), stale_reason=reason)
+        await services.store.replace("continuity_analyses", analysis["id"], analysis)
+        changed += 1
+        await audit("continuity.stale", actor_id, mission["organization_id"], mission["id"],
+                    "continuity_analysis", analysis["id"], services,
+                    {"plan_id": analysis.get("plan_id"), "reason": reason})
+    return changed
+
+
+def continuity_digital_twin(
+    mission: dict[str, Any], plan: dict[str, Any] | None, quotes: list[dict[str, Any]],
+    approvals: list[dict[str, Any]], orders: list[dict[str, Any]], analysis: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """A graph-shaped, persisted-state view for the UI and judge tooling."""
+
+    supplier_ids = sorted({quote["supplier_id"] for quote in quotes})
+    names = {
+        supplier_id: row.get("legal_name") or row.get("email") or supplier_id
+        for supplier_id, row in ((plan or {}).get("policy", {}).get("suppliers", {}) or {}).items()
+    }
+    nodes = [
+        {"id": f"mission:{mission['id']}", "type": "mission", "label": mission["name"], "status": mission["status"]},
+        *[{"id": f"requirement:{row.get('id') or row['item']}", "type": "requirement", "label": row["item"],
+           "quantity": row["quantity"]} for row in mission["requirements"]],
+        *[{"id": f"supplier:{supplier_id}", "type": "supplier", "label": names.get(supplier_id, supplier_id),
+           "quote_count": sum(quote["supplier_id"] == supplier_id for quote in quotes)} for supplier_id in supplier_ids],
+        *([{ "id": f"plan:{plan['id']}", "type": "plan", "label": f"Plan v{plan['version']}",
+             "status": plan["status"], "cost": plan["total_cost"]}] if plan else []),
+        *[{"id": f"approval:{row['id']}", "type": "approval", "label": row["status"],
+           "plan_version": row.get("plan_version")} for row in approvals],
+        *[{"id": f"po:{row['id']}", "type": "purchase_order", "label": row["po_number"],
+           "status": row["status"]} for row in orders],
+        *([{ "id": f"continuity:{analysis['id']}", "type": "continuity_analysis", "label": "N-1 stress test",
+             "status": analysis["status"], "provenance": analysis.get("provenance")} ] if analysis else []),
+    ]
+    edges = [
+        {"from": f"mission:{mission['id']}", "to": f"requirement:{row.get('id') or row['item']}", "type": "requires"}
+        for row in mission["requirements"]
+    ]
+    edges.extend({"from": f"mission:{mission['id']}", "to": f"supplier:{supplier_id}", "type": "received_quote"}
+                 for supplier_id in supplier_ids)
+    if plan:
+        edges.append({"from": f"mission:{mission['id']}", "to": f"plan:{plan['id']}", "type": "planned"})
+        edges.extend({"from": f"supplier:{row['supplier_id']}", "to": f"plan:{plan['id']}", "type": "allocated",
+                      "quantity": row["quantity"]} for row in plan.get("allocations", []))
+        edges.extend({"from": f"plan:{plan['id']}", "to": f"approval:{row['id']}", "type": "approved_by"}
+                     for row in approvals if row.get("plan_id") == plan["id"])
+        edges.extend({"from": f"plan:{plan['id']}", "to": f"po:{row['id']}", "type": "issued_as"}
+                     for row in orders if row.get("plan_id") == plan["id"])
+    if analysis and plan:
+        edges.append({"from": f"plan:{plan['id']}", "to": f"continuity:{analysis['id']}", "type": "stress_tested"})
+    return {
+        "label": "Procurement Digital Twin",
+        "provenance": "PERSISTED_APPLICATION_STATE",
+        "nodes": nodes,
+        "edges": edges,
+        "disaster_context": mission.get("emergency_event"),
+    }
 
 
 def committed_lines(orders: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -249,6 +418,14 @@ async def compute_plan(services: Services, mission_id: str, trigger: str,
                 services, ops_events.PLAN_REPLANNED if prior and trigger in REPLAN_TRIGGERS
                 else ops_events.APPROVAL_REQUIRED, mission, subject_id=plan["id"], version=plan["version"],
                 data={"plan_id": plan["id"], "trigger": trigger})
+        # Counterfactual work is durable and asynchronous. It never changes this
+        # plan; its result is bound to an exact input hash before display.
+        if plan["status"] == "feasible" and services.settings.continuity_engine_enabled:
+            from .jobs import enqueue  # avoids a module cycle during app wiring
+
+            await enqueue(services, "continuity_analysis", mission, coalesce=False,
+                          payload={"plan_id": plan["id"]},
+                          trigger={"kind": "plan_computed", "plan_id": plan["id"], "at": now_iso()})
         return plan
 
 
@@ -304,4 +481,8 @@ async def invalidate_for_change(services: Services, mission: dict[str, Any], act
                                   "failure_type": details.get("failure_type") or "Policy or evidence change",
                                   "stale_versions": affected, "approvals_invalidated": invalidated,
                                   "sent_orders_affected": flagged, "replanning": "queued automatically"})
+    # A prior counterfactual remains historical evidence only: quote, policy, or
+    # evidence changes mean it must never be displayed as the current posture.
+    if affected:
+        await mark_continuity_stale(services, mission, actor_id, reason)
     return affected

@@ -17,6 +17,7 @@ ASI:One conversation.
 | `run evidence checks` | `POST /v1/missions/{id}/evidence/refresh` | live OFAC / SAM.gov / openFDA / USAspending results per supplier |
 | `find suppliers for N95 masks` | `POST /v1/missions/{id}/discovery` (Apify actor run) | supplier **leads**, never binding quotes |
 | `optimize` | `POST /v1/missions/{id}/optimize` | the policy-gated mixed-integer allocation |
+| `which supplier is the biggest single point of failure?` | `GET /v1/missions/{id}/continuity` | stored deterministic **HYPOTHETICAL** N-1 stress test, failure frontiers, and resilient-plan tradeoff |
 | `why was <supplier> rejected?` | `GET /v1/missions/{id}/explain` | the deterministic policy decisions and evidence IDs behind the allocation |
 | `what changed?` (after a supplier revises/withdraws its quote or declines a PO) | `GET /v1/missions/{id}/brief` | old plan -> new plan, cost delta, approval invalidation |
 

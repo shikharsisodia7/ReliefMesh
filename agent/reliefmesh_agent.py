@@ -48,6 +48,8 @@ HELP = (
     "- `run evidence checks` (live OFAC, SAM.gov, openFDA, USAspending on suppliers that have quoted)\n"
     "- `find suppliers for N95 masks` (Apify discovery; results are leads, never quotes)\n"
     "- `optimize` (deterministic policy + integer optimizer over real supplier quotes)\n"
+    "- `which supplier is the biggest single point of failure?` / `can this plan survive losing Supplier A?`\n"
+    "- `what is the cheapest resilient alternative?` (deterministic HYPOTHETICAL stress-test results)\n"
     "- `why was <supplier> rejected?` / `what changed?` after a supplier withdraws or edits its quote\n"
     "I only report what is in ReliefMesh: suppliers join by accepting an RFQ and quoting themselves. "
     "I cannot approve spending or send purchase orders. A human coordinator does that in ReliefMesh."
@@ -197,6 +199,9 @@ def classify(text: str) -> tuple[str, dict[str, Any]]:
         return "simulate", {"supplier": simulated.group(1).strip(), "kind": kind}
     if re.search(r"\b(evidence|screen|sanction|ofac|compliance)\b", lowered):
         return "evidence", {}
+    if re.search(r"\b(continuity|surviv|single point|resilien|failure frontier|price shock|delay shock|"
+                 r"capacity shock|los(?:e|ing)\s+(?:supplier|vendor)|biggest.*failure)\b", lowered):
+        return "continuity", {}
     if re.search(r"\b(find|discover|search|source)\b.*\b(supplier|vendor|lead)s?\b", lowered):
         topic = re.sub(r".*\b(?:for|of)\b\s*", "", text, flags=re.IGNORECASE).strip() or "relief supplies"
         return "discover", {"query": topic}
@@ -324,6 +329,16 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
         result = await client.call("POST", f"/v1/missions/{mission_id}/optimize")
         plan = await client.call("GET", f"/v1/plans/{result['plan_id']}")
         return describe_plan(mission, plan)
+    if intent == "continuity":
+        continuity = await client.call("GET", f"/v1/missions/{mission_id}/continuity")
+        if continuity["state"] == "RUNNING":
+            return ("Continuity analysis is running in the background. It is testing hypothetical supplier failures "
+                    "against the exact plan/quote snapshot; no real supplier data is being changed. Ask again shortly.")
+        analysis = continuity.get("analysis")
+        if not analysis or continuity["state"] != "COMPLETE":
+            return ("There is no current continuity result yet. Run `optimize` after policy-eligible quotes exist; "
+                    "ReliefMesh automatically queues a deterministic HYPOTHETICAL N-1 stress test for that plan.")
+        return describe_continuity(analysis, mission_id)
     if intent == "explain":
         explanation = await client.call("GET", f"/v1/missions/{mission_id}/explain?supplier={httpx.QueryParams({'q': args['supplier']})['q']}")
         if not explanation.get("found"):
@@ -384,6 +399,40 @@ def describe_brief(brief: dict[str, Any]) -> str:
     return "\n".join(lines) + link(mission["id"])
 
 
+def describe_continuity(analysis: dict[str, Any], mission_id: str) -> str:
+    """Explain stored deterministic analysis; no model calculates these values."""
+
+    metrics = analysis["metrics"]
+    n1 = metrics["n1_survivability"]
+    lines = [
+        f"**Continuity analysis for plan v{analysis['plan_version']}** — **HYPOTHETICAL STRESS TEST** "
+        "(it did not change any supplier quote).",
+        f"N-1 survivability: {n1['survives']}/{n1['tested']} allocated supplier failures recoverable. "
+        f"Budget headroom {money(metrics['budget_headroom'])}; deadline slack {metrics['deadline_slack_hours']} hours.",
+    ]
+    critical = metrics.get("critical_supplier")
+    if critical:
+        lines.append(f"Biggest current single point of failure: **{critical['supplier']}** — {critical['reason']}")
+    else:
+        lines.append("No allocated supplier produced an unrecoverable N-1 result in this snapshot.")
+    for scenario in analysis.get("n1_scenarios", []):
+        if scenario["feasible"]:
+            lines.append(f"- Stress test: {scenario['supplier']} unavailable → **RECOVERABLE**; "
+                         f"{money(scenario['new_cost'])} ({money(scenario['cost_delta'])} delta).")
+        else:
+            lines.append(f"- Stress test: {scenario['supplier']} unavailable → **UNRECOVERABLE**; "
+                         f"{scenario['lost_quantity']} units uncovered.")
+    alternative = analysis.get("resilient_alternative") or {}
+    if alternative.get("status") == "AVAILABLE":
+        resilience = alternative["n1_survivability"]
+        lines.append(f"Cheapest 50%-concentration alternative: {money(alternative['total_cost'])}, "
+                     f"additional {money(alternative['added_cost'])}; N-1 {resilience['survives']}/{resilience['tested']}.")
+    else:
+        lines.append("No feasible plan met the stronger 50% supplier-concentration guardrail.")
+    lines.append("These numbers come from the stored deterministic MILP results; I cannot change policy, approve, or pay." + link(mission_id))
+    return "\n".join(lines)
+
+
 # ----- optional ASI:One LLM routing (tool selection only; the API remains the authority) -----
 
 TOOLS = [
@@ -400,6 +449,7 @@ TOOLS = [
         ("discover", "Discover supplier leads", {"type": "object", "properties": {"query": {"type": "string"}},
                                                   "required": ["query"]}),
         ("optimize", "Run the policy-gated optimizer", {"type": "object", "properties": {}}),
+        ("continuity", "Explain deterministic hypothetical N-1 continuity analysis", {"type": "object", "properties": {}}),
         ("explain", "Explain a supplier's allocation or rejection", {"type": "object", "properties": {
             "supplier": {"type": "string"}}, "required": ["supplier"]}),
         ("disruption", "Describe the latest disruption and recovery", {"type": "object", "properties": {}}),

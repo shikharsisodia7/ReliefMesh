@@ -3,10 +3,11 @@
 ![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 ![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
 
-**An evidence-backed autonomous procurement network that rebuilds its own purchasing plan when the supply
-chain changes.** Coordinators buy emergency supplies from real supplier quotes. ReliefMesh screens every supplier
-against public records, decides eligibility with deterministic policy, allocates with integer optimization,
-replans by itself when a supplier fails, and leaves financial authority with an independent human approver.
+**ReliefMesh is a procurement continuity engine for emergency response.** Instead of only finding the cheapest
+purchasing plan, it mathematically stress-tests that exact plan against supplier loss, price shocks, delays, and
+capacity reductions; calculates a constrained resilient alternative; and automatically invalidates and rebuilds the
+plan when a real supplier change occurs. Coordinators buy from real supplier quotes, deterministic policy decides
+eligibility, and independent humans retain financial authority.
 
 | | |
 | --- | --- |
@@ -14,6 +15,23 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 | API | https://reliefmesh-api.onrender.com ([/health](https://reliefmesh-api.onrender.com/health), [/docs](https://reliefmesh-api.onrender.com/docs)) |
 | Live integration status | https://reliefmesh.us/status |
 | Fetch.ai agent | `reliefmesh-buyer-agent` · `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x` · [Agentverse](https://agentverse.ai/agents/details/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x/profile) · [Chat on ASI:One](https://asi1.ai/ai/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x) |
+
+## Why ReliefMesh is different
+
+Procurement software produces a plan for today's assumptions. ReliefMesh asks whether that plan will survive
+tomorrow's disruption. For every feasible plan, the **Continuity Engine** queues a bounded, background, deterministic
+analysis that persists an exact input binding (mission, plan version/hash, quote versions, policy fingerprint,
+evidence fingerprint, optimizer inputs, timestamp). It runs the same MILP on copies of the saved quote snapshot:
+
+```text
+CHEAPEST PLAN → N-1 SUPPLIER SHOCKS → FAILURE FRONTIER → RESILIENT ALTERNATIVE
+       │                │                    │                     │
+       └── real quote change ──> plan stale / approval revoked ──> automatic Plan V2
+```
+
+The results are always labeled **HYPOTHETICAL STRESS TEST**. They never mutate a real quote, supplier, policy,
+approval, or purchase order; any material input change marks the result **STALE**. The resilient proposal applies a
+transparent 50% supplier-concentration guardrail and still requires the normal independent human approval.
 
 ## What happens, end to end
 

@@ -15,16 +15,18 @@ site shows **real data only**: there are no seeded suppliers and no "disrupt" bu
    an existing quote and press **Pre-fill with Gemini**, then review before submitting.
 5. Wait for the evidence chips (live OFAC, openFDA, USAspending). Keep ASI:One open with the ReliefMesh Buyer Agent.
 
-## 2-minute core
+## 3-minute core
 
 | Time | Say | Do |
 | --- | --- | --- |
-| 0:00–0:15 | "When a wildfire hits, emergency buyers source fast from suppliers they've never vetted. Then a supplier changes terms and the purchase plan breaks." | Mission header |
-| 0:15–0:35 | "This mission is tied to a real, open NASA EONET event, with live NWS alerts, FIRMS fire detections, and FEMA declarations. They inform the buyer; they never decide what to buy." | Emergency panel, LIVE badges |
-| 0:35–0:55 | "Two suppliers answered our emailed RFQ with binding quotes. Each was screened against the live Treasury sanctions list, openFDA, and USAspending. Missing evidence is never a pass, and no AI made the eligibility call." | Supplier cards, evidence chips, USER_SUBMITTED badges |
-| 0:55–1:15 | "The integer optimizer splits the buy for $2,070. I requested this mission, so I can't approve it; my colleague does." | Run optimization → Plan v1 → B approves |
-| 1:15–1:40 | Hand the supplier phone to the judge: "You're Supplier A. Raise your price." **Revise price → $25 → Save revision**. | Supplier portal shows Quote v2 |
-| 1:40–2:00 | "That persisted change made Plan v1 stale and invalidated its approval. ReliefMesh replanned by itself: all 100 from Supplier B, $2,240, +$170, and it says why. A human must approve the new plan before anything is bought." | Recovery panel: STALE → v2, INVALIDATED, reasons |
+| 0:00–0:18 | "Emergency procurement software produces a plan for today's assumptions. ReliefMesh asks whether that plan survives tomorrow's failures." | Mission header + LIVE emergency context |
+| 0:18–0:38 | "These are real USER_SUBMITTED supplier quotes. Public evidence informs a deterministic policy; no AI decides who is eligible." | Supplier cards/evidence chips |
+| 0:38–0:55 | "The MILP finds the cheapest exact-coverage plan. I requested it, so I cannot approve it—an independent person must." | Plan V1 |
+| 0:55–1:35 | "Before approval, Continuity tests the exact quote snapshot. This is a **HYPOTHETICAL STRESS TEST**, not a claimed failure." Show the critical lane, an N-1 scenario, price/ETA/capacity frontier, and cost of the ≤50% concentration alternative. | Continuity Engine / Digital Twin |
+| 1:35–2:05 | Hand the supplier phone to the judge: "Raise your price." Make the actual USER_SUBMITTED revision. | Supplier quote v2 |
+| 2:05–2:30 | "Reality changed. Plan V1 is stale, approval is revoked, and the analysis is stale too—so it cannot mislead us." | Timeline + stale labels |
+| 2:30–2:48 | "ReliefMesh generated Plan V2 from the revised facts. It shows the cost and supplier delta, and it needs fresh human approval." | Recovery panel: V2 + approval boundary |
+| 2:48–3:00 | "The agent can explain these deterministic results, but cannot approve or pay. Here is the tamper-evident audit chain." | Fetch question + audit verification |
 
 ## Minute three (pick by judge)
 

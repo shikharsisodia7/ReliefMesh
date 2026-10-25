@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
+import { ContinuityPanel } from "@/components/mission/continuity-panel";
 import { MissionLifecycleControls } from "@/components/mission/lifecycle-controls";
 import { MarketPanel } from "@/components/mission/market-panel";
 import { OperationsPanel } from "@/components/mission/operations-panel";
@@ -54,6 +55,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const approvalBlocked = mission.created_by === session.user.id && !organization?.is_demo ? "You requested this mission, so another approver in your organization must approve its plan (segregation of duties)." : null;
   const checking = jobs.some((job) => job.type === "evidence_refresh" && (job.status === "queued" || job.status === "running"));
   const replanning = jobs.some((job) => job.type === "replan" && (job.status === "queued" || job.status === "running"));
+  const continuityRunning = jobs.some((job) => job.type === "continuity_analysis" && (job.status === "queued" || job.status === "running"));
   return (
     <main className="min-h-screen bg-background">
       <AppHeader email={session.user.email} home="/dashboard" label="Coordinator" />
@@ -82,6 +84,11 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
           <SupplierEvidence missionId={missionId} token={token} rows={suppliers} quotes={quotes} run={run} canReview={isAdmin} checking={checking} />
         </div>
         <OptimizerPanel mission={mission} plan={latest} eligibleCount={eligible} quoteCount={quotes.filter((quote) => quote.status === "submitted").length} busy={replanning} onOptimize={() => void run(async () => { const response = await api<{ plan_id: string; version: number }>(`/v1/missions/${missionId}/optimize`, { method: "POST", token }); setNotice(`Plan v${response.version} computed from current policy-eligible quotes.`); })} />
+        <ContinuityPanel plan={latest} view={data.continuity.data} running={continuityRunning} onRun={() => void run(async () => {
+          if (!latest) throw new Error("Create a feasible plan before running continuity analysis.");
+          await api(`/v1/plans/${latest.id}/continuity`, { method: "POST", token });
+          setNotice(`Continuity analysis queued for Plan v${latest.version}. All scenarios are explicitly HYPOTHETICAL.`);
+        })} />
         {demoMode && isAdmin && suppliers.length > 0 && <DisruptionConsole missionId={missionId} token={token} rows={suppliers} plan={latest} run={run} disruptions={data.disruptions.data ?? []} setNotice={setNotice} />}
         <PlanComparison plans={plans} approvals={data.approvals.data ?? []} order={supplierOrder} />
         <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} />

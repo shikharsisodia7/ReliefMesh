@@ -17,7 +17,11 @@ export function StatusText({ tone = "neutral", value, className, children }: { t
   return <span data-value={value} className={cn("font-medium", toneClass[tone], className)}>{children}</span>;
 }
 
-const provenanceLabels: Record<string, string> = { USER_SUBMITTED: "USER SUBMITTED", BLOCKED_EXTERNAL: "NOT CONFIGURED" };
+const provenanceLabels: Record<string, string> = {
+  USER_SUBMITTED: "USER SUBMITTED",
+  HYPOTHETICAL: "HYPOTHETICAL STRESS TEST",
+  BLOCKED_EXTERNAL: "NOT CONFIGURED",
+};
 
 // Renders e.g. "LIVE · 14:20". `at` is the API timestamp.
 export function Provenance({ value, at, className }: { value?: string | null; at?: string | null; className?: string }) {

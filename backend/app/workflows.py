@@ -9,7 +9,7 @@ from .core import Services, audit, new_id, notify, now_iso, secret
 from .evidence.service import collect_supplier_evidence
 from .integrations import apify
 from .jobs import enqueue
-from .planning import compute_plan, evaluate_mission, invalidate_for_change
+from .planning import compute_continuity_analysis, compute_plan, evaluate_mission, invalidate_for_change
 
 
 FAILURE_TYPES = {"withdrawn": "Supplier withdrew its quote", "updated": "Supplier revised its quote"}
@@ -75,6 +75,26 @@ async def handle_replan(services: Services, job: dict[str, Any]) -> dict[str, An
                      f"Plan v{plan['version']} is infeasible after the disruption; see shortages.", "critical",
                      {"plan_id": plan["id"], "version": plan["version"]})
     return {"plan_id": plan["id"], "version": plan["version"], "status": plan["status"]}
+
+
+async def handle_continuity_analysis(services: Services, job: dict[str, Any]) -> dict[str, Any]:
+    """Run a bounded, read-only stress-test job for one exact plan version."""
+
+    plan_id = job.get("payload", {}).get("plan_id")
+    if not plan_id:
+        raise RuntimeError("continuity analysis job has no plan_id")
+    mission = await services.store.get("missions", job["mission_id"])
+    if not mission:
+        raise RuntimeError("mission no longer exists")
+    await notify(services, mission, "continuity_started",
+                 "Continuity analysis started: running deterministic hypothetical supplier shocks.", "info",
+                 {"job_id": job["id"], "plan_id": plan_id, "provenance": "HYPOTHETICAL"})
+    result = await compute_continuity_analysis(services, mission["id"], plan_id)
+    if result["status"] == "complete":
+        await notify(services, mission, "continuity_completed",
+                     "Continuity analysis completed. Results are hypothetical stress tests; supplier data was not changed.",
+                     "info", {"job_id": job["id"], **result, "provenance": "HYPOTHETICAL"})
+    return result
 
 
 async def refresh_supplier_evidence(services: Services, mission: dict[str, Any], supplier_ids: list[str],
@@ -199,6 +219,7 @@ async def latest_plan(services: Services, mission_id: str) -> dict[str, Any] | N
 def register_handlers(services: Services) -> None:
     services.job_handlers.update({
         "replan": handle_replan,
+        "continuity_analysis": handle_continuity_analysis,
         "evidence_refresh": handle_evidence_refresh,
         "supplier_discovery": handle_supplier_discovery,
     })

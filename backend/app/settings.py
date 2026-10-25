@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # Demo/judge tooling: seeded TEST suppliers with synthetic quotes, simulated disruptions, and the
     # demo-org self-approval override. Off unless explicitly enabled; production refuses to start with it.
     demo_mode: bool = False
+    # Deterministic, read-only counterfactual optimization.  It is safe in production
+    # because it only reads persisted quote/evidence snapshots and never mutates them.
+    continuity_engine_enabled: bool = True
     # Agent chat senders allowed to spend paid credits (Apify discovery). Empty denies every agent sender.
     agent_privileged_senders: list[str] = []
 

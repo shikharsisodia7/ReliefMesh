@@ -1,4 +1,4 @@
-export type Provenance = "LIVE" | "CACHED" | "SANDBOX" | "USER_SUBMITTED" | "SYNTHETIC" | "TEST" | "BLOCKED_EXTERNAL" | "UNAVAILABLE";
+export type Provenance = "LIVE" | "CACHED" | "SANDBOX" | "USER_SUBMITTED" | "SYNTHETIC" | "TEST" | "HYPOTHETICAL" | "BLOCKED_EXTERNAL" | "UNAVAILABLE";
 export type PolicyStatus = "PASS" | "WARN" | "NEEDS_REVIEW" | "BLOCK";
 
 export type Requirement = { id?: string; item: string; quantity: number };
@@ -154,6 +154,43 @@ export type AuditVerification = { valid: boolean; length: number; head_hash?: st
 export type Job = { id: string; type: string; status: "queued" | "running" | "succeeded" | "failed"; attempts: number; max_attempts: number; last_error?: string | null; created_at: string; result?: Record<string, unknown> | null; payload?: Record<string, unknown> };
 export type Lead = { id: string; name: string; website?: string | null; phone?: string | null; address?: string | null; category?: string | null; rating?: number | null; reviews?: number | null; source_url?: string | null; status: "lead" | "invited" | "onboarded" | "dismissed"; provenance: Provenance; retrieved_at?: string | null; apify_run_id?: string; apify_dataset_id?: string; invited_email?: string };
 export type Disruption = { id: string; kind: string; supplier_id: string; supplier_name: string; summary: string; before: Record<string, unknown>; after: Record<string, unknown>; job_id: string | null; created_at: string };
+
+export type ContinuityScenario = {
+  supplier_id: string; supplier: string; feasible: boolean; status: "RECOVERABLE" | "UNRECOVERABLE";
+  replacement_suppliers: string[]; new_cost: string | null; cost_delta: string | null; latest_delivery: string | null;
+  deadline_delta_hours: number | null; lost_quantity: number; budget_feasible: boolean; deadline_feasible: boolean;
+  shortages: { item: string; shortage: number; reason: string }[];
+};
+export type ContinuityFrontier = {
+  supplier_id: string; supplier: string;
+  price: { increase_basis_points: number; increase_percent: number } | null;
+  delay: { hours: number } | null;
+  capacity: { loss_units: number; loss_percent: number | null; method: string } | null;
+  note?: string;
+};
+export type ContinuityAnalysis = {
+  id: string; status: "COMPLETE" | "STALE"; provenance: "HYPOTHETICAL"; counterfactual_label: string;
+  input_hash: string; created_at: string; plan_id: string; plan_version: number; plan_hash: string;
+  baseline: { total_cost: string; remaining_budget: string; latest_delivery: string | null; supplier_concentration: { supplier_id: string; supplier: string; units: number; unit_share: number }[] };
+  metrics: {
+    n1_survivability: { survives: number; tested: number }; budget_headroom: string; deadline_slack_hours: number | null;
+    largest_supplier_concentration: number; alternative_eligible_capacity: number;
+    price_shock_tolerance: { increase_basis_points: number; increase_percent: number } | null;
+    delay_tolerance: { hours: number } | null;
+    capacity_loss_tolerance: { loss_units: number; loss_percent: number | null; method: string } | null;
+    critical_supplier: { supplier_id: string; supplier: string; reason: string } | null;
+  };
+  n1_scenarios: ContinuityScenario[]; failure_frontier: ContinuityFrontier[];
+  resilient_alternative: {
+    status: "AVAILABLE" | "UNAVAILABLE"; total_cost?: string; added_cost?: string; supplier_count?: number;
+    n1_survivability?: { survives: number; tested: number }; improvement?: string; reason?: string;
+  };
+};
+export type ContinuityView = {
+  mission_id: string; plan_id: string | null; plan_version: number | null; state: "NOT_READY" | "RUNNING" | "COMPLETE" | "STALE";
+  analysis: ContinuityAnalysis | null; active_jobs: { id: string; status: string; created_at: string }[];
+  digital_twin: { label: string; provenance: string; nodes: { id: string; type: string; label: string; status?: string; quantity?: number }[]; edges: { from: string; to: string; type: string; quantity?: number }[]; disaster_context: EmergencyEvent | null };
+};
 
 export type ContextSection<T> = { status: "OK" | "BLOCKED_EXTERNAL" | "UNAVAILABLE"; provenance: Provenance | null; retrieved_at: string | null; source_url: string | null; error: string | null; data: T; note?: string; scope?: string; meta?: Record<string, unknown> };
 export type NwsAlert = { id: string; event: string; headline: string | null; severity: string; urgency: string; certainty: string; effective: string; expires: string; area: string; sender: string; source_url: string };

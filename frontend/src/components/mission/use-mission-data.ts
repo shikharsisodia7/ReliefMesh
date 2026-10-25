@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
-  Approval, AuditEvent, AuditVerification, Disruption, Job, Lead, Mission, MissionContext, Notification, Payment, Plan,
+  Approval, AuditEvent, AuditVerification, ContinuityView, Disruption, Job, Lead, Mission, MissionContext, Notification, Payment, Plan,
   PurchaseOrder, Quote, SupplierRow,
 } from "@/lib/types";
 
@@ -23,6 +23,7 @@ export function useMissionData(missionId: string, token: string | undefined) {
   const context = useQuery({ queryKey: ["context", missionId], enabled, queryFn: get<MissionContext>(`/v1/missions/${missionId}/context`), staleTime: 300_000 });
   const quotes = useQuery({ queryKey: ["quotes", missionId], enabled, refetchInterval: fast, queryFn: get<Quote[]>(`/v1/missions/${missionId}/quotes`) });
   const plans = useQuery({ queryKey: ["plans", missionId], enabled, refetchInterval: fast, queryFn: get<Plan[]>(`/v1/missions/${missionId}/plans`) });
+  const continuity = useQuery({ queryKey: ["continuity", missionId], enabled, refetchInterval: fast, queryFn: get<ContinuityView>(`/v1/missions/${missionId}/continuity`) });
   const approvals = useQuery({ queryKey: ["approvals", missionId], enabled, refetchInterval: fast, queryFn: get<Approval[]>(`/v1/missions/${missionId}/approvals`) });
   const suppliers = useQuery({ queryKey: ["suppliers", missionId], enabled, refetchInterval: slow, queryFn: get<SupplierRow[]>(`/v1/missions/${missionId}/suppliers`) });
   const notifications = useQuery({ queryKey: ["notifications", missionId], enabled, refetchInterval: fast, queryFn: get<Notification[]>(`/v1/missions/${missionId}/notifications`) });
@@ -37,5 +38,5 @@ export function useMissionData(missionId: string, token: string | undefined) {
     queryFn: get<PurchaseOrder[]>(`/v1/purchase-orders?organization_id=${mission.data?.organization_id}&mission_id=${missionId}`),
   });
   const refresh = () => client.invalidateQueries({ predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[1] === missionId });
-  return { mission, context, quotes, plans, approvals, suppliers, notifications, audit, verification, leads, invitations, disruptions, payments, orders, jobs, busy, refresh };
+  return { mission, context, quotes, plans, continuity, approvals, suppliers, notifications, audit, verification, leads, invitations, disruptions, payments, orders, jobs, busy, refresh };
 }

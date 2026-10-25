@@ -1,9 +1,9 @@
 # ReliefMesh architecture
 
-ReliefMesh is an evidence-backed autonomous procurement network: it buys emergency supplies from
-real supplier quotes, screens every supplier against public records, decides eligibility with
-deterministic policy, allocates with integer optimization, rebuilds its plan when the supply chain
-changes, and leaves financial authority with a human.
+ReliefMesh is a procurement continuity engine for emergency response: it buys from real supplier quotes,
+screens suppliers against public records, decides eligibility with deterministic policy, allocates with integer
+optimization, stress-tests a persisted plan on counterfactual copies, rebuilds after real supply-chain changes,
+and leaves financial authority with a human.
 
 ```
                  NASA EONET · NWS · NASA FIRMS · OpenFEMA        (emergency context, read-only)
@@ -14,6 +14,7 @@ changes, and leaves financial authority with a human.
                                    │                      · CRS sandbox (identity/fraud) · x402 paid dossiers
                                    ├─ policy engine (pure function) ─▶ eligible quotes only
                                    ├─ optimizer (PuLP / CBC MILP)
+                                   ├─ Continuity Engine (N-1 + breakpoints + resilient MILP, HYPOTHETICAL only)
                                    ├─ jobs (replan / evidence / discovery) with retries + recovery
                                    ├─ approvals (plan-hash bound, expiring, single-use) → purchase orders
                                    ├─ audit chain (SHA-256 linked events) + notifications
@@ -32,6 +33,7 @@ changes, and leaves financial authority with a human.
 | Policy | `backend/app/policy/engine.py` | PASS / WARN / NEEDS_REVIEW / BLOCK; no LLM, no free-text interpretation |
 | Optimization | `backend/app/optimizer.py` | Codex's MILP, now fed only policy-eligible quotes |
 | Planning, diff, invalidation | `backend/app/planning.py` | plan hash + policy fingerprint; before/after supplier delta and reasons |
+| Continuity Engine | `backend/app/continuity.py`, `routes/continuity.py` | persisted, input-hash-bound N-1/failure-frontier/resilience results; no mutation of supplier data |
 | Background jobs | `backend/app/jobs.py`, `backend/app/workflows.py` | coalescing, attempts/backoff, stuck-job recovery |
 | Demo tooling (dev/test only) | `backend/app/routes/demo.py` | 404 unless `RELIEFMESH_DEMO_MODE=true`; production refuses to start with it |
 | Agent API | `backend/app/routes/agent.py` | scoped tokens; cannot approve, order, or move procurement money |
@@ -50,6 +52,24 @@ changes, and leaves financial authority with a human.
    `plan_hash` over its material contents.
 5. Approval re-evaluates policy. If the fingerprint changed, approval is refused. The approval binds the plan version,
    hash, amount, and spending ceiling, expires (default 4 h), and is consumed by the first PO issuance.
+
+## Continuity Engine
+
+After each feasible plan, a durable `continuity_analysis` job runs off the request path. The analysis has no authority
+to alter policy, quotes, plans, approvals, or purchase orders. It records `HYPOTHETICAL` provenance and a SHA-256
+input hash over the mission/plan binding, plan hash, quote versions, policy fingerprint, evidence fingerprint, and
+optimizer-input fingerprint. It then:
+
+1. Removes each allocated supplier in turn and reruns the same policy-eligible MILP (N-1 survivability).
+2. Computes the smallest monotonic per-supplier price, ETA, and proportional-capacity stress that makes the current
+   quote snapshot infeasible.
+3. Solves a second transparent candidate with a ≤50% supplier concentration guardrail, then publishes its actual N-1
+   outcome and incremental cost.
+
+Results are cached by `(mission, plan, input_hash)`, run in a retryable background job, and are marked `STALE` when
+the plan is invalidated. The read API repeats the input-hash check, so a race cannot display outdated analysis as
+current. The Procurement Digital Twin graph is composed only from persisted mission, requirements, quotes, plan,
+approval, purchase-order, emergency, and continuity records.
 
 ## What triggers recovery
 

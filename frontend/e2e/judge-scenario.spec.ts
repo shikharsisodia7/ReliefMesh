@@ -39,6 +39,12 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await expect(page.getByRole("heading", { name: "Plan v1" })).toBeVisible();
   await expect(page.getByText(/Total \$3,271\.00/)).toBeVisible();
   await expect(page.getByText(/Pioneer Logistics Supply: \d+ blankets/)).toHaveCount(0);
+  // The counterfactual analysis runs off the request path and must remain visibly
+  // labeled as hypothetical before the judge performs a real supplier change.
+  await expect(page.getByLabel("Continuity Engine")).toBeVisible();
+  await expect(page.getByLabel("N-1 survivability")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel("Failure frontier")).toBeVisible();
+  await expect(page.getByText("HYPOTHETICAL STRESS TEST").first()).toBeVisible();
 
   await pioneer.getByText(/OFAC POTENTIAL_MATCH/).click();
   await expect(page.getByRole("dialog", { name: "Evidence detail" }).getByText(/PIONEER LOGISTICS/).first()).toBeVisible();
