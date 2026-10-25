@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from app.main import create_app
-from conftest import FakeUpstream, auth, make_settings, register, settle_jobs
+from conftest import FakeUpstream, auth, make_settings, register, settle_jobs, wait_for
 from test_po_disruption import quote
 
 
@@ -39,8 +39,8 @@ async def test_emergency_sources_down_are_reported_unavailable_never_fabricated(
             context = (await client.get(f"/v1/missions/{mission['id']}/context", headers=auth(coordinator))).json()
             assert context["nws"]["status"] == "UNAVAILABLE" and not context["nws"].get("data")
             assert context["fema"]["status"] == "UNAVAILABLE" and not context["fema"].get("data")
-            # The event falls back to the real snapshot stored at mission creation, labeled as such.
-            assert context["event"]["provenance"] == "CACHED" and "snapshot" in context["event"]["note"]
+            # The event falls back to real data captured earlier (cache or creation snapshot), labeled CACHED.
+            assert context["event"]["provenance"] == "CACHED", context["event"]
             # The mission and procurement still work while every emergency feed is down.
             assert (await client.get(f"/v1/missions/{mission['id']}", headers=auth(coordinator))).status_code == 200
 
@@ -110,8 +110,9 @@ async def test_crs_down_holds_sandbox_suppliers_for_review() -> None:
             await client.post(f"/v1/missions/{mission['id']}/demo/seed", headers=auth(coordinator))
             await settle_jobs(client, coordinator, mission["id"])
             rows = (await client.get(f"/v1/missions/{mission['id']}/suppliers", headers=auth(coordinator))).json()
-            crs = [row["latest_evidence"].get("CRS_VERIFICATION") for row in rows]
-            assert crs and all(record and record["status"] == "UNAVAILABLE" for record in crs)
+            crs = {row["supplier"]["legal_name"]: (row["latest_evidence"].get("CRS_VERIFICATION") or {}).get("status")
+                   for row in rows}
+            assert crs and all(status == "UNAVAILABLE" for status in crs.values()), crs
             assert all(row["policy"]["status"] in {"NEEDS_REVIEW", "BLOCK"} for row in rows)
 
 
@@ -125,7 +126,10 @@ async def test_apify_down_fails_the_discovery_job_without_inventing_leads() -> N
             mission = await _mission(client, coordinator)
             await client.post(f"/v1/missions/{mission['id']}/discovery", headers=auth(coordinator),
                               json={"query": "blankets", "max_results": 3})
-            jobs = await settle_jobs(client, coordinator, mission["id"])
+            async def finished():
+                rows = (await client.get(f"/v1/missions/{mission['id']}/jobs", headers=auth(coordinator))).json()
+                return rows if rows and all(job["status"] in {"succeeded", "failed"} for job in rows) else None
+            jobs = await wait_for(finished, attempts=150, delay=0.2)  # 3 attempts with 2 s / 4 s backoff
             discovery = [job for job in jobs if job["type"] == "supplier_discovery"]
             assert discovery and discovery[0]["status"] == "failed"
             assert (await client.get(f"/v1/missions/{mission['id']}/leads", headers=auth(coordinator))).json() == []

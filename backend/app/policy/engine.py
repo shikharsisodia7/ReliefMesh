@@ -205,8 +205,13 @@ def supplier_decisions(supplier: dict[str, Any], evidence: list[dict[str, Any]],
                                  else f"CRS sandbox check flagged this contact: {crs.get('summary')}"),
                                 "supplier", sid, [crs["id"]]))
         else:
-            out.append(decision("CRS_VERIFICATION_INCOMPLETE", "WARN", "MEDIUM",
-                                f"CRS check did not complete: {crs.get('summary')}", "supplier", sid, [crs["id"]]))
+            # Unavailable or stale: identity verification required for this signer is missing, which is never a
+            # pass (same rule as missing/stale sanctions screening). A human can clear this exact record.
+            cleared = _cleared(state, "CRS_VERIFICATION_INCOMPLETE", crs["id"])
+            out.append(decision("CRS_VERIFICATION_INCOMPLETE", "WARN" if cleared else "NEEDS_REVIEW", "HIGH",
+                                (f"Incomplete CRS check reviewed: {cleared['reason']}" if cleared
+                                 else f"CRS check did not complete or is stale: {crs.get('summary')}"),
+                                "supplier", sid, [crs["id"]]))
 
     if supplier.get("is_demo"):
         out.append(decision("TEST_SUPPLIER", "WARN", "INFO",
