@@ -515,8 +515,10 @@ async def withdraw_quote(quote_id: str, user: dict = Depends(current_user),
 async def list_quotes(mission_id: str, user: dict = Depends(current_user),
                       services: Services = Depends(get_services)) -> list:
     _, membership = await require_mission_access(mission_id, user, services)
-    if user["role"] != "coordinator" or membership["role"] not in {"admin", "coordinator"}:
-        raise HTTPException(status_code=403, detail="Only procurement coordinators can review quotes")
+    # Approvers authorize spend against these quotes, so they read them too (read-only; suppliers never can).
+    if user["role"] != "coordinator" or membership["role"] not in {"admin", "coordinator", "approver"}:
+        raise HTTPException(status_code=403, detail="Only the buyer organization's coordinators and approvers can "
+                                                    "review quotes")
     return sorted(await services.store.find("quotes", mission_id=mission_id), key=lambda row: row["created_at"],
                   reverse=True)
 

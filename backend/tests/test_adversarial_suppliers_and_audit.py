@@ -57,6 +57,9 @@ async def test_a_supplier_cannot_touch_a_competitors_quote_order_or_invitation(c
     for method, url, body in attacks:
         response = await client.request(method, url, json=body, headers=auth(alpha))
         assert response.status_code in {403, 404, 409}, (method, url, response.status_code, response.text[:120])
+    # The independent approver reviews the quotes it authorizes spend against (read-only).
+    approver_view = await client.get(f"/v1/missions/{mid}/quotes", headers=auth(approver))
+    assert approver_view.status_code == 200 and len(approver_view.json()) == 2
     alpha_orders = (await client.get("/v1/purchase-orders", headers=auth(alpha))).json()
     assert {o["supplier_email"] for o in alpha_orders} == {"a@alpha-textiles.example.org"}
     after = (await client.get(f"/v1/quotes/{beta_quote['id']}", headers=auth(beta))).json()
