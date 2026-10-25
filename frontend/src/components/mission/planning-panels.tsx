@@ -1,14 +1,16 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, Download, Hash, Link2, Play, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, Download, Hash, Link2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
-import { PlanStatusText, Provenance, StatusText, ago, money, when } from "@/components/status-badges";
+import { Dialog } from "@/components/patterns/overlays";
+import { PlanStatusText, Provenance, StatusText, ago, money, signedAmount, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_BASE_URL, api } from "@/lib/api";
-import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Mission, Notification, Payment, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
+import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Notification, Payment, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type Run = (operation: () => Promise<void>) => Promise<void>;
 
@@ -45,32 +47,6 @@ export function AllocationBar({ plan, order }: { plan: Plan; order: string[] }) 
   );
 }
 
-function etaHours(plan: Plan) {
-  if (!plan.latest_delivery) return null;
-  return Math.max(0, Math.round((new Date(plan.latest_delivery).getTime() - new Date(plan.computed_at).getTime()) / 3_600_000));
-}
-
-export function OptimizerPanel({ mission, plan, eligibleCount, quoteCount, onOptimize, busy }: { mission: Mission; plan?: Plan; eligibleCount: number; quoteCount: number; onOptimize: () => void; busy: boolean }) {
-  return (
-    <section aria-label="Optimization" className="rounded-xl border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Mixed-integer optimizer (PuLP / CBC)</h2>
-          <p className="mt-1 text-sm"><span className="font-mono text-telemetry">{eligibleCount}</span> of {quoteCount} submitted quote{quoteCount === 1 ? "" : "s"} policy-eligible · latest plan: {plan ? `v${plan.version} ${plan.status}` : "not calculated"}</p>
-        </div>
-        <div className="text-right"><Button onClick={onOptimize} disabled={busy || eligibleCount === 0}><Play className="size-3.5" />Run optimization</Button>{eligibleCount === 0 && <p className="mt-1 max-w-56 text-[11px] text-muted-foreground">{quoteCount === 0 ? "Waiting for supplier quotes." : "Waiting for evidence checks to make a quote eligible."} A plan can be generated after eligible quotes are received.</p>}</div>
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        <div className="rounded border p-2"><dt className="text-muted-foreground">Budget ceiling</dt><dd className="font-mono text-base text-telemetry">{money(mission.budget)}</dd></div>
-        <div className="rounded border p-2"><dt className="text-muted-foreground">Deliver by</dt><dd className="font-mono">{when(mission.delivery_deadline)}</dd></div>
-        <div className="rounded border p-2"><dt className="text-muted-foreground">Max supplier share</dt><dd className="font-mono">{mission.max_supplier_share ? `${Math.round(Number(mission.max_supplier_share) * 100)}%` : "none"}</dd></div>
-        <div className="rounded border p-2"><dt className="text-muted-foreground">Coverage</dt><dd className="font-mono">exact quantity · {mission.single_source_only ? "single source" : "multi-source"}</dd></div>
-      </dl>
-      <p className="mt-2 text-[11px] text-tertiary">Minimizes landed cost (unit price × quantity + per-supplier shipping) subject to exact coverage, inventory, delivery deadline, budget, and concentration. Binding constraints are reported with each plan.</p>
-    </section>
-  );
-}
-
 const DISRUPTIONS = [
   { kind: "withdraw", label: "Supplier withdraws quote" },
   { kind: "reduce_inventory", label: "Supplier cuts inventory" },
@@ -79,7 +55,9 @@ const DISRUPTIONS = [
   { kind: "block_supplier", label: "Policy blocks supplier" },
 ] as const;
 
-export function DisruptionConsole({ missionId, token, rows, plan, run, disruptions, setNotice }: { missionId: string; token: string; rows: SupplierRow[]; plan?: Plan; run: Run; disruptions: Disruption[]; setNotice: (value: string) => void }) {
+// Demo-only section at the bottom of the Plan tab. The dialog changes persisted quote or policy state
+// through the same code path a real supplier edit uses.
+export function DemoControls({ missionId, token, rows, plan, run, disruptions, setNotice }: { missionId: string; token: string; rows: SupplierRow[]; plan?: Plan; run: Run; disruptions: Disruption[]; setNotice: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<(typeof DISRUPTIONS)[number]["kind"]>("withdraw");
   const allocated = new Set(plan?.allocations.map((row) => row.supplier_id));
@@ -89,76 +67,86 @@ export function DisruptionConsole({ missionId, token, rows, plan, run, disruptio
   const [value, setValue] = useState("");
   const chosen = supplierId && candidates.some((row) => row.supplier.id === supplierId) ? supplierId : defaultSupplier;
   const last = disruptions[0];
+  const valueLabel = kind === "reduce_inventory" ? "New quantity" : kind === "raise_price" ? "New unit price" : kind === "delay_eta" ? "Delay (hours)" : "Reason";
+  const select = "mt-1.5 h-9 w-full rounded-md border bg-background px-3 text-sm";
+  const apply = () => run(async () => {
+    const body: Record<string, unknown> = { kind, supplier_id: chosen };
+    if (kind === "reduce_inventory" && value) body.quantity = Number(value);
+    if (kind === "raise_price" && value) body.unit_price = Number(value).toFixed(2);
+    if (kind === "delay_eta" && value) body.delay_hours = Number(value);
+    if (kind === "block_supplier") body.reason = value || "Blocked during a supply-chain disruption drill";
+    const result = await api<Disruption>(`/v1/missions/${missionId}/disruptions`, { method: "POST", token, body: JSON.stringify(body) });
+    setNotice(`${result.summary}. Plan invalidated; autonomous replanning job ${result.job_id?.slice(0, 8)} queued.`);
+    setOpen(false); setValue("");
+  });
   return (
-    <section aria-label="Disruption control" className="rounded-xl border border-critical/40 bg-critical/5 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section aria-label="Demo controls" className="border-t pt-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-critical">Judge control</h2>
-          <p className="text-xs text-muted-foreground">Mutates persisted quote or policy state through the same code path a supplier edit uses. Quote changes are limited to labeled TEST suppliers.</p>
+          <h3 className="text-base font-semibold">Demo controls</h3>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">Change saved quote or policy state through the same code path a supplier edit uses. Quote changes are limited to labeled TEST suppliers.</p>
+          {last && <p className="mt-2 text-sm text-muted-foreground">Last: {last.summary} · {ago(last.created_at)}</p>}
         </div>
-        <Button className="h-11 bg-critical px-5 text-base font-bold tracking-wide text-white hover:bg-critical/85" onClick={() => setOpen(!open)}><Zap className="size-4" />DISRUPT SUPPLY CHAIN</Button>
+        <Button variant="secondary" onClick={() => setOpen(true)}>Disrupt supply chain</Button>
       </div>
-      {open && (
-        <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_160px_auto] sm:items-end" onSubmit={(event) => { event.preventDefault(); void run(async () => {
-          const body: Record<string, unknown> = { kind, supplier_id: chosen };
-          if (kind === "reduce_inventory" && value) body.quantity = Number(value);
-          if (kind === "raise_price" && value) body.unit_price = Number(value).toFixed(2);
-          if (kind === "delay_eta" && value) body.delay_hours = Number(value);
-          if (kind === "block_supplier") body.reason = value || "Blocked during a supply-chain disruption drill";
-          const result = await api<Disruption>(`/v1/missions/${missionId}/disruptions`, { method: "POST", token, body: JSON.stringify(body) });
-          setNotice(`${result.summary}. Plan invalidated; autonomous replanning job ${result.job_id?.slice(0, 8)} queued.`);
-          setOpen(false); setValue("");
-        }); }}>
-          <div><Label htmlFor="disruption-kind">Disruption</Label><select id="disruption-kind" className="mt-1 h-8 w-full rounded-lg border bg-background px-2 text-sm" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>{DISRUPTIONS.map((option) => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></div>
-          <div><Label htmlFor="disruption-supplier">Supplier</Label><select id="disruption-supplier" className="mt-1 h-8 w-full rounded-lg border bg-background px-2 text-sm" value={chosen} onChange={(event) => setSupplierId(event.target.value)}>{candidates.map((row) => <option key={row.supplier.id} value={row.supplier.id}>{row.supplier.legal_name ?? row.supplier.email}{row.supplier.is_demo ? " (TEST)" : ""}{allocated.has(row.supplier.id) ? " · allocated" : ""}</option>)}</select></div>
-          <div><Label htmlFor="disruption-value">{kind === "reduce_inventory" ? "New quantity" : kind === "raise_price" ? "New unit price" : kind === "delay_eta" ? "Delay (hours)" : kind === "block_supplier" ? "Reason" : "—"}</Label><Input id="disruption-value" className="mt-1" disabled={kind === "withdraw"} value={value} onChange={(event) => setValue(event.target.value)} placeholder={kind === "reduce_inventory" ? "auto: ÷3" : kind === "raise_price" ? "auto: +35%" : kind === "delay_eta" ? "72" : ""} /></div>
-          <Button type="submit" variant="primary" disabled={!chosen}>Apply disruption</Button>
+      <Dialog open={open} onOpenChange={setOpen} title="Disrupt supply chain" subtitle="Demo only" footer={<Button type="submit" form="disruption-form" disabled={!chosen}>Apply disruption</Button>}>
+        <form id="disruption-form" className="space-y-4" onSubmit={(event) => { event.preventDefault(); void apply(); }}>
+          <div><Label htmlFor="disruption-kind">Disruption</Label><select id="disruption-kind" className={select} value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>{DISRUPTIONS.map((option) => <option key={option.kind} value={option.kind}>{option.label}</option>)}</select></div>
+          <div><Label htmlFor="disruption-supplier">Supplier</Label><select id="disruption-supplier" className={select} value={chosen} onChange={(event) => setSupplierId(event.target.value)}>{candidates.map((row) => <option key={row.supplier.id} value={row.supplier.id}>{row.supplier.legal_name ?? row.supplier.email}{row.supplier.is_demo ? " (TEST)" : ""}{allocated.has(row.supplier.id) ? " · allocated" : ""}</option>)}</select></div>
+          {kind !== "withdraw" && <div><Label htmlFor="disruption-value">{valueLabel}</Label><Input id="disruption-value" className="mt-1.5" value={value} onChange={(event) => setValue(event.target.value)} placeholder={kind === "reduce_inventory" ? "auto: ÷3" : kind === "raise_price" ? "auto: +35%" : kind === "delay_eta" ? "72" : ""} /></div>}
+          <p className="text-muted-foreground">This changes saved data, so the current plan goes stale and ReliefMesh replans.</p>
         </form>
-      )}
-      {last && <p className="mt-3 text-xs"><span className="font-mono text-critical">LAST</span> {last.summary} · {ago(last.created_at)}</p>}
+      </Dialog>
     </section>
   );
 }
 
-export function PlanComparison({ plans, approvals, order }: { plans: Plan[]; approvals: Approval[]; order: string[] }) {
-  const [latest, previous] = plans;
-  if (!latest || !previous) return null;
+// Full-width, side-by-side view of the previous and current plan. Changed cells are marked by weight, not color.
+export function CompareView({ latest, previous, approvals, onClose }: { latest: Plan; previous: Plan; approvals: Approval[]; onClose: () => void }) {
   const invalidated = approvals.find((approval) => approval.plan_id === previous.id && approval.status === "invalidated");
+  const rows = latest.difference.previous_plan_id === previous.id ? latest.difference.supplier_delta ?? [] : [];
   const delta = latest.difference.cost_delta;
-  const column = (plan: Plan, label: string) => (
-    <div className={`rounded-lg border p-3 ${plan.status === "stale" ? "opacity-75" : "border-live/40"}`}>
-      <div className="flex items-center justify-between"><span className="font-mono text-xs text-muted-foreground">{label}</span><PlanStatusText value={plan.status} /></div>
-      <p className="mt-1 text-xl font-semibold">PLAN V{plan.version}</p>
-      <AllocationBar plan={plan} order={order} />
-      <ul className="mt-2 space-y-0.5 text-sm">
-        {plan.status === "infeasible" ? plan.shortages.map((row) => <li key={row.item} className="text-critical">{row.item}: short {row.shortage} ({row.reason})</li>) : shares(plan).map((entry) => <li key={entry.supplierId} className="flex justify-between gap-2"><span className="flex items-center gap-1.5 truncate"><span className="inline-block size-2 rounded-sm" style={{ background: colorFor(order, entry.supplierId) }} />{supplierName(plan, entry.supplierId)}</span><span className="font-mono">{Math.round(entry.share * 100)}% · {entry.units}u</span></li>)}
-      </ul>
-      <p className="mt-2 font-mono text-lg text-telemetry">{plan.status === "infeasible" ? "—" : money(plan.total_cost)}</p>
-      <p className="font-mono text-xs text-muted-foreground">{etaHours(plan) !== null ? `${etaHours(plan)}h to last delivery` : ""}</p>
+  const column = (plan: Plan, label: string, side: "before" | "after") => (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="mt-1 flex items-baseline gap-3"><h3 className="text-lg font-semibold">v{plan.version}</h3><PlanStatusText value={plan.status} /></div>
+      <table className="mt-4 w-full text-sm">
+        <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 font-medium">Supplier</th><th className="py-2 text-right font-medium">Units</th><th className="py-2 text-right font-medium">Items cost</th></tr></thead>
+        <tbody>
+          {rows.map((row) => {
+            const units = side === "before" ? row.units_before : row.units_after;
+            const changed = row.units_before !== row.units_after;
+            return (
+              <tr key={row.supplier_id} className={cn("border-b", changed && "font-semibold")}>
+                <td className="py-2.5">{row.supplier}</td>
+                <td className="py-2.5 text-right tabular">{units}</td>
+                <td className="py-2.5 text-right tabular">{money(side === "before" ? row.cost_before : row.cost_after)}</td>
+              </tr>
+            );
+          })}
+          <tr><td className="py-2.5 text-muted-foreground">Total with shipping</td><td /><td className="py-2.5 text-right font-medium tabular">{plan.status === "infeasible" ? "—" : money(plan.total_cost)}</td></tr>
+        </tbody>
+      </table>
     </div>
   );
   return (
-    <section aria-label="Plan comparison" className="rounded-xl border bg-card p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovery: before → after</h2>
-      <div className="grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr]">
-        {column(previous, "OLD PLAN")}
-        <div className="hidden items-center md:flex"><ArrowRight className="size-6 text-live" /></div>
-        {column(latest, "NEW PLAN")}
+    <section aria-label="Plan comparison" data-testid="compare-view">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Compare v{previous.version} and v{latest.version}</h2>
+        <Button variant="text" onClick={onClose}>Back to plan</Button>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <div className="rounded border p-2"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Why it changed</p><ul className="mt-1 list-disc pl-4 text-sm">{(latest.difference.why?.length ? latest.difference.why : [latest.trigger]).map((reason) => <li key={reason}>{reason}</li>)}</ul></div>
-        <div className="rounded border p-2"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost delta</p><p className={`mt-1 font-mono text-2xl ${delta?.startsWith("-") ? "text-ok" : "text-telemetry"}`}>{delta ? `${delta.startsWith("-") ? "−" : "+"}${money(delta.replace(/^[+-]/, ""))}` : "n/a"}</p></div>
-        <div className="rounded border p-2"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approval</p>
-          {invalidated ? <p className="mt-1 text-sm"><span className="font-mono text-critical">INVALIDATED</span> · v{previous.version} approval for {money(invalidated.amount)}: {invalidated.invalidation_reason}</p> : <p className="mt-1 text-sm text-muted-foreground">Prior plan was not approved.</p>}
-          {latest.status === "feasible" && <p className="mt-1 text-sm font-medium text-telemetry">New human approval required for v{latest.version}.</p>}
-          {latest.status === "approved" && <p className="mt-1 text-sm text-ok">v{latest.version} re-approved.</p>}
-        </div>
+      <div className="mt-6 grid gap-12 md:grid-cols-2">
+        {column(previous, "Previous plan", "before")}
+        {column(latest, "Current plan", "after")}
       </div>
-      {latest.difference.supplier_delta && latest.difference.supplier_delta.length > 0 && (
-        <table className="mt-3 w-full text-xs"><thead><tr className="text-left text-muted-foreground"><th className="py-1 font-medium">Supplier delta</th><th className="font-medium">Units</th><th className="font-medium">Cost</th></tr></thead>
-          <tbody>{latest.difference.supplier_delta.map((row) => <tr key={row.supplier_id} className="border-t border-border/60"><td className="py-1">{row.supplier}</td><td className="font-mono">{row.units_before} → {row.units_after}</td><td className="font-mono">{money(row.cost_before)} → {money(row.cost_after)}</td></tr>)}</tbody>
-        </table>
-      )}
+      <dl className="mt-10 grid max-w-3xl gap-x-6 gap-y-4 text-sm sm:grid-cols-[160px_1fr]">
+        <dt className="text-muted-foreground">Cost change</dt>
+        <dd><span className="text-base font-semibold tabular">{delta ? signedAmount(delta, true) : "—"}</span></dd>
+        <dt className="text-muted-foreground">Why it changed</dt>
+        <dd><ul className="space-y-1">{(latest.difference.why?.length ? latest.difference.why : [latest.trigger]).map((reason) => <li key={reason}>{reason}</li>)}</ul></dd>
+        <dt className="text-muted-foreground">Approval</dt>
+        <dd>{invalidated ? <><span className="font-medium">Approval revoked</span> · v{previous.version} approval for {money(invalidated.amount)}: {invalidated.invalidation_reason}</> : <span className="text-muted-foreground">Plan v{previous.version} was not approved.</span>}</dd>
+      </dl>
     </section>
   );
 }

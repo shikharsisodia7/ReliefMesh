@@ -84,9 +84,10 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
 
   // Live OFAC screening must finish before either quote is eligible.
   await expect(coordinator.getByText(/OFAC NO_MATCH/)).toHaveCount(2, { timeout: 45_000 });
+  await coordinator.getByRole("tab", { name: "Plan" }).click();
   await coordinator.getByRole("button", { name: "Run optimization" }).click();
   await expect(coordinator.getByRole("heading", { name: "Plan v1" })).toBeVisible();
-  await expect(coordinator.getByText(/Total \$80\.00/)).toBeVisible();
+  await expect(coordinator.getByTestId("plan-total")).toHaveText("$80");
   // Segregation of duties: the requester has no approve control; Coordinator B approves.
   await expect(coordinator.getByText(/another approver in your organization must approve/).first()).toBeVisible();
   await expect(coordinator.getByRole("button", { name: "Approve plan" })).toHaveCount(0);
@@ -98,12 +99,13 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await supplierOne.getByRole("button", { name: "Withdraw quote" }).click();
   await expect(supplierOne.getByText("withdrawn", { exact: true })).toBeVisible();
   await expect(coordinator.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
-  await expect(coordinator.getByText(/Total \$90\.00/)).toBeVisible();
-  await expect(coordinator.getByText("INVALIDATED", { exact: true })).toBeVisible();
+  await expect(coordinator.getByTestId("plan-total")).toHaveText("$90");
+  await expect(coordinator.getByText(/Approval revoked/).first()).toBeVisible();
   await expect(approver.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
   await approver.getByRole("button", { name: "Approve plan" }).click();
   await expect(approver.getByText("Approved", { exact: true }).first()).toBeVisible();
   await coordinator.getByRole("button", { name: "Generate POs" }).click();
+  await coordinator.getByRole("tab", { name: "Orders" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
   await coordinator.getByRole("button", { name: "Confirm & send" }).click();
   await expect(coordinator.getByText("sent", { exact: true })).toBeVisible();
@@ -114,5 +116,6 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await expect(supplierTwo.getByText("supplier_accepted", { exact: true })).toBeVisible();
   await supplierTwo.getByRole("button", { name: "Mark delivered" }).click();
   await expect(supplierTwo.getByText("completed", { exact: true })).toBeVisible();
+  await coordinator.getByRole("tab", { name: "Audit" }).click();
   await expect(coordinator.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

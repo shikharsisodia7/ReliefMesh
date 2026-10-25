@@ -146,7 +146,7 @@ export type Plan = {
   stale_reason?: string;
 };
 
-export type Approval = { id: string; plan_id: string; plan_version: number; status: "active" | "consumed" | "invalidated" | "expired"; amount: string; spending_ceiling?: string; approved_at: string; expires_at: string | null; invalidation_reason?: string | null; plan_hash?: string };
+export type Approval = { id: string; plan_id: string; plan_version: number; status: "active" | "consumed" | "invalidated" | "expired"; amount: string; spending_ceiling?: string; approved_at: string; expires_at: string | null; invalidated_at?: string | null; invalidation_reason?: string | null; plan_hash?: string; approver_email?: string | null; requested_by?: string | null; segregation_of_duties?: string };
 export type PurchaseOrder = { id: string; po_number: string; supplier_email: string; status: string; plan_version?: number; subtotal?: string; plan_stale?: boolean; lines: Allocation[] };
 export type Notification = { id: string; kind: string; severity: "info" | "success" | "warning" | "critical"; message: string; created_at: string };
 export type AuditEvent = { id: string; sequence: number; action: string; actor_id: string | null; entity_type: string; entity_id: string; metadata: Record<string, unknown>; created_at: string; event_hash: string; previous_hash: string };
