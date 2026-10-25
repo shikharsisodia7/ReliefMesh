@@ -6,27 +6,26 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { DeliveryList } from "@/components/operations/delivery-list";
-import { StatusDot, ago } from "@/components/status-badges";
+import { StatusText, ago, type Tone } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { CapabilityStatus, IntegrationState, IntegrationsView } from "@/lib/types";
 
-const stateTone: Record<IntegrationState, "ok" | "warn" | "idle" | "critical"> = { LIVE: "ok", DEGRADED: "warn", NOT_CONFIGURED: "idle", BLOCKED: "critical" };
-const stateText: Record<IntegrationState, string> = { LIVE: "text-ok", DEGRADED: "text-warn", NOT_CONFIGURED: "text-muted-foreground", BLOCKED: "text-critical" };
+const stateTone: Record<IntegrationState, Tone> = { LIVE: "neutral", DEGRADED: "warn", NOT_CONFIGURED: "muted", BLOCKED: "critical" };
 
-export function StateBadge({ state }: { state: IntegrationState }) {
-  return <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-wider ${stateText[state]}`}><StatusDot tone={stateTone[state]} />{state.replace("_", " ")}</span>;
+export function StateText({ state }: { state: IntegrationState }) {
+  return <StatusText tone={stateTone[state]} value={state} className="text-xs tracking-wide">{state.replace("_", " ")}</StatusText>;
 }
 
 function CapabilityRow({ icon, name, status, onTest, testing, canTest }: { icon: ReactNode; name: string; status: CapabilityStatus; onTest?: () => void; testing?: boolean; canTest: boolean }) {
   return (
     <li className="grid gap-1 py-2.5 sm:grid-cols-[150px_140px_1fr_auto] sm:items-center">
       <span className="flex items-center gap-2 text-sm font-medium">{icon}{name}</span>
-      <StateBadge state={status.state} />
+      <StateText state={status.state} />
       <span className="text-xs text-muted-foreground">{status.detail}{status.last_success ? ` · last success ${ago(status.last_success)}` : ""}</span>
-      {canTest && onTest && status.state !== "NOT_CONFIGURED" && <Button size="sm" variant="outline" disabled={testing} onClick={onTest}>{testing ? "Testing…" : "Send test"}</Button>}
+      {canTest && onTest && status.state !== "NOT_CONFIGURED" && <Button size="sm" variant="secondary" disabled={testing} onClick={onTest}>{testing ? "Testing…" : "Send test"}</Button>}
     </li>
   );
 }
@@ -93,7 +92,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
           {isAdmin && google.oauth_configured && (
             <div className="flex gap-2">
               <Button size="sm" disabled={busy !== null} onClick={() => void connect("google")}>{googleConnected ? "Reconnect Google" : "Connect Google"}</Button>
-              {googleConnected && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void disconnect("google")}>Disconnect</Button>}
+              {googleConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void disconnect("google")}>Disconnect</Button>}
             </div>
           )}
         </div>
@@ -117,12 +116,12 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
           {isAdmin && (
             <div className="flex gap-2">
               {data.slack.oauth_configured && <Button size="sm" disabled={busy !== null} onClick={() => void connect("slack")}><MessageSquare className="size-3.5" />Add to Slack</Button>}
-              {slackConnected && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void test("slack")}>Send test</Button>}
-              {slackConnected && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void disconnect("slack")}>Disconnect</Button>}
+              {slackConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void test("slack")}>Send test</Button>}
+              {slackConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void disconnect("slack")}>Disconnect</Button>}
             </div>
           )}
         </div>
-        <div className="mt-2"><StateBadge state={data.slack.state} /> <span className="ml-2 text-xs text-muted-foreground">{data.slack.detail}</span></div>
+        <div className="mt-2"><StateText state={data.slack.state} /> <span className="ml-2 text-xs text-muted-foreground">{data.slack.detail}</span></div>
         {isAdmin && !slackConnected && (
           <form className="mt-3 space-y-2 rounded-lg border border-dashed p-3" onSubmit={(event) => { event.preventDefault(); void saveSlack(); }}>
             <div className="flex gap-3 text-xs">
@@ -149,7 +148,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
       <section aria-label="Recent deliveries" className="rounded-xl border bg-card p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recent external deliveries</h2>
-          <Button size="sm" variant="ghost" onClick={() => void view.refetch()}><RefreshCw className={view.isFetching ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button>
+          <Button size="sm" variant="text" onClick={() => void view.refetch()}><RefreshCw className={view.isFetching ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button>
         </div>
         <DeliveryList deliveries={data.deliveries} token={token} canRetry={isAdmin} onChanged={() => void view.refetch()} showMission />
       </section>

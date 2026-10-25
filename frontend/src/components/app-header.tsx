@@ -18,7 +18,7 @@ export function AppHeader({ email, home, label }: { email?: string; home: string
         </div>
         <div className="flex items-center gap-3 text-sm">
           {email && <span className="hidden text-muted-foreground md:block">{email}</span>}
-          <Button variant="outline" size="sm" onClick={() => { clearSession(); router.push("/"); }}>Sign out</Button>
+          <Button variant="secondary" size="sm" onClick={() => { clearSession(); router.push("/"); }}>Sign out</Button>
         </div>
       </div>
     </header>

@@ -36,8 +36,8 @@ export function MissionLifecycleControls({ mission, token, run, setNotice }: {
   });
   return (
     <div className="flex flex-wrap items-end gap-2 text-sm">
-      <Button size="sm" variant="outline" onClick={() => { setOpen(open === "deadline" ? null : "deadline"); setConfirming(false); }}>Change deadline</Button>
-      <Button size="sm" variant="outline" className="border-critical/40 text-critical" onClick={() => { setOpen(open === "cancel" ? null : "cancel"); setConfirming(false); }}>Cancel mission</Button>
+      <Button size="sm" variant="secondary" onClick={() => { setOpen(open === "deadline" ? null : "deadline"); setConfirming(false); }}>Change deadline</Button>
+      <Button size="sm" variant="secondary" className="border-critical/40 text-critical" onClick={() => { setOpen(open === "cancel" ? null : "cancel"); setConfirming(false); }}>Cancel mission</Button>
       {open === "deadline" && (
         <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void changeDeadline(); }}>
           <div><Label htmlFor="new-deadline" className="text-xs">New delivery deadline</Label><Input id="new-deadline" type="datetime-local" required className="mt-1 h-8" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></div>
@@ -48,7 +48,7 @@ export function MissionLifecycleControls({ mission, token, run, setNotice }: {
       {open === "cancel" && (
         <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (confirming) void cancel(); else setConfirming(true); }}>
           <div><Label htmlFor="cancel-reason" className="text-xs">Cancellation reason</Label><Input id="cancel-reason" required minLength={3} className="mt-1 h-8 w-72" value={reason} onChange={(event) => setReason(event.target.value)} /></div>
-          <Button size="sm" type="submit" variant={confirming ? "destructive" : "outline"}>{confirming ? "Confirm cancellation" : "Cancel mission…"}</Button>
+          <Button size="sm" type="submit" variant={confirming ? "primary" : "secondary"}>{confirming ? "Confirm cancellation" : "Cancel mission…"}</Button>
         </form>
       )}
     </div>

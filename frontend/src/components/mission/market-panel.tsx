@@ -3,7 +3,7 @@
 import { ExternalLink, FlaskConical, Search, Send } from "lucide-react";
 import { useState } from "react";
 
-import { ProvenanceBadge, ago } from "@/components/status-badges";
+import { Provenance, ago } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,7 @@ export function MarketPanel({ mission, token, leads, invitations, jobs, run, set
     <section aria-label="Supplier market" className="space-y-4 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Supplier market</h2>
-        {demoMode && !hasDemo && <Button size="sm" variant="outline" onClick={() => void run(async () => { await api(`/v1/missions/${mission.id}/demo/seed`, { method: "POST", token }); setNotice("Seeded four labeled TEST suppliers with synthetic quotes. Live OFAC / openFDA / USAspending checks are running on their names."); })}><FlaskConical className="size-3.5" />Seed TEST suppliers</Button>}
+        {demoMode && !hasDemo && <Button size="sm" variant="secondary" onClick={() => void run(async () => { await api(`/v1/missions/${mission.id}/demo/seed`, { method: "POST", token }); setNotice("Seeded four labeled TEST suppliers with synthetic quotes. Live OFAC / openFDA / USAspending checks are running on their names."); })}><FlaskConical className="size-3.5" />Seed TEST suppliers</Button>}
       </div>
 
       <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void run(async () => { const response = await api<RfqResponse>(`/v1/missions/${mission.id}/invitations`, { method: "POST", token, body: JSON.stringify({ supplier_email: supplierEmail }) }); setNotice(rfqNotice(response)); setSupplierEmail(""); }); }}>
@@ -57,7 +57,7 @@ export function MarketPanel({ mission, token, leads, invitations, jobs, run, set
             {leads.map((lead) => (
               <li key={lead.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
                 <div className="min-w-48 flex-1">
-                  <div className="flex items-center gap-2"><span className="font-medium">{lead.name}</span><ProvenanceBadge value={lead.provenance} /><span className={`font-mono text-[10px] uppercase ${leadTone[lead.status]}`}>{lead.status}</span></div>
+                  <div className="flex items-center gap-2"><span className="font-medium">{lead.name}</span><Provenance value={lead.provenance} /><span className={`font-mono text-[10px] uppercase ${leadTone[lead.status]}`}>{lead.status}</span></div>
                   <p className="text-xs text-muted-foreground">{[lead.category, lead.phone, lead.address].filter(Boolean).join(" · ")}</p>
                   <p className="font-mono text-[10px] text-tertiary">apify run {lead.apify_run_id?.slice(0, 10)} · dataset {lead.apify_dataset_id?.slice(0, 10)} · {ago(lead.retrieved_at)}</p>
                 </div>
@@ -84,7 +84,7 @@ export function MarketPanel({ mission, token, leads, invitations, jobs, run, set
             {invitations.map((invitation) => (
               <li key={invitation.id} className="flex items-center justify-between gap-2 rounded border border-border/60 px-2 py-1">
                 <span className="truncate">{invitation.supplier_email}</span>
-                <span className="flex items-center gap-1.5">{invitation.is_demo && <ProvenanceBadge value="TEST" />}<span className="font-mono text-[10px] uppercase text-muted-foreground">{invitation.status}{invitation.delivery_status && invitation.delivery_status !== "sent" && invitation.delivery_status !== "not_sent_test_supplier" ? ` · email ${invitation.delivery_status}` : ""}</span></span>
+                <span className="flex items-center gap-1.5">{invitation.is_demo && <Provenance value="TEST" />}<span className="font-mono text-[10px] uppercase text-muted-foreground">{invitation.status}{invitation.delivery_status && invitation.delivery_status !== "sent" && invitation.delivery_status !== "not_sent_test_supplier" ? ` · email ${invitation.delivery_status}` : ""}</span></span>
               </li>
             ))}
           </ul>

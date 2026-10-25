@@ -6,7 +6,7 @@ import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import { ProvenanceBadge, ago, when } from "@/components/status-badges";
+import { Provenance, ago, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +35,7 @@ export function MissionForm({ onSubmit }: { onSubmit: (values: MissionValues, ev
   return (
     <form className="grid gap-4" onSubmit={form.handleSubmit(async (values) => { await onSubmit(values, selected); form.reset(); })}>
       <div className="rounded-lg border bg-background/40 p-3">
-        <div className="flex items-center justify-between gap-2"><Label htmlFor="event">Real emergency (NASA EONET, open events)</Label>{events.data?.[0] && <span className="flex items-center gap-2"><ProvenanceBadge value={events.data[0].provenance} /><span className="font-mono text-[10px] text-tertiary">{ago(events.data[0].retrieved_at)}</span></span>}</div>
+        <div className="flex items-center justify-between gap-2"><Label htmlFor="event">Real emergency (NASA EONET, open events)</Label>{events.data?.[0] && <span className="flex items-center gap-2"><Provenance value={events.data[0].provenance} /><span className="font-mono text-[10px] text-tertiary">{ago(events.data[0].retrieved_at)}</span></span>}</div>
         <select id="event" className="mt-1 h-9 w-full rounded-lg border bg-background px-2 text-sm" {...form.register("emergency_event_id")}>
           <option value="">No linked event</option>
           {events.data?.map((event) => <option key={event.id} value={event.id}>{event.categories[0]?.title ?? "Event"} · {event.title}</option>)}
@@ -60,11 +60,11 @@ export function MissionForm({ onSubmit }: { onSubmit: (values: MissionValues, ev
           <div key={field.id} className="grid grid-cols-[1fr_120px_auto] items-end gap-2 sm:col-span-2">
             <div><Label htmlFor={`extra-item-${index}`}>Additional line {index + 2} name</Label><Input id={`extra-item-${index}`} className="mt-1" {...form.register(`extra.${index}.item`)} /></div>
             <div><Label htmlFor={`extra-qty-${index}`}>Units</Label><Input id={`extra-qty-${index}`} className="mt-1" type="number" {...form.register(`extra.${index}.quantity`, { valueAsNumber: true })} /></div>
-            <Button type="button" variant="ghost" size="icon" aria-label={`Remove line ${index + 2}`} onClick={() => extra.remove(index)}><Trash2 /></Button>
+            <Button type="button" variant="text" size="icon" aria-label={`Remove line ${index + 2}`} onClick={() => extra.remove(index)}><Trash2 /></Button>
           </div>
         ))}
         <div className="flex items-end gap-3 sm:col-span-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => extra.append({ item: "", quantity: 1 })}><Plus className="size-3.5" />Add supply line</Button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => extra.append({ item: "", quantity: 1 })}><Plus className="size-3.5" />Add supply line</Button>
           <div className="w-56"><Label htmlFor="max-share">Max share per supplier (optional)</Label><Input id="max-share" className="mt-1" placeholder="e.g. 0.7" {...form.register("max_supplier_share")} /></div>
         </div>
       </div>

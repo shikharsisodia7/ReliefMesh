@@ -46,7 +46,7 @@ export function IntegrationsPageClient() {
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Carry the procurement workflow into the tools your team already uses: RFQs and purchase orders by Gmail, deadlines on Google Calendar, alerts in Slack, and document copies in Drive. These are notification layers only — ReliefMesh remains the record, and money moves only after approval inside ReliefMesh.</p>
         </section>
         {(organizations.data?.length ?? 0) > 1 && (
-          <div className="flex flex-wrap gap-2">{organizations.data!.map((row) => <Button key={row.id} size="sm" variant={row.id === selected ? "default" : "outline"} onClick={() => setOrganizationId(row.id)}>{row.name} · {row.membership_role}</Button>)}</div>
+          <div className="flex flex-wrap gap-2">{organizations.data!.map((row) => <Button key={row.id} size="sm" variant={row.id === selected ? "primary" : "secondary"} onClick={() => setOrganizationId(row.id)}>{row.name} · {row.membership_role}</Button>)}</div>
         )}
         {organizations.isError && !expired && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{organizations.error.message}</p>}
         {organizations.data?.length === 0 && <p className="text-muted-foreground">Create an organization on the dashboard first.</p>}

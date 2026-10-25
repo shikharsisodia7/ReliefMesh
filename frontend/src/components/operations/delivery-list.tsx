@@ -4,15 +4,15 @@ import { CalendarDays, ExternalLink, FolderArchive, Mail, MessageSquare } from "
 import Link from "next/link";
 import { useState } from "react";
 
-import { StatusDot, when } from "@/components/status-badges";
+import { StatusText, when, type Tone } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { DeliveryStatus, OperationsDelivery } from "@/lib/types";
 
 const icons = { gmail: Mail, slack: MessageSquare, calendar: CalendarDays, drive: FolderArchive } as const;
-const tone: Record<DeliveryStatus, "ok" | "warn" | "critical" | "idle" | "live"> = {
-  SENT: "ok", TEST: "idle", DISABLED: "idle", SUPPRESSED: "idle", SKIPPED: "idle", NOT_CONFIGURED: "idle",
-  PENDING: "live", SENDING: "live", RETRYING: "warn", FAILED: "critical",
+const tone: Record<DeliveryStatus, Tone> = {
+  SENT: "neutral", TEST: "muted", DISABLED: "muted", SUPPRESSED: "muted", SKIPPED: "muted", NOT_CONFIGURED: "muted",
+  PENDING: "neutral", SENDING: "neutral", RETRYING: "warn", FAILED: "critical",
 };
 const eventLabel: Record<string, string> = {
   mission_created: "Mission created", mission_updated: "Mission updated", mission_cancelled: "Mission cancelled",
@@ -50,9 +50,9 @@ export function DeliveryList({ deliveries, token, canRetry, onChanged, showMissi
                 {row.last_error && <p className="text-xs text-critical/90">{row.last_error}</p>}
               </div>
               <div className="flex items-center gap-2 sm:justify-end">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold"><StatusDot tone={tone[row.status]} />{row.status.replace("_", " ")}</span>
+                <StatusText tone={tone[row.status]} value={row.status} className="text-xs tracking-wide">{row.status.replace("_", " ")}</StatusText>
                 {row.provider_url && <a className="text-muted-foreground hover:text-foreground" href={row.provider_url} target="_blank" rel="noreferrer" aria-label="Open in provider"><ExternalLink className="size-3.5" /></a>}
-                {canRetry && (row.status === "FAILED" || row.status === "NOT_CONFIGURED") && row.event_type !== "integration_test" && <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => void retry(row.id)}>Retry</Button>}
+                {canRetry && (row.status === "FAILED" || row.status === "NOT_CONFIGURED") && row.event_type !== "integration_test" && <Button size="sm" variant="secondary" className="h-6 px-2 text-xs" onClick={() => void retry(row.id)}>Retry</Button>}
               </div>
             </li>
           );

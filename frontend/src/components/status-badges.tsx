@@ -1,57 +1,53 @@
+import type { ReactNode } from "react";
+
 import { cn } from "@/lib/utils";
 
-const provenanceStyles: Record<string, string> = {
-  LIVE: "border-live/40 bg-live/10 text-live",
-  CACHED: "border-telemetry/40 bg-telemetry/10 text-telemetry",
-  SANDBOX: "border-violet-400/40 bg-violet-400/10 text-violet-300",
-  USER_SUBMITTED: "border-sky-300/30 bg-sky-300/10 text-sky-200",
-  SYNTHETIC: "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300",
-  TEST: "border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300",
-  BLOCKED_EXTERNAL: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  UNAVAILABLE: "border-critical/40 bg-critical/10 text-critical",
+// Status is text only: no dots, pills, or tinted backgrounds. Raw API codes stay in data-value.
+export type Tone = "ok" | "warn" | "neutral" | "critical" | "muted";
+
+const toneClass: Record<Tone, string> = {
+  ok: "text-ok",
+  warn: "text-warn",
+  neutral: "text-foreground",
+  critical: "text-critical",
+  muted: "text-muted-foreground",
 };
 
-const labels: Record<string, string> = { USER_SUBMITTED: "USER SUBMITTED", BLOCKED_EXTERNAL: "NOT CONFIGURED", NEEDS_REVIEW: "NEEDS REVIEW" };
+export function StatusText({ tone = "neutral", value, className, children }: { tone?: Tone; value?: string; className?: string; children: ReactNode }) {
+  return <span data-value={value} className={cn("font-medium", toneClass[tone], className)}>{children}</span>;
+}
 
-export function ProvenanceBadge({ value, className }: { value?: string | null; className?: string }) {
+const provenanceLabels: Record<string, string> = { USER_SUBMITTED: "USER SUBMITTED", BLOCKED_EXTERNAL: "NOT CONFIGURED" };
+
+// Renders e.g. "LIVE · 14:20". `at` is the API timestamp.
+export function Provenance({ value, at, className }: { value?: string | null; at?: string | null; className?: string }) {
   if (!value) return null;
   return (
-    <span className={cn("inline-flex h-5 items-center rounded border px-1.5 font-mono text-[10px] font-semibold tracking-wider", provenanceStyles[value] ?? provenanceStyles.BLOCKED_EXTERNAL, className)} title={`Data provenance: ${value}`}>
-      {labels[value] ?? value}
+    <span data-value={value} title={`Data provenance: ${value}`} className={cn("text-xs font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase", className)}>
+      {provenanceLabels[value] ?? value}{at ? ` · ${clock(at)}` : ""}
     </span>
   );
 }
 
-const policyStyles: Record<string, string> = {
-  PASS: "border-ok/40 bg-ok/10 text-ok",
-  WARN: "border-warn/40 bg-warn/10 text-warn",
-  NEEDS_REVIEW: "border-telemetry/50 bg-telemetry/15 text-telemetry",
-  BLOCK: "border-critical/50 bg-critical/15 text-critical",
-};
+const supplierPolicy: Record<string, [string, Tone]> = { PASS: ["Eligible", "neutral"], WARN: ["Eligible", "neutral"], NEEDS_REVIEW: ["Needs review", "warn"], BLOCK: ["Blocked", "neutral"] };
+const rulePolicy: Record<string, [string, Tone]> = { PASS: ["Pass", "muted"], WARN: ["Warning", "neutral"], NEEDS_REVIEW: ["Needs review", "warn"], BLOCK: ["Blocked", "neutral"] };
 
-export function PolicyBadge({ value, className }: { value?: string | null; className?: string }) {
+// A supplier's overall verdict, or ("rule") the result of a single policy rule.
+export function PolicyText({ value, scope = "supplier", className }: { value?: string | null; scope?: "supplier" | "rule"; className?: string }) {
   if (!value) return null;
+  const [label, tone] = (scope === "rule" ? rulePolicy : supplierPolicy)[value] ?? [value, "neutral"];
   return (
-    <span className={cn("inline-flex h-5 items-center rounded border px-1.5 font-mono text-[10px] font-bold tracking-wider", policyStyles[value] ?? policyStyles.WARN, className)} title={`Policy status: ${value}`}>
-      {labels[value] ?? value}
-    </span>
+    <StatusText tone={tone} value={value} className={className}>
+      {label}{scope === "supplier" && value === "WARN" && <span className="font-normal text-muted-foreground"> with warnings</span>}
+    </StatusText>
   );
 }
 
-const planStyles: Record<string, string> = {
-  feasible: "border-live/40 bg-live/10 text-live",
-  approved: "border-ok/50 bg-ok/15 text-ok",
-  stale: "border-muted-foreground/30 bg-muted text-muted-foreground line-through decoration-1",
-  infeasible: "border-critical/50 bg-critical/15 text-critical",
-};
+const planStates: Record<string, [string, Tone]> = { feasible: ["Feasible", "ok"], approved: ["Approved", "neutral"], stale: ["Stale", "muted"], infeasible: ["Infeasible", "warn"] };
 
-export function PlanStatusBadge({ value }: { value: string }) {
-  return <span className={cn("inline-flex h-5 items-center rounded border px-1.5 font-mono text-[10px] font-bold uppercase tracking-wider", planStyles[value] ?? planStyles.stale)}>{value}</span>;
-}
-
-export function StatusDot({ tone }: { tone: "ok" | "warn" | "critical" | "idle" | "live" }) {
-  const color = { ok: "bg-ok", warn: "bg-warn", critical: "bg-critical", idle: "bg-tertiary", live: "bg-live" }[tone];
-  return <span className={cn("inline-block size-2 rounded-full", color, tone === "live" && "animate-pulse")} aria-hidden />;
+export function PlanStatusText({ value }: { value: string }) {
+  const [label, tone] = planStates[value] ?? [value.charAt(0).toUpperCase() + value.slice(1), "neutral"];
+  return <StatusText tone={tone} value={value}>{label}</StatusText>;
 }
 
 export function money(value: string | number | null | undefined) {
@@ -60,9 +56,16 @@ export function money(value: string | number | null | undefined) {
   return number.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 }
 
+// Dates and times people read, e.g. "Oct 24, 2:20 PM".
 export function when(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+// Compact 24-hour HH:mm, only for provenance stamps.
+export function clock(value?: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 export function ago(value?: string | null) {

@@ -2,14 +2,14 @@
 
 import { ExternalLink, Flame, Landmark, Radio, Satellite } from "lucide-react";
 
-import { ProvenanceBadge, ago, when } from "@/components/status-badges";
+import { Provenance, ago, when } from "@/components/status-badges";
 import type { ContextSection, Mission, MissionContext } from "@/lib/types";
 
 function SectionHeader({ icon: Icon, title, section }: { icon: typeof Flame; title: string; section?: ContextSection<unknown> | null }) {
   return (
     <div className="mb-2 flex items-center justify-between gap-2">
       <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"><Icon className="size-3.5" />{title}</h3>
-      {section && <span className="flex items-center gap-2">{section.status === "OK" ? <ProvenanceBadge value={section.provenance} /> : <ProvenanceBadge value={section.status} />}{section.retrieved_at && <span className="font-mono text-[10px] text-tertiary">{ago(section.retrieved_at)}</span>}</span>}
+      {section && <span className="flex items-center gap-2">{section.status === "OK" ? <Provenance value={section.provenance} /> : <Provenance value={section.status} />}{section.retrieved_at && <span className="font-mono text-[10px] text-tertiary">{ago(section.retrieved_at)}</span>}</span>}
     </div>
   );
 }

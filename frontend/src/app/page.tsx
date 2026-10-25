@@ -10,7 +10,7 @@ const pillars = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background text-foreground panel-grid">
+    <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8 lg:px-10">
         <header className="flex items-center justify-between">
           <span className="font-mono text-sm font-bold tracking-[0.2em]">RELIEF<span className="text-live">MESH</span></span>

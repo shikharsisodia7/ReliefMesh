@@ -85,7 +85,7 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requ
           <Label htmlFor="pasted-quote">Paste an existing quote (optional)</Label>
           <Textarea id="pasted-quote" rows={4} maxLength={12000} placeholder="Paste the text of your emailed or PDF quote. Gemini pre-fills the form below; nothing is submitted until you review it." value={pasted} onChange={(event) => setPasted(event.target.value)} />
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" size="sm" disabled={drafting || pasted.trim().length < 20} onClick={() => void applyDraft()}>{drafting ? "Reading quote…" : "Pre-fill with Gemini"}</Button>
+            <Button type="button" variant="secondary" size="sm" disabled={drafting || pasted.trim().length < 20} onClick={() => void applyDraft()}>{drafting ? "Reading quote…" : "Pre-fill with Gemini"}</Button>
             <span className="text-xs text-muted-foreground">AI draft only. It cannot mark you eligible or change screening.</span>
           </div>
           {draftError && <p className="text-xs text-critical">{draftError}</p>}

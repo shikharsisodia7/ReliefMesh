@@ -88,7 +88,7 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await approver.goto(coordinator.url());
   await expect(approver.getByRole("heading", { name: "Plan v1" })).toBeVisible();
   await approver.getByRole("button", { name: "Approve plan" }).click();
-  await expect(approver.getByText("approved", { exact: true }).first()).toBeVisible();
+  await expect(approver.getByText("Approved", { exact: true }).first()).toBeVisible();
 
   await supplierOne.getByRole("button", { name: "Withdraw quote" }).click();
   await expect(supplierOne.getByText("withdrawn", { exact: true })).toBeVisible();
@@ -97,7 +97,7 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await expect(coordinator.getByText("INVALIDATED", { exact: true })).toBeVisible();
   await expect(approver.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
   await approver.getByRole("button", { name: "Approve plan" }).click();
-  await expect(approver.getByText("approved", { exact: true }).first()).toBeVisible();
+  await expect(approver.getByText("Approved", { exact: true }).first()).toBeVisible();
   await coordinator.getByRole("button", { name: "Generate POs" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
   await coordinator.getByRole("button", { name: "Confirm & send" }).click();

@@ -32,7 +32,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByRole("button", { name: "Seed TEST suppliers" }).click();
   const pioneer = page.getByTestId("supplier-Pioneer Logistics Supply");
   await expect(pioneer.getByText(/OFAC POTENTIAL_MATCH/)).toBeVisible({ timeout: 60_000 });
-  await expect(pioneer.getByText("NEEDS REVIEW").first()).toBeVisible();
+  await expect(pioneer.getByText(/needs review/i).first()).toBeVisible();
   await expect(page.getByText(/OFAC NO_MATCH/)).toHaveCount(3, { timeout: 30_000 });
 
   await page.getByRole("button", { name: "Run optimization" }).click();
@@ -45,7 +45,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByRole("button", { name: "Close evidence" }).click();
 
   await page.getByRole("button", { name: "Approve plan" }).click();
-  await expect(page.getByText("approved", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Approved", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "DISRUPT SUPPLY CHAIN" }).click();
   await page.getByLabel("Disruption", { exact: true }).selectOption("withdraw");

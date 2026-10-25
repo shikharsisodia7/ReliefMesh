@@ -12,7 +12,7 @@ import { OperationsPanel } from "@/components/mission/operations-panel";
 import { DisruptionConsole, OptimizerPanel, OrdersPanel, PaymentsPanel, PlanComparison, PlanVersions, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
-import { ProvenanceBadge, money, when } from "@/components/status-badges";
+import { Provenance, money, when } from "@/components/status-badges";
 import { signInUrl } from "@/lib/session";
 import { api } from "@/lib/api";
 import { useAppConfig } from "@/hooks/use-config";
@@ -61,7 +61,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-live">Mission · {mission.delivery_location}</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.name}{organization?.is_demo && <span className="ml-3 rounded border border-fuchsia-400/40 px-2 py-0.5 align-middle font-mono text-xs text-fuchsia-300">DEMO ORG</span>}</h1>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{mission.name}{organization?.is_demo && <span className="ml-3 align-middle text-xs font-medium tracking-wide text-muted-foreground">DEMO ORG</span>}</h1>
             <p className="mt-1 text-muted-foreground">Need {mission.requirements.map((item) => `${item.quantity} ${item.item}`).join(", ")} by {when(mission.delivery_deadline)} · Budget {money(mission.budget)}{mission.created_via === "agent" ? " · created by Fetch.ai agent" : ""}</p>
           </div>
           <div className="flex flex-wrap gap-2 font-mono text-xs">
@@ -89,7 +89,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <PaymentsPanel payments={data.payments.data ?? []} />
         <OperationsPanel missionId={missionId} organizationId={mission.organization_id} token={token} isAdmin={isAdmin} />
         <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
-        <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo</>} fixtures</p>
+        <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <Provenance value="LIVE" /> fetched from the public source · <Provenance value="CACHED" /> last-known-good copy · <Provenance value="SANDBOX" /> sponsor sandbox · <Provenance value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <Provenance value="TEST" /> / <Provenance value="SYNTHETIC" /> demo</>} fixtures</p>
       </div>
     </main>
   );
