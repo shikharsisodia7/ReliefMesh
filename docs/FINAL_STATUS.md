@@ -66,5 +66,6 @@ Found and fixed during verification: the supplier portal's "Save revision" never
 - The Gemini quote assistant runs on the free tier: about 20 drafts a day, reset at midnight Pacific. When the limit
   is hit, suppliers see `GEMINI_RATE_LIMITED` and fill the form manually, and `/status` shows Gemini as degraded
   until a draft succeeds again.
-- Gmail, Google Calendar, Google Drive and Slack show NOT_CONFIGURED in production until Google Cloud and Slack OAuth
-  app credentials are configured.
+- Gmail, Google Calendar, Google Drive and Slack are per-organization OAuth connections. As of 2026-10-25 01:56 UTC
+  one organization has connected all four in production (`/status`: 18 of 18 integrations OK); an organization that
+  has not connected a channel sees its notifications collapsed as "not connected".
