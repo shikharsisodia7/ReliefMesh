@@ -101,7 +101,8 @@ async def test_public_status_refresh_cannot_amplify_upstream_calls(client: httpx
 ])
 async def test_resend_key_check_is_read_only_and_fails_closed(status_code, body, expected) -> None:
     from app.core import Services
-    from app.emailing import TestEmailGateway
+    from app.emailing import EmailGateway
+    from app.integrations.connections import TokenVault
     from app.integrations.http import IntegrationHub
     from app.routes.status import check_resend
     from app.store import MemoryStore
@@ -115,5 +116,7 @@ async def test_resend_key_check_is_read_only_and_fails_closed(status_code, body,
     settings = make_settings(app_env="development", demo_mode=False, expose_invitation_links=False,
                              resend_api_key="re_test_key_for_status_check")
     hub = IntegrationHub(MemoryStore(), "ReliefMesh/test", transport=httpx.MockTransport(resend))
-    status, _detail, _ = await check_resend(Services(settings, MemoryStore(), TestEmailGateway(), hub))
+    store = MemoryStore()
+    gateway = EmailGateway(settings, store, TokenVault(settings), hub.client)
+    status, _detail, _ = await check_resend(Services(settings, store, gateway, hub))
     assert status == expected and seen == [("GET", "/domains")]  # never POSTs (never sends) to validate

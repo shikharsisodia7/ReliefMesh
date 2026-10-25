@@ -12,9 +12,13 @@ from .jobs import enqueue
 from .planning import compute_plan, evaluate_mission, invalidate_for_change
 
 
+FAILURE_TYPES = {"withdrawn": "Supplier withdrew its quote", "updated": "Supplier revised its quote"}
+
+
 async def apply_quote_change(services: Services, quote: dict[str, Any], mission: dict[str, Any],
                              actor_id: str | None, *, kind: str, summary: str,
-                             updates: dict[str, Any] | None = None, withdraw: bool = False) -> tuple[dict, dict]:
+                             updates: dict[str, Any] | None = None, withdraw: bool = False,
+                             failure_type: str | None = None) -> tuple[dict, dict]:
     """Persist a quote revision/withdrawal, invalidate dependent plans, and queue a replan."""
 
     await services.store.insert("quote_versions", {
@@ -31,7 +35,10 @@ async def apply_quote_change(services: Services, quote: dict[str, Any], mission:
     await services.store.replace("quotes", quote["id"], quote)
     await notify(services, mission, f"quote_{kind}", summary, "warning",
                  {"quote_id": quote["id"], "supplier_id": quote["supplier_id"]})
-    await invalidate_for_change(services, mission, actor_id, summary)
+    supplier = await services.store.get("suppliers", quote["supplier_id"])
+    await invalidate_for_change(services, mission, actor_id, summary, cause={
+        "supplier_id": quote["supplier_id"], "supplier": supplier_label(supplier, quote["supplier_email"]),
+        "failure_type": failure_type or FAILURE_TYPES.get(kind, kind)})
     job = await enqueue(services, "replan", mission, trigger={
         "kind": kind, "quote_id": quote["id"], "supplier_id": quote["supplier_id"], "summary": summary,
         "at": now_iso(),
@@ -49,6 +56,8 @@ async def handle_replan(services: Services, job: dict[str, Any]) -> dict[str, An
     mission = await services.store.get("missions", job["mission_id"])
     if not mission:
         raise RuntimeError("mission no longer exists")
+    if mission.get("status") == "cancelled":
+        return {"status": "skipped", "reason": "mission cancelled"}
     triggers = job.get("triggers") or []
     await notify(services, mission, "replan_started",
                  f"Replanning started after {len(triggers) or 1} change(s).", "info", {"job_id": job["id"]})

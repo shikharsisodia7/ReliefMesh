@@ -10,10 +10,12 @@ from typing import Any
 
 from .core import Services, audit, new_id, notify, now_iso
 from .integrations.http import canonical_json
+from .operations import events as ops_events
 from .optimizer import cents, money, solve
 from .policy.engine import EvidenceTTL, evaluate
 
 _mission_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+REPLAN_TRIGGERS = {"supplier_disruption", "policy_change"}
 # Purchase orders a supplier has received and not declined/cancelled: their units are already bought.
 ACTIVE_ORDER_STATUSES = {"sent", "supplier_accepted", "in_fulfillment", "completed"}
 
@@ -242,14 +244,23 @@ async def compute_plan(services: Services, mission_id: str, trigger: str,
             "plan_hash": plan["plan_hash"], "total_cost": plan["total_cost"],
             "policy_fingerprint": report["fingerprint"],
         })
+        if plan["status"] == "feasible" or (prior and trigger in REPLAN_TRIGGERS):
+            await ops_events.emit(
+                services, ops_events.PLAN_REPLANNED if prior and trigger in REPLAN_TRIGGERS
+                else ops_events.APPROVAL_REQUIRED, mission, subject_id=plan["id"], version=plan["version"],
+                data={"plan_id": plan["id"], "trigger": trigger})
         return plan
 
 
 async def invalidate_for_change(services: Services, mission: dict[str, Any], actor_id: str | None,
-                                reason: str) -> list[int]:
-    """Mark every current plan stale, invalidate its approvals, and void unsent POs."""
+                                reason: str, cause: dict[str, Any] | None = None, emit: bool = True) -> list[int]:
+    """Mark every current plan stale, invalidate its approvals, and void unsent POs.
+
+    ``cause`` (supplier_id/supplier/failure_type) only enriches the operations alert.
+    """
 
     affected: list[int] = []
+    invalidated = flagged = 0
     plans = await services.store.find("plans", mission_id=mission["id"])
     for plan in sorted(plans, key=lambda row: row["version"]):
         if plan["status"] not in {"feasible", "approved"}:
@@ -265,6 +276,7 @@ async def invalidate_for_change(services: Services, mission: dict[str, Any], act
             if approval["status"] != "active":
                 continue
             approval.update(status="invalidated", invalidated_at=now_iso(), invalidation_reason=reason)
+            invalidated += 1
             await services.store.replace("approvals", approval["id"], approval)
             await audit("approval.invalidated", actor_id, mission["organization_id"], mission["id"], "approval",
                         approval["id"], services, {"plan_id": plan["id"], "reason": reason})
@@ -280,5 +292,16 @@ async def invalidate_for_change(services: Services, mission: dict[str, Any], act
                             "purchase_order", order["id"], services, {"reason": reason})
             elif order["status"] in {"sent", "supplier_accepted", "in_fulfillment"}:
                 order["plan_stale"] = True
+                flagged += 1
                 await services.store.replace("purchase_orders", order["id"], order)
+    if affected and emit:
+        details = cause or {}
+        await ops_events.emit(services, ops_events.SUPPLIER_DISRUPTED, mission,
+                              subject_id=details.get("supplier_id") or "policy",
+                              version=",".join(str(v) for v in affected), data={
+                                  "reason": reason, "supplier": details.get("supplier"),
+                                  "supplier_id": details.get("supplier_id"),
+                                  "failure_type": details.get("failure_type") or "Policy or evidence change",
+                                  "stale_versions": affected, "approvals_invalidated": invalidated,
+                                  "sent_orders_affected": flagged, "replanning": "queued automatically"})
     return affected

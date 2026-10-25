@@ -134,6 +134,11 @@ async def seed_demo_suppliers(mission_id: str, user: dict = Depends(current_prin
     return {"suppliers": created, "seeded": True, "evidence_job_id": job["id"]}
 
 
+DISRUPTION_LABELS = {"withdraw": "Supplier withdrew its quote", "reduce_inventory": "Inventory shortfall",
+                     "raise_price": "Price increase", "delay_eta": "Delivery delay",
+                     "block_supplier": "Blocked by buyer policy"}
+
+
 def describe(kind: str, name: str, before: dict[str, Any], after: dict[str, Any]) -> str:
     if kind == "withdraw":
         return f"{name} withdrew its quote"
@@ -180,7 +185,8 @@ async def disrupt_supply_chain(mission_id: str, payload: DisruptionRequest, user
         await notify(services, mission, "supplier_blocked", summary, "warning", {"supplier_id": payload.supplier_id})
         current = await latest_plan(services, mission_id)
         if current and current["status"] in {"feasible", "approved"}:
-            await invalidate_for_change(services, mission, user["id"], summary)
+            await invalidate_for_change(services, mission, user["id"], summary, cause={
+                "supplier_id": payload.supplier_id, "supplier": name, "failure_type": DISRUPTION_LABELS[payload.kind]})
         job = await enqueue(services, "replan", mission, trigger={
             "kind": "policy_change", "supplier_id": payload.supplier_id, "summary": summary, "at": now_iso()})
     else:
@@ -214,6 +220,7 @@ async def disrupt_supply_chain(mission_id: str, payload: DisruptionRequest, user
             services, quote, mission, user["id"], kind="withdrawn" if payload.kind == "withdraw" else "updated",
             summary=summary, withdraw=payload.kind == "withdraw",
             updates=None if payload.kind == "withdraw" else {"lines": lines},
+            failure_type=DISRUPTION_LABELS[payload.kind],
         )
     disruption = {
         "id": new_id(), "mission_id": mission_id, "organization_id": mission["organization_id"],

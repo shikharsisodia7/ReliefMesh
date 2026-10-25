@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
+import { MissionLifecycleControls } from "@/components/mission/lifecycle-controls";
 import { MarketPanel } from "@/components/mission/market-panel";
+import { OperationsPanel } from "@/components/mission/operations-panel";
 import { DisruptionConsole, OptimizerPanel, OrdersPanel, PaymentsPanel, PlanComparison, PlanVersions, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
@@ -69,6 +71,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
             {checking && <span className="rounded border border-telemetry/50 px-2 py-1 text-telemetry">evidence checks…</span>}
           </div>
         </section>
+        {(isAdmin || organization?.membership_role === "coordinator") && <MissionLifecycleControls mission={mission} token={token} run={run} setNotice={setNotice} />}
         {error && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
         {notice && <p className="rounded-md border border-live/30 bg-live/10 p-3 text-sm text-live">{notice}</p>}
 
@@ -83,6 +86,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
         <PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} />
         <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
         <PaymentsPanel payments={data.payments.data ?? []} />
+        <OperationsPanel missionId={missionId} organizationId={mission.organization_id} token={token} isAdmin={isAdmin} />
         <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
         <p className="pb-6 text-center text-[11px] text-tertiary">Data labels: <ProvenanceBadge value="LIVE" /> fetched from the public source · <ProvenanceBadge value="CACHED" /> last-known-good copy · <ProvenanceBadge value="SANDBOX" /> sponsor sandbox · <ProvenanceBadge value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <ProvenanceBadge value="TEST" /> / <ProvenanceBadge value="SYNTHETIC" /> demo</>} fixtures</p>
       </div>
