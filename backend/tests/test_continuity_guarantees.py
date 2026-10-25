@@ -23,9 +23,6 @@ import pytest
 
 from conftest import auth, register, settle_jobs, wait_for
 
-# These pin the engine's contract; they run once the Continuity Engine (app.continuity) is merged in.
-pytest.importorskip("app.continuity", reason="Continuity Engine not present on this branch yet")
-
 REAL_COLLECTIONS = ("quotes", "suppliers", "plans", "approvals", "purchase_orders", "evidence", "invitations")
 
 
