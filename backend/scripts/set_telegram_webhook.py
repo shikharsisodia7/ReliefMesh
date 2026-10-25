@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 
 import httpx
+
+# Make the backend package importable when this script is run as
+# `python scripts/set_telegram_webhook.py` from the backend directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core import secret
 from app.settings import get_settings
