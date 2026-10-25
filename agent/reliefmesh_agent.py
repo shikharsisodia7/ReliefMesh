@@ -62,6 +62,12 @@ NO_DEMO = ("This ReliefMesh deployment works only with real supplier data, so th
            "disruptions. A real disruption happens when a supplier withdraws or edits its quote in the supplier portal; "
            "ReliefMesh then replans by itself. Say `what changed` afterwards.")
 _config: dict[str, Any] = {}
+# Financial authority never belongs to the agent: answered before any parsing or LLM routing.
+SPEND_REQUEST = re.compile(r"\b(approv\w*|sign[- ]?off|authori[sz]e|pay|paying|payment|wire|transfer funds|"
+                           r"(issue|send|generate)\s+(the\s+)?(po|pos|purchase orders?))\b", re.IGNORECASE)
+SPEND_REFUSAL = ("I can't approve plans, issue or send purchase orders, or pay anyone. Financial authority stays with "
+                 "a human approver in ReliefMesh, and the coordinator who requested a mission cannot approve it. "
+                 "I can show the current plan (`status`) or explain an allocation (`why was <supplier> rejected?`).")
 
 
 async def demo_mode() -> bool:
@@ -449,6 +455,8 @@ async def answer(text: str, ctx: Context | None = None, sender: str = "local") -
     if ctx:
         previous = ctx.storage.get(f"last_text:{sender}") or ""
         ctx.storage.set(f"last_text:{sender}", (previous + " " + text)[-600:])
+    if SPEND_REQUEST.search(text):
+        return SPEND_REFUSAL
     routed = await route_with_asi1(text)
     intent, args = routed or classify(text)
     if intent == "create_mission" and rate_limited(ctx, sender, "missions", MAX_MISSIONS_PER_HOUR):

@@ -41,6 +41,9 @@ async def main(base: str) -> None:
     assert "real supplier data" in await say("simulate Bayside withdrawing")
     assert "No suppliers have quoted" in await say("run evidence checks")
     assert "No supplier quotes have been received" in await say("optimize")
+    for request in ("approve the plan and pay the suppliers", "please sign off on plan v1", "send the PO now"):
+        assert "can't approve" in await say(request)
+    assert "Created mission" not in await say("show wildfire events in California")
     mission_id = http.get(f"/v1/missions?organization_id={org['id']}", headers=human).json()[0]["id"]
     for path in ("suppliers", "quotes", "plans", "disruptions"):
         assert http.get(f"/v1/missions/{mission_id}/{path}", headers=human).json() == [], path
