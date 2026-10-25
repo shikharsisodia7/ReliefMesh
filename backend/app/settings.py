@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     crs_evidence_ttl_hours: int = 24 * 7
 
     # Public-data integrations. Keyless sources need no configuration.
-    http_user_agent: str = "ReliefMesh/1.0 (+https://reliefmesh-app.vercel.app)"
+    http_user_agent: str = "ReliefMesh/1.0 (+https://reliefmesh.us)"
     nasa_firms_map_key: SecretStr | None = None
     sam_gov_api_key: SecretStr | None = None
     ofac_sdn_url: str = "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/SDN.CSV"

@@ -10,9 +10,9 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 
 | | |
 | --- | --- |
-| Web app | https://reliefmesh-app.vercel.app |
+| Web app | https://reliefmesh.us |
 | API | https://reliefmesh-api.onrender.com ([/health](https://reliefmesh-api.onrender.com/health), [/docs](https://reliefmesh-api.onrender.com/docs)) |
-| Live integration status | https://reliefmesh-app.vercel.app/status |
+| Live integration status | https://reliefmesh.us/status |
 | Fetch.ai agent | `reliefmesh-buyer-agent` · `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x` · [Agentverse](https://agentverse.ai/agents/details/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x/profile) · [Chat on ASI:One](https://asi1.ai/ai/agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x) |
 
 ## What happens, end to end

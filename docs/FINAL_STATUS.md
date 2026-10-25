@@ -1,7 +1,7 @@
 # ReliefMesh final status (2026-10-24)
 
-Live: web https://reliefmesh-app.vercel.app · API https://reliefmesh-api.onrender.com ·
-status https://reliefmesh-app.vercel.app/status · Fetch.ai agent
+Live: web https://reliefmesh.us · API https://reliefmesh-api.onrender.com ·
+status https://reliefmesh.us/status · Fetch.ai agent
 `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x`.
 
 ## Production data-integrity audit

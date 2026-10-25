@@ -4,8 +4,8 @@ Evidence-based matrix (updated 2026-10-24 after deployment). "Live proof" means 
 demonstration or provider artifact that was actually observed. Production shows real data only, so sandbox and devnet
 proofs are labeled as such and never presented as real-world verification or payment.
 
-Live: web https://reliefmesh-app.vercel.app · API https://reliefmesh-api.onrender.com · status
-https://reliefmesh-app.vercel.app/status
+Live: web https://reliefmesh.us · API https://reliefmesh-api.onrender.com · status
+https://reliefmesh.us/status
 
 | Track | Exact evidence observed | Live proof | Missing requirement | Verdict |
 | --- | --- | --- | --- | --- |
