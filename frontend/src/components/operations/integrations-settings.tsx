@@ -133,12 +133,12 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
               <div className="flex flex-wrap items-end gap-2">
                 <div><Label htmlFor="slack-token" className="text-xs">Bot token (xoxb-…)</Label><Input id="slack-token" type="password" autoComplete="off" required className="mt-1 h-8 w-72" value={botToken} onChange={(event) => setBotToken(event.target.value)} /></div>
                 <div><Label htmlFor="slack-channel" className="text-xs">Channel</Label><Input id="slack-channel" required className="mt-1 h-8 w-52" value={channel} onChange={(event) => setChannel(event.target.value)} /></div>
-                <Button size="sm" type="submit" disabled={busy !== null}>Verify & connect</Button>
+                <Button size="sm" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
                 <div><Label htmlFor="slack-webhook" className="text-xs">Webhook URL</Label><Input id="slack-webhook" type="password" autoComplete="off" required placeholder="https://hooks.slack.com/services/…" className="mt-1 h-8 w-96" value={webhook} onChange={(event) => setWebhook(event.target.value)} /></div>
-                <Button size="sm" type="submit" disabled={busy !== null}>Verify & connect</Button>
+                <Button size="sm" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
               </div>
             )}
             <p className="text-[11px] text-tertiary">ReliefMesh posts one real test message before saving; credentials are encrypted at rest and never shown again.</p>

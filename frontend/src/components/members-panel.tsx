@@ -17,7 +17,7 @@ export function MembersPanel({ organizationId, token, isAdmin }: { organizationI
   const [message, setMessage] = useState<string | null>(null);
   return (
     <div className="rounded-lg border p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Members & approvers</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Members &amp; approvers</p>
       <p className="text-[11px] text-tertiary">Segregation of duties: the coordinator who requests a mission cannot approve its plan. Add an approver to sign off.</p>
       <ul className="mt-2 flex flex-wrap gap-2 text-xs">
         {members.data?.members.map((member) => <li key={member.user_id} className="rounded border px-2 py-0.5">{member.email} · <span className="font-mono text-telemetry">{member.role}</span></li>)}

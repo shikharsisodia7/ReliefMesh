@@ -230,7 +230,7 @@ export function OrdersPanel({ orders, token, run, setNotice }: { orders: Purchas
               <div className="flex items-center gap-2">
                 <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase">{order.status}</span>
                 <Button size="sm" variant="ghost" aria-label={`Download ${order.po_number} PDF`} onClick={() => void run(() => downloadPdf(order.id, order.po_number, token))}><Download className="size-3.5" /></Button>
-                {order.status === "draft" && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/purchase-orders/${order.id}/send`, { method: "POST", token, body: JSON.stringify({ confirm: true }) }); setNotice(`${order.po_number} sent to supplier.`); })}>Confirm & send</Button>}
+                {order.status === "draft" && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/purchase-orders/${order.id}/send`, { method: "POST", token, body: JSON.stringify({ confirm: true }) }); setNotice(`${order.po_number} sent to supplier.`); })}>Confirm &amp; send</Button>}
               </div>
             </div>
           ))}
@@ -270,7 +270,7 @@ export function Timeline({ notifications, audit, verification, jobs }: { notific
   return (
     <section aria-label="Mission timeline" className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Timeline & audit</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Timeline &amp; audit</h2>
         {verification && (
           <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[11px] ${verification.valid ? "border-ok/40 text-ok" : "border-critical/50 text-critical"}`} title="SHA-256 hash chain over canonical audit fields">
             <Link2 className="size-3" />{verification.valid ? `hash chain verified · ${verification.length} events · ${verification.head_hash?.slice(0, 10)}` : `CHAIN BROKEN at #${verification.broken_at}: ${verification.reason}`}

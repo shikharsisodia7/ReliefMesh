@@ -79,7 +79,7 @@ export function SupplierEvidence({ missionId, token, rows, quotes, run, canRevie
     <section aria-label="Supplier evidence and policy" className="rounded-xl border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Evidence & deterministic policy</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Evidence &amp; deterministic policy</h2>
           <p className="text-xs text-tertiary">Only PASS / WARN quotes reach the optimizer. Missing or unavailable screening is NEEDS REVIEW, never a pass. No language model makes these calls.</p>
         </div>
         <Button size="sm" variant="secondary" disabled={checking || rows.length === 0} onClick={() => void run(async () => { await api(`/v1/missions/${missionId}/evidence/refresh`, { method: "POST", token }); })}><RefreshCw className={checking ? "size-3.5 animate-spin" : "size-3.5"} />{checking ? "Checks running…" : "Run evidence checks"}</Button>
