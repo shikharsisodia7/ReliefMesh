@@ -46,6 +46,12 @@ export function safeNext(value: string | null | undefined): string | null {
   }
 }
 
+/** Sign-in URL that returns to the current page afterwards (consumed by safeNext on the sign-in page). */
+export function signInUrl(): string {
+  if (typeof window === "undefined") return "/sign-in";
+  return `/sign-in?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`;
+}
+
 export function clearSession() {
   localStorage.removeItem(key);
   cachedRaw = null;

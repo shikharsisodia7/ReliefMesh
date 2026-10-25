@@ -9,6 +9,7 @@ import { toLocalInput } from "@/components/quote-form";
 import { money, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { signInUrl } from "@/lib/session";
 import { api } from "@/lib/api";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
@@ -21,7 +22,7 @@ const badge = "rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase";
 export default function SupplierPage() {
   const router = useRouter(); const session = useSession(); const [error, setError] = useState<string | null>(null); const [notes, setNotes] = useState<Record<string, string>>({});
   const hydrated = useHydrated();
-  useEffect(() => { if (hydrated && (!session || session.user.role !== "supplier")) router.replace("/sign-in"); }, [hydrated, router, session]);
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "supplier")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const invitations = useQuery({ queryKey: ["supplier-invitations"], enabled: Boolean(session), queryFn: () => api<Invitation[]>("/v1/supplier/invitations", { token: session!.token }) });
   const quotes = useQuery({ queryKey: ["supplier-quotes"], enabled: Boolean(session), queryFn: () => api<Quote[]>("/v1/supplier/quotes", { token: session!.token }) });
   const orders = useQuery({ queryKey: ["supplier-orders"], enabled: Boolean(session), refetchInterval: 5000, queryFn: () => api<Order[]>("/v1/purchase-orders", { token: session!.token }) });

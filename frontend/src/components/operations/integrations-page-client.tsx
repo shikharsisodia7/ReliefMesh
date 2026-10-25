@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { IntegrationsSettings } from "@/components/operations/integrations-settings";
 import { Button } from "@/components/ui/button";
 import { api, type ApiError } from "@/lib/api";
-import { clearSession } from "@/lib/session";
+import { clearSession, signInUrl } from "@/lib/session";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Organization = { id: string; name: string; membership_role: string };
@@ -29,12 +29,12 @@ export function IntegrationsPageClient() {
   const session = useSession();
   const hydrated = useHydrated();
   const [organizationId, setOrganizationId] = useState<string | null>(params.get("org"));
-  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
   const selected = organizationId ?? organizations.data?.[0]?.id ?? null;
   const expired = (organizations.error as ApiError | null)?.status === 401;
   // A token for a deleted or revoked account must not leave a blank settings page: start a fresh sign-in.
-  useEffect(() => { if (expired) { clearSession(); router.replace("/sign-in"); } }, [expired, router]);
+  useEffect(() => { if (expired) { clearSession(); router.replace(signInUrl()); } }, [expired, router]);
   if (!session) return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</main>;
   return (
     <main className="min-h-screen bg-background">

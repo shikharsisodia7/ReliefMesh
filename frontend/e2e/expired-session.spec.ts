@@ -9,6 +9,6 @@ test("integrations settings with a revoked session redirects to sign-in and clea
     user: { id: "deleted-user", email: "deleted@example.test", role: "coordinator" },
   })));
   await page.goto("/settings/integrations");
-  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fsettings%2Fintegrations/);
   expect(await page.evaluate(() => localStorage.getItem("reliefmesh.session"))).toBeNull();
 });
