@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Page, PageHeader } from "@/components/layout/page-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MissionMenu } from "@/components/mission/lifecycle-controls";
-import { MarketPanel } from "@/components/mission/market-panel";
+import { LeadsSection, MarketActions } from "@/components/mission/market-panel";
 import { OperationsPanel } from "@/components/mission/operations-panel";
 import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
 import { OrdersPanel, PaymentsPanel, PlanVersions, Timeline } from "@/components/mission/planning-panels";
@@ -132,13 +132,10 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
           ]}>
             <TabPanel value="context"><EmergencyPanel mission={mission} context={data.context.data} loading={data.context.isLoading} /></TabPanel>
             <TabPanel value="evidence">
-              <div className="space-y-5">
-                <div className="grid gap-5 xl:grid-cols-[1fr_1.4fr]">
-                  <MarketPanel mission={mission} token={token} leads={data.leads.data ?? []} invitations={data.invitations.data ?? []} jobs={jobs} run={run} setNotice={setNotice} demoMode={demoMode} hasDemo={suppliers.some((row) => row.supplier.is_demo)} />
-                  <SupplierEvidence missionId={missionId} token={token} rows={suppliers} quotes={quotes} run={run} canReview={isAdmin} checking={checking} />
-                </div>
-                <p className="text-center text-xs text-muted-foreground">Data labels: <Provenance value="LIVE" /> fetched from the public source · <Provenance value="CACHED" /> last-known-good copy · <Provenance value="SANDBOX" /> sponsor sandbox · <Provenance value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <Provenance value="TEST" /> / <Provenance value="SYNTHETIC" /> demo</>} fixtures</p>
-              </div>
+              <SupplierEvidence missionId={missionId} token={token} rows={suppliers} quotes={quotes} run={run} canReview={isAdmin} checking={checking}
+                actions={<MarketActions mission={mission} token={token} invitations={data.invitations.data ?? []} jobs={jobs} run={run} setNotice={setNotice} canSeed={demoMode && !suppliers.some((row) => row.supplier.is_demo)} />} />
+              <LeadsSection token={token} leads={data.leads.data ?? []} jobs={jobs} run={run} setNotice={setNotice} />
+              <p className="mt-12 text-xs text-muted-foreground">Data labels: <Provenance value="LIVE" /> fetched from the public source · <Provenance value="CACHED" /> last-known-good copy · <Provenance value="SANDBOX" /> sponsor sandbox · <Provenance value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <Provenance value="TEST" /> / <Provenance value="SYNTHETIC" /> demo</>} fixtures</p>
             </TabPanel>
             <TabPanel value="plan">
               <PlanTab

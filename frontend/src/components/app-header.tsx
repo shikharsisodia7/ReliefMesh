@@ -109,9 +109,11 @@ function TabNav({ tabs, pathname, tab }: { tabs: Tab[]; pathname: string; tab: s
     measure();
     // Turn the transition on after the first placement, so the bar doesn't sweep in on load.
     const frame = requestAnimationFrame(() => { bar.dataset.ready = "true"; });
-    window.addEventListener("resize", measure);
+    // Re-measure whenever the tabs' layout changes (fonts loading, resizes, tabs added).
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
     void document.fonts?.ready.then(measure);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", measure); };
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [activeIndex]);
   return (
     <nav ref={listRef} aria-label="Main" className="relative flex h-full items-center gap-8">

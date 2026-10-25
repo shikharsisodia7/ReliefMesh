@@ -70,8 +70,10 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await expect(coordinator).toHaveURL(/\/missions\//);
 
   const invite = async (email: string) => {
-    await coordinator.getByLabel("Supplier email").fill(email);
     await coordinator.getByRole("button", { name: "Send RFQ" }).click();
+    await coordinator.getByLabel("Supplier email").fill(email);
+    await coordinator.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
+    await expect(coordinator.getByRole("dialog", { name: "Send RFQ" })).toHaveCount(0);
     const text = await coordinator.getByText(/Development invitation:/).textContent();
     const url = text?.match(/https?:\/\/\S+/)?.[0];
     expect(url).toBeTruthy();
@@ -83,7 +85,7 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   const supplierTwo = await registerSupplier(await browser.newContext(), supplierTwoEmail, secondInvite, "9", "Harbor Textile Supply");
 
   // Live OFAC screening must finish before either quote is eligible.
-  await expect(coordinator.getByText(/OFAC NO_MATCH/)).toHaveCount(2, { timeout: 45_000 });
+  await expect(coordinator.locator('[data-check="OFAC_SCREENING"][data-result="NO_MATCH"]')).toHaveCount(2, { timeout: 45_000 });
   await coordinator.getByRole("tab", { name: "Plan" }).click();
   await coordinator.getByRole("button", { name: "Run optimization" }).click();
   await expect(coordinator.getByRole("heading", { name: "Plan v1" })).toBeVisible();

@@ -24,8 +24,10 @@ test("revising a quote keeps its expiry in the supplier's local time", async ({ 
   await coordinator.getByRole("button", { name: "Create mission" }).click();
   await expect(coordinator).toHaveURL(/\/missions\//);
   const supplierEmail = `supplier-revise-${runId}@e2e.example.com`;
-  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  // Send RFQ opens a dialog with the supplier email.
   await coordinator.getByRole("button", { name: "Send RFQ" }).click();
+  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  await coordinator.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
   const inviteUrl = (await coordinator.getByText(/Development invitation:/).textContent())?.match(/https?:\/\/\S+/)?.[0];
   expect(inviteUrl).toBeTruthy();
 

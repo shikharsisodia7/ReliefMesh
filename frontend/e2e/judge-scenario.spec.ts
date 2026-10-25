@@ -34,9 +34,10 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
 
   await page.getByRole("button", { name: "Seed TEST suppliers" }).click();
   const pioneer = page.getByTestId("supplier-Pioneer Logistics Supply");
-  await expect(pioneer.getByText(/OFAC POTENTIAL_MATCH/)).toBeVisible({ timeout: 60_000 });
+  // Check lines read "OFAC · Potential match"; the raw result code stays in data-result.
+  await expect(pioneer.getByRole("button", { name: /^OFAC · Potential match/ })).toBeVisible({ timeout: 60_000 });
   await expect(pioneer.getByText(/needs review/i).first()).toBeVisible();
-  await expect(page.getByText(/OFAC NO_MATCH/)).toHaveCount(3, { timeout: 30_000 });
+  await expect(page.locator('[data-check="OFAC_SCREENING"][data-result="NO_MATCH"]')).toHaveCount(3, { timeout: 30_000 });
 
   await page.getByRole("tab", { name: "Plan" }).click();
   await page.getByRole("button", { name: "Run optimization" }).click();
@@ -53,7 +54,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await expect(page.getByText("HYPOTHETICAL STRESS TEST").first()).toBeVisible();
 
   await page.getByRole("tab", { name: "Suppliers & Evidence" }).click();
-  await pioneer.getByText(/OFAC POTENTIAL_MATCH/).click();
+  await pioneer.getByRole("button", { name: /^OFAC · Potential match/ }).click();
   await expect(page.getByRole("dialog", { name: "Evidence detail" }).getByText(/PIONEER LOGISTICS/).first()).toBeVisible();
   await page.getByRole("button", { name: "Close evidence" }).click();
 
@@ -93,8 +94,12 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
     await page.getByRole("tab", { name: "Suppliers & Evidence" }).click();
     await expect(pioneer).toBeVisible();
     if ((await pioneer.getByRole("button", { name: "Clear finding" }).count()) === 0) break;
-    await pioneer.getByLabel("Clear finding reason").first().fill("Distinct US entity; signer and EIN verified by phone");
+    // Clear finding opens a dialog that requires a reason.
     await pioneer.getByRole("button", { name: "Clear finding" }).first().click();
+    const clearDialog = page.getByRole("dialog", { name: "Clear finding" });
+    await clearDialog.getByLabel("Clear finding reason").fill("Distinct US entity; signer and EIN verified by phone");
+    await clearDialog.getByRole("button", { name: "Clear finding" }).click();
+    await expect(clearDialog).toHaveCount(0);
     await page.waitForTimeout(1500);
   }
   await page.getByRole("tab", { name: "Plan" }).click();

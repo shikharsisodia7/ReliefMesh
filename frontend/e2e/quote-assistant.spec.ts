@@ -26,8 +26,10 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await coordinator.getByLabel("Quantity").fill("100");
   await coordinator.getByRole("button", { name: "Create mission" }).click();
   await expect(coordinator).toHaveURL(/\/missions\//);
-  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  // Send RFQ opens a dialog with the supplier email.
   await coordinator.getByRole("button", { name: "Send RFQ" }).click();
+  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  await coordinator.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
   const inviteUrl = (await coordinator.getByText(/Development invitation:/).textContent())?.match(/https?:\/\/\S+/)?.[0];
   expect(inviteUrl).toBeTruthy();
 
