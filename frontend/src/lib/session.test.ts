@@ -9,7 +9,7 @@ describe("safeNext", () => {
   });
 
   it("rejects anything that could leave the site", () => {
-    for (const value of ["https://evil.test", "//evil.test", "/\\evil.test", "javascript:alert(1)", "", null, undefined]) {
+    for (const value of ["https://evil.test", "//evil.test", "/\\evil.test", "/\t/evil.test", "/\n/evil.test", "/x\\y", "javascript:alert(1)", "", null, undefined]) {
       expect(safeNext(value)).toBeNull();
     }
   });

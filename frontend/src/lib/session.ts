@@ -28,9 +28,19 @@ export function readSession(): { token: string; user: SessionUser } | null {
   }
 }
 
-/** Where to go after signing in: only same-site paths, so a crafted link cannot bounce users off-site. */
+/** Where to go after signing in: only same-site paths, so a crafted link cannot bounce users off-site.
+ * Control characters and backslashes are rejected outright (browsers strip or rewrite them, turning a
+ * tab between the two slashes into "//evil.test"); the rest is resolved by the URL parser and must stay
+ * on this origin. */
 export function safeNext(value: string | null | undefined): string | null {
-  return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : null;
+  if (!value || !value.startsWith("/") || /[\u0000-\u001F\u007F\\]/.test(value)) return null;
+  try {
+    const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+    const url = new URL(value, origin);
+    return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearSession() {
