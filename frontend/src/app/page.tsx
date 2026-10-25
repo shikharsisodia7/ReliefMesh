@@ -29,6 +29,7 @@ export default function Home() {
             ))}
           </div>
         </div>
+        <footer className="flex gap-4 border-t pt-5 text-xs text-muted-foreground"><Link className="hover:text-foreground" href="/privacy">Privacy policy</Link><Link className="hover:text-foreground" href="/terms">Terms of service</Link><Link className="hover:text-foreground" href="/status">System status</Link></footer>
       </section>
     </main>
   );
