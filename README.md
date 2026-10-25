@@ -70,7 +70,7 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 - **Operations integrations** ([docs/OPERATIONS_INTEGRATIONS.md](docs/OPERATIONS_INTEGRATIONS.md)): each organization
   connects its own Gmail (RFQs, approval requests, disruption alerts, POs with PDF), Google Calendar (deadline,
   approval window, supplier ETA), Google Drive (plan/PO/audit archive) and Slack (informational alerts, never
-  approvals). Gmail, Calendar and Drive are verified with real calls; deliveries are idempotent and never block procurement.
+  approvals). Gmail, Calendar, Drive and Slack are verified with real calls; deliveries are idempotent and never block procurement.
 
 ## Run locally
 

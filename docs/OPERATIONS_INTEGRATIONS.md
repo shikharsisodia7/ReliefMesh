@@ -10,7 +10,7 @@ emergency-management team already uses; none of them can approve, order, or pay.
 | Gmail (`gmail.send`) | **Verified with real calls** | RFQ, Plan V1 approval request, disruption alert, Plan V2 approval request, and PO email (PDF attached) delivered through the organization's own Gmail; message ids recorded per send |
 | Google Calendar (`calendar.app.created`) | **Verified with real calls** | Delivery deadline, approval window (V1 → stale → V2 → approved on one event id), supplier ETA, deadline change (event moved in place), cancellation (event removed) |
 | Google Drive (`drive.file`) | **Verified with real calls** | `ReliefMesh/Missions/<mission>/` with `Plan-V1.pdf`, `Plan-V2.pdf`, PO PDF, `Audit-Export.json`; one file per artifact |
-| Slack (`chat:write`, `chat:write.public`, `incoming-webhook`) | Built and tested; live check pending a dedicated workspace | Real Slack API error path verified (`invalid_auth` rejected, connection never shown as connected) |
+| Slack (`chat:write`, `chat:write.public`, `incoming-webhook`) | **Verified with real calls** | Installed through ReliefMesh's own OAuth flow into a dedicated single-member workspace; approval, disruption (old approval post struck through as STALE), Plan V2, PO issued and fulfillment posts delivered to `#relief-operations`; revoked-token failure recorded as FAILED/BLOCKED and recovered by retry |
 
 ## How it works
 
