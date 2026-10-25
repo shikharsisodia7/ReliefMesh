@@ -13,6 +13,7 @@ import { DisruptionConsole, OptimizerPanel, OrdersPanel, PaymentsPanel, PlanComp
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { ProvenanceBadge, money, when } from "@/components/status-badges";
+import { signInUrl } from "@/lib/session";
 import { api } from "@/lib/api";
 import { useAppConfig } from "@/hooks/use-config";
 import { useHydrated, useSession } from "@/hooks/use-session";
@@ -25,7 +26,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const hydrated = useHydrated();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
+  useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const data = useMissionData(missionId, session?.token);
   const { demoMode } = useAppConfig();
   const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
