@@ -17,6 +17,7 @@ import { useMissionData } from "@/components/mission/use-mission-data";
 import { showToast } from "@/components/patterns/toast";
 import { TabPanel, UnderlineTabs } from "@/components/patterns/underline-tabs";
 import { Provenance } from "@/components/status-badges";
+import { RecoveryImpactPanel } from "@/components/mission/recovery-impact-panel";
 import { Button } from "@/components/ui/button";
 import { signInUrl } from "@/lib/session";
 import { api } from "@/lib/api";
@@ -39,7 +40,8 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const [explaining, setExplaining] = useState(false);
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const data = useMissionData(missionId, session?.token);
-  const { demoMode, approvalTtlMinutes } = useAppConfig();
+  const appConfig = useAppConfig();
+  const { demoMode, approvalTtlMinutes } = appConfig;
   const { organizations } = useOrganizations(session?.token);
   const mission = data.mission.data;
   // Members give the requester's email for the approval chain.
@@ -136,12 +138,15 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
               <p className="mt-12 text-xs text-muted-foreground">Data labels: <Provenance value="LIVE" /> fetched from the public source · <Provenance value="CACHED" /> last-known-good copy · <Provenance value="SANDBOX" /> sponsor sandbox · <Provenance value="USER_SUBMITTED" /> supplier-entered{demoMode && <> · <Provenance value="TEST" /> / <Provenance value="SYNTHETIC" /> demo</>} fixtures</p>
             </TabPanel>
             <TabPanel value="plan">
+              <div className="space-y-5">
               <PlanTab
                 mission={mission} plans={plans} approvals={data.approvals.data ?? []} quotes={quotes} suppliers={suppliers} continuity={data.continuity.data} disruptions={data.disruptions.data ?? []}
                 token={token} run={run} setNotice={setNotice} onTab={setTab} onOptimize={optimize}
                 canApprove={canApprove} approvalBlocked={approvalBlocked} requester={requester} showDemo={demoMode && isAdmin && suppliers.length > 0} approvalTtlMinutes={approvalTtlMinutes}
                 busy={replanning} continuityRunning={continuityRunning} eligibleCount={eligible} quoteCount={submitted}
               />
+              <RecoveryImpactPanel mission={mission} plans={plans} approvals={data.approvals.data ?? []} jobs={jobs} orders={data.orders.data ?? []} verification={data.verification.data} loading={data.plans.isLoading} token={token} claudeEnabled={appConfig.data?.claude_recovery_explanation === true} />
+              </div>
             </TabPanel>
             <TabPanel value="approval">
               <ApprovalTab plans={plans} approvals={data.approvals.data ?? []} demoOrg={Boolean(organization?.is_demo)} canApprove={canApprove} approvalBlocked={approvalBlocked} requester={requester} ttlMinutes={approvalTtlMinutes}

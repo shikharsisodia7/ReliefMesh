@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-export type AppConfig = { app_env: string; demo_mode: boolean; email: "configured" | "not_configured"; quote_assistant: boolean; approval_ttl_minutes?: number };
+export type AppConfig = { app_env: string; demo_mode: boolean; email: "configured" | "not_configured"; quote_assistant: boolean; approval_ttl_minutes?: number; claude_recovery_explanation?: boolean; bright_data_supplier_review?: boolean };
 
 // Deployment capabilities. Demo tooling renders only when the API itself says it is a demo deployment.
 export function useAppConfig() {

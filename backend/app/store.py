@@ -115,6 +115,12 @@ class MongoStore:
         for collection in ("ops_events", "ops_deliveries", "integration_connections", "oauth_states",
                            "calendar_slots", "drive_files", "drive_folders", "email_outbox"):
             await self.database[collection].create_index([("id", ASCENDING)], unique=True)
+        for collection in ("telegram_updates", "telegram_subscriptions", "telegram_onboarding", "telegram_quote_drafts",
+                           "telegram_link_tokens", "telegram_pending_actions", "sms_subscriptions",
+                           "sms_pending_actions", "twilio_messages"):
+            await self.database[collection].create_index([("id", ASCENDING)], unique=True)
+        await self.database.telegram_updates.create_index([("telegram_user_id", ASCENDING), ("created_at", DESCENDING)])
+        await self.database.twilio_messages.create_index([("message_sid", ASCENDING)], unique=True)
         await self.database.ops_deliveries.create_index([("organization_id", ASCENDING), ("created_at", DESCENDING)])
         await self.database.ops_deliveries.create_index([("mission_id", ASCENDING), ("channel", ASCENDING)])
         await self.database.ops_deliveries.create_index([("status", ASCENDING)])

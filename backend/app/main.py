@@ -18,6 +18,7 @@ from .payments import x402_exchange
 from .routes import (
     agent, continuity, demo, evidence, integrations, intel, market, mission_lifecycle, payments, procurement, status,
 )
+from .routes import recovery, sms, telegram
 from .settings import Settings, get_settings
 from .store import MemoryStore, MongoStore, Store
 from .workflows import register_handlers
@@ -41,10 +42,17 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        telegram_polling_task: asyncio.Task | None = None
         await services.store.initialize()
         await recover_jobs(services)
         await services.ops.recover()
+        if runtime_settings.telegram_polling_enabled and runtime_settings.telegram_bot_token:
+            from .routes.telegram import poll_telegram_updates
+            telegram_polling_task = asyncio.create_task(poll_telegram_updates(services))
         yield
+        if telegram_polling_task:
+            telegram_polling_task.cancel()
+            await asyncio.gather(telegram_polling_task, return_exceptions=True)
         if services.jobs:
             await asyncio.gather(*services.jobs, return_exceptions=True)
         await services.store.close()
@@ -80,7 +88,7 @@ def create_app(settings: Settings | None = None, http_transport: httpx.AsyncBase
     async def health() -> dict[str, str]:
         return {"status": "ok", "storage": runtime_settings.storage_mode}
 
-    for module in (procurement, mission_lifecycle, continuity, intel, evidence, market, demo, agent, payments, x402_exchange,
+    for module in (procurement, mission_lifecycle, continuity, intel, evidence, market, recovery, sms, telegram, demo, agent, payments, x402_exchange,
                    integrations, status):
         app.include_router(module.router)
     return app

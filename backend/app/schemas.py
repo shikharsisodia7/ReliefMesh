@@ -53,6 +53,7 @@ class RequirementInput(APIModel):
 class MissionCreateRequest(APIModel):
     organization_id: str
     name: str = Field(min_length=2, max_length=200)
+    community_label: str | None = Field(default=None, min_length=3, max_length=200)
     emergency_event_id: str | None = Field(default=None, max_length=200)
     delivery_location: str = Field(min_length=2, max_length=400)
     delivery_deadline: datetime

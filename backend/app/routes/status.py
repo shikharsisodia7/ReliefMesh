@@ -223,6 +223,8 @@ async def runtime_config(services: Services = Depends(get_services)) -> dict[str
         "demo_mode": settings.demo_enabled,
         "email": "configured" if settings.resend_api_key else "not_configured",
         "quote_assistant": bool(settings.gemini_api_key),
+        "claude_recovery_explanation": bool(settings.anthropic_api_key),
+        "bright_data_supplier_review": bool(settings.bright_data_api_key and settings.bright_data_zone),
     }
 
 

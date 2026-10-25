@@ -255,7 +255,9 @@ async def create_invitation_record(services: Services, mission: dict, supplier_e
     await services.store.insert("invitations", invitation)
     url = f"{services.settings.frontend_origin}/invitations/{raw_token}"
     organization = await services.store.get("organizations", mission["organization_id"]) or {}
-    subject, html, text = templates.rfq_email(organization, mission, url)
+    bot_username = (services.settings.telegram_bot_username or "").strip().removeprefix("@")
+    telegram_url = f"https://t.me/{bot_username}?start={raw_token}" if bot_username else None
+    subject, html, text = templates.rfq_email(organization, mission, url, telegram_url)
     attempt = await record_email(
         to=invitation["supplier_email"], subject=subject, html=html, text=text,
         kind="rfq_invitation", entity_id=invitation["id"], services=services,

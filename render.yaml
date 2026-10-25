@@ -38,6 +38,34 @@ services:
         sync: false
       - key: RELIEFMESH_APIFY_API_TOKEN
         sync: false
+      - key: RELIEFMESH_ANTHROPIC_API_KEY
+        sync: false
+      - key: RELIEFMESH_ANTHROPIC_MODEL
+        value: claude-haiku-5-5
+      - key: RELIEFMESH_BRIGHT_DATA_API_KEY
+        sync: false
+      - key: RELIEFMESH_BRIGHT_DATA_ZONE
+        sync: false
+      - key: RELIEFMESH_TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: RELIEFMESH_TELEGRAM_BOT_USERNAME
+        sync: false
+      - key: RELIEFMESH_TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: RELIEFMESH_TELEGRAM_POLLING_ENABLED
+        value: "false"
+      - key: RELIEFMESH_TWILIO_ACCOUNT_SID
+        sync: false
+      - key: RELIEFMESH_TWILIO_AUTH_TOKEN
+        sync: false
+      - key: RELIEFMESH_TWILIO_PHONE_NUMBER
+        sync: false
+      - key: RELIEFMESH_OPENROUTER_API_KEY
+        sync: false
+      - key: RELIEFMESH_OPENROUTER_MODEL
+        value: openai/gpt-4o-mini
+      - key: RELIEFMESH_OPENROUTER_BASE_URL
+        value: https://openrouter.ai/api/v1
       - key: RELIEFMESH_CRS_USERNAME
         sync: false
       - key: RELIEFMESH_CRS_PASSWORD

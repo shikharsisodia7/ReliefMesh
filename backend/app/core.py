@@ -65,6 +65,8 @@ class Services:
         self.assist_limiter = RateLimiter(settings.quote_draft_per_minute, "Too many quote drafts; try again in a minute")
         self.jobs: set[asyncio.Task] = set()
         self.audit_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self.telegram_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self.sms_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.job_handlers: dict[str, Callable[[Services, dict[str, Any]], Awaitable[dict[str, Any]]]] = {}
         self.status_cache: dict[str, Any] = {}
         # Operations integrations (Gmail/Calendar/Slack/Drive); wired in main.create_app.

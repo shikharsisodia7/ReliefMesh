@@ -16,6 +16,7 @@ import type { EmergencyEvent } from "@/lib/types";
 
 const schema = z.object({
   name: z.string().min(2),
+  community_label: z.string(),
   delivery_location: z.string().min(2),
   delivery_deadline: z.string().min(1),
   budget: z.number().positive(),
@@ -28,7 +29,7 @@ const schema = z.object({
 export type MissionValues = z.infer<typeof schema>;
 
 const FORM_ID = "new-mission-form";
-const defaults: MissionValues = { name: "", delivery_location: "", delivery_deadline: "", budget: 5000, item: "blankets", quantity: 100, extra: [], emergency_event_id: "", max_supplier_share: "" };
+const defaults: MissionValues = { name: "", community_label: "", delivery_location: "", delivery_deadline: "", budget: 5000, item: "blankets", quantity: 100, extra: [], emergency_event_id: "", max_supplier_share: "" };
 
 // The New mission slide-over. Field labels are unchanged from the old inline form; the tests rely on them.
 export function NewMissionSlideOver({ open, onOpenChange, error, onSubmit }: {
@@ -67,6 +68,7 @@ export function NewMissionSlideOver({ open, onOpenChange, error, onSubmit }: {
           )}
         </div>
         <div><Label htmlFor="mission-name">Mission name</Label><Input id="mission-name" className="mt-1.5" placeholder="e.g. Emergency shelter supplies" {...form.register("name")} /></div>
+        <div><Label htmlFor="community-label">Specific community served (optional)</Label><Input id="community-label" className="mt-1.5" placeholder="e.g. families displaced by the North Bay flood" {...form.register("community_label")} /></div>
         <div><Label htmlFor="location">Delivery location</Label><Input id="location" className="mt-1.5" placeholder="City, ST" {...form.register("delivery_location")} /></div>
         <div className="grid grid-cols-2 gap-4">
           <div><Label htmlFor="deadline">Delivery deadline</Label><Input id="deadline" className="mt-1.5" type="datetime-local" {...form.register("delivery_deadline")} /></div>

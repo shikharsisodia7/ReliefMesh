@@ -35,6 +35,7 @@ export type Mission = {
   id: string;
   organization_id: string;
   name: string;
+  community_label?: string | null;
   status: string;
   delivery_location: string;
   delivery_deadline: string;
@@ -157,7 +158,7 @@ export type Notification = { id: string; kind: string; severity: "info" | "succe
 export type AuditEvent = { id: string; sequence: number; action: string; actor_id: string | null; entity_type: string; entity_id: string; metadata: Record<string, unknown>; created_at: string; event_hash: string; previous_hash: string };
 export type AuditVerification = { valid: boolean; length: number; head_hash?: string; broken_at: number | null; reason: string | null };
 export type Job = { id: string; type: string; status: "queued" | "running" | "succeeded" | "failed"; attempts: number; max_attempts: number; last_error?: string | null; created_at: string; result?: Record<string, unknown> | null; payload?: Record<string, unknown> };
-export type Lead = { id: string; name: string; website?: string | null; phone?: string | null; address?: string | null; category?: string | null; rating?: number | null; reviews?: number | null; source_url?: string | null; status: "lead" | "invited" | "onboarded" | "dismissed"; provenance: Provenance; retrieved_at?: string | null; apify_run_id?: string; apify_dataset_id?: string; invited_email?: string };
+export type Lead = { id: string; name: string; website?: string | null; phone?: string | null; address?: string | null; category?: string | null; rating?: number | null; reviews?: number | null; source_url?: string | null; public_web_review?: { status: string; provenance?: Provenance; source_url?: string | null; retrieved_at?: string | null; error?: string | null; data?: { page_title?: string | null; description?: string | null; excerpt?: string; target_status?: number } | null }; status: "lead" | "invited" | "onboarded" | "dismissed"; provenance: Provenance; retrieved_at?: string | null; apify_run_id?: string; apify_dataset_id?: string; invited_email?: string };
 export type Disruption = { id: string; kind: string; supplier_id: string; supplier_name: string; summary: string; before: Record<string, unknown>; after: Record<string, unknown>; job_id: string | null; created_at: string };
 
 export type ContinuityScenario = {

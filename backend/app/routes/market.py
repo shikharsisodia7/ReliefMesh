@@ -6,10 +6,35 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core import Services, current_principal, current_user, get_services, now_iso, require_mission_access
 from ..jobs import enqueue
+from ..integrations import brightdata
+from ..core import secret, audit
 from ..schemas import DiscoveryRequest, LeadInviteRequest
 from .procurement import create_invitation_record
 
 router = APIRouter()
+
+
+@router.post("/v1/leads/{lead_id}/public-web")
+async def review_public_web(lead_id: str, principal: dict = Depends(current_principal),
+                            services: Services = Depends(get_services)) -> dict:
+    lead = await services.store.get("supplier_leads", lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    mission, _ = await require_mission_access(lead["mission_id"], principal, services)
+    if principal["role"] not in {"coordinator", "agent"}:
+        raise HTTPException(status_code=403, detail="Only coordinators can review supplier websites")
+    result = await brightdata.fetch_public_page(
+        services.hub, secret(services.settings.bright_data_api_key), services.settings.bright_data_zone,
+        lead.get("website") or "",
+    )
+    snapshot = {"provider": "bright_data", "status": result.status, "provenance": result.provenance,
+               "source_url": result.source_url, "retrieved_at": result.retrieved_at,
+               "error": result.error, "data": result.data}
+    lead["public_web_review"] = snapshot
+    await services.store.replace("supplier_leads", lead_id, lead)
+    await audit("supplier_lead.public_web_reviewed", principal["id"], mission["organization_id"], mission["id"],
+                "supplier_lead", lead_id, services, {"status": result.status, "source_url": result.source_url})
+    return snapshot
 
 
 @router.post("/v1/missions/{mission_id}/discovery", status_code=status.HTTP_202_ACCEPTED)

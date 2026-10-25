@@ -100,7 +100,8 @@ def _text(title: str, rows: list[tuple[str, str]], link: tuple[str, str] | None)
     return "\n".join(body + ["", FOOTER])
 
 
-def rfq_email(organization: dict[str, Any], mission: dict[str, Any], url: str) -> tuple[str, str, str]:
+def rfq_email(organization: dict[str, Any], mission: dict[str, Any], url: str,
+              telegram_url: str | None = None) -> tuple[str, str, str]:
     subject = f"Urgent RFQ — ReliefMesh Mission {mission['name']}"
     items = requirements_lines(mission)
     rows = [("Organization", esc(organization.get("name"))), ("Mission", esc(mission["name"])),
@@ -109,11 +110,16 @@ def rfq_email(organization: dict[str, Any], mission: dict[str, Any], url: str) -
             ("Items", "<br>".join(esc(i) for i in items))]
     intro = (f"{esc(organization.get('name'))} is requesting quotes for emergency relief supplies. "
              "Respond through the secure link below; it is unique to your email address.")
-    html_body = _email("Request for quotation", intro, rows, ("Respond to this RFQ", url), tone="#b45309")
+    extra = (f'<p style="margin:12px 0"><a href="{esc(telegram_url)}">Accept and respond in Telegram</a></p>'
+             if telegram_url else "")
+    html_body = _email("Request for quotation", intro, rows, ("Respond to this RFQ", url), extra_html=extra,
+                       tone="#b45309")
     text = _text(subject, [("Organization", organization.get("name") or ""), ("Mission", mission["name"]),
                            ("Delivery location", mission["delivery_location"]),
                            ("Delivery deadline", when(mission["delivery_deadline"])), ("Items", "; ".join(items))],
                  ("Supplier response link", url))
+    if telegram_url:
+        text += f"\nTelegram response: {telegram_url}"
     return subject, html_body, text
 
 

@@ -100,7 +100,7 @@ export default function DashboardPage() {
             try {
               const requirements = [{ item: values.item, quantity: values.quantity }, ...values.extra];
               const created = await api<Mission>("/v1/missions", { method: "POST", token: session.token, body: JSON.stringify({
-                organization_id: organizationId, name: values.name, delivery_location: values.delivery_location,
+                organization_id: organizationId, name: values.name, community_label: values.community_label.trim() || null, delivery_location: values.delivery_location,
                 delivery_deadline: new Date(values.delivery_deadline).toISOString(), budget: values.budget.toFixed(2), currency: "USD", requirements,
                 emergency_event_id: values.emergency_event_id || null, max_supplier_share: values.max_supplier_share ? values.max_supplier_share : null,
               }) });
