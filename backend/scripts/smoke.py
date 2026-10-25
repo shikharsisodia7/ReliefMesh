@@ -38,7 +38,7 @@ def main(base: str) -> None:
     mission.raise_for_status()
     mid = mission.json()["id"]
     assert mission.json()["emergency_event"]["id"] == event["id"], "event snapshot missing"
-    seed = client.post(f"/v1/missions/{mid}/demo/seed", headers=headers).json()
+    client.post(f"/v1/missions/{mid}/demo/seed", headers=headers).raise_for_status()
     wait_jobs(client, headers, mid)
     suppliers = client.get(f"/v1/missions/{mid}/suppliers", headers=headers).json()
     for row in suppliers:

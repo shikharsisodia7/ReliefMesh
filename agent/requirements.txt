@@ -1,3 +1,7 @@
 uagents==0.26.1
 uagents-core==0.4.12
 httpx>=0.28,<1.0
+# Known transitive advisories with no installable fix (reviewed 2026-10-24):
+# - pynacl 1.6.0 (PYSEC-2026-1448/3002): cosmpy 0.12.2, the latest, pins pynacl==1.6.0. Affects only custom
+#   crypto_core_ed25519_is_valid_point use, which neither this agent nor uAgents calls.
+# - ecdsa 0.19.2 (PYSEC-2026-1325): Minerva timing attack on NIST P-256; agent identities use secp256k1. No upstream fix.

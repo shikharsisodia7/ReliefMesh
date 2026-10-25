@@ -37,7 +37,7 @@ def residual_problem(mission: dict[str, Any], quotes: list[dict[str, Any]],
         taken[(line["quote_id"], line["requirement_id"])] += line["quantity"]
         spent += cents(line["line_cost"])
     by_id = {quote["id"]: quote for quote in quotes}
-    spent += sum(cents(by_id[qid].get("shipping_cost") or "0") for qid in {l["quote_id"] for l in commitments}
+    spent += sum(cents(by_id[qid].get("shipping_cost") or "0") for qid in {line["quote_id"] for line in commitments}
                  if qid in by_id)
     requirements = [{**row, "quantity": row["quantity"] - covered.get(requirement_key(row), 0)}
                     for row in mission["requirements"] if row["quantity"] > covered.get(requirement_key(row), 0)]
