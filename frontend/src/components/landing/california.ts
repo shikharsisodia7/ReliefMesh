@@ -46,13 +46,24 @@ for (let row = 0; row * GAP <= MAP_HEIGHT; row += 1) {
 }
 const byCell = new Set(DOTS.map((dot) => `${dot.col}:${dot.row}`));
 
-// Snaps real coordinates to the nearest dot inside the state; points outside it are dropped.
+// Snaps real coordinates to the nearest dot inside the state. A point on the simplified border uses an adjacent
+// inside dot; points farther out are dropped.
 export function nearestDots(points: { latitude: number; longitude: number }[]) {
   const keys = new Set<string>();
   for (const point of points) {
     const { x, y } = project(point.latitude, point.longitude);
-    const key = `${Math.floor(x / GAP)}:${Math.floor(y / GAP)}`;
-    if (byCell.has(key)) keys.add(key);
+    const col = Math.floor(x / GAP);
+    const row = Math.floor(y / GAP);
+    let best: string | null = null;
+    let bestDistance = Infinity;
+    for (let dc = -1; dc <= 1; dc += 1) {
+      for (let dr = -1; dr <= 1; dr += 1) {
+        const key = `${col + dc}:${row + dr}`;
+        const distance = ((col + dc + 0.5) * GAP - x) ** 2 + ((row + dr + 0.5) * GAP - y) ** 2;
+        if (byCell.has(key) && distance < bestDistance) { best = key; bestDistance = distance; }
+      }
+    }
+    if (best) keys.add(best);
   }
   return keys;
 }

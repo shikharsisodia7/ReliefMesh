@@ -31,8 +31,9 @@ const bayArea = nearestDots([
   { latitude: 37.68, longitude: -121.85 }, { latitude: 37.4, longitude: -121.95 },
 ]);
 
-// A constant element, so the per-frame playback renders skip its ~2,600 dots.
-const backdrop = <DotMap lit={bayArea} glow dotClass="fill-white/[0.07]" className="pointer-events-none absolute top-[-260px] left-[calc(50%+320px)] h-[1150px] w-auto max-lg:hidden" />;
+// A constant element, so the per-frame playback renders skip its ~2,600 dots. It sits under the cards, placed so the
+// Bay Area glow lands in the open space left of the plan card.
+const backdrop = <DotMap lit={bayArea} glow dotClass="fill-white/[0.12]" className="pointer-events-none absolute top-[-300px] left-[40px] h-[1300px] w-auto max-lg:hidden" />;
 
 // Slides in from one side once its moment is reached; under reduced motion it just appears.
 // In the stacked mobile layout a fragment takes no space until its moment.
@@ -211,11 +212,11 @@ export function SupplierFails() {
 
   return (
     <section aria-labelledby="supplier-fails-title" className="relative overflow-hidden bg-charcoal py-20 text-white md:py-28">
-      {backdrop}
       <div className="relative mx-auto max-w-[1376px] px-4 md:px-8">
         <h2 id="supplier-fails-title" className="max-w-[900px] text-[38px] leading-[1.02] font-bold tracking-[-0.035em] md:text-[72px]">When a supplier fails,<br className="max-md:hidden" /> the plan rebuilds itself.</h2>
 
         <div className="mt-12 grid gap-4 lg:relative lg:mt-16 lg:block lg:h-[580px]">
+          {backdrop}
           <Reveal shown={moment >= 1} className="lg:absolute lg:top-[60px] lg:left-[30px] lg:z-10 lg:w-[330px] lg:-rotate-2">
             <SupplierNotice />
           </Reveal>

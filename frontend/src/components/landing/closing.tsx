@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { DotWordmark } from "@/components/landing/dot-wordmark";
+
 type FooterLink = { label: string; href: string };
 
 const AGENT = "agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x";
@@ -37,20 +39,6 @@ function FooterAnchor({ link }: { link: FooterLink }) {
   const className = "text-base text-ink hover:underline md:text-lg";
   if (link.href.startsWith("http")) return <a className={className} href={link.href} target="_blank" rel="noreferrer">{link.label}</a>;
   return <Link className={className} href={link.href}>{link.label}</Link>;
-}
-
-// "ReliefMesh" in a dot pattern: the letters are filled with a grid of dots and cropped by the bottom edge.
-function DotWordmark() {
-  return (
-    <svg viewBox="0 0 1000 190" className="block h-auto w-full" role="img" aria-label="ReliefMesh">
-      <defs>
-        <pattern id="wordmark-dots" width="7" height="7" patternUnits="userSpaceOnUse">
-          <circle cx="3.5" cy="3.5" r="2.6" fill="#15161A" />
-        </pattern>
-      </defs>
-      <text x="0" y="228" textLength="1000" lengthAdjust="spacingAndGlyphs" fill="url(#wordmark-dots)" style={{ font: "800 290px var(--font-inter), sans-serif", letterSpacing: "-0.02em" }}>ReliefMesh</text>
-    </svg>
-  );
 }
 
 export function Closing() {

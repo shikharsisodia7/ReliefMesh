@@ -68,7 +68,7 @@ export function ProductShot() {
                   <TabPanel value="plan">
                     <PlanTab
                       {...data} suppliers={[]} disruptions={[]} token="" run={async () => {}} setNotice={noop} onTab={noop} onOptimize={noop}
-                      canApprove approvalBlocked={null} requester="Maya Chen" showDemo={false} approvalTtlMinutes={1440}
+                      canApprove approvalBlocked={null} requester="Maya Chen" showDemo={false} approvalTtlMinutes={240}
                       busy={false} continuityRunning={false} eligibleCount={2} quoteCount={3}
                     />
                   </TabPanel>

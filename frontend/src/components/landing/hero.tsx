@@ -37,7 +37,7 @@ export function Hero() {
       <DotMap
         lit={lit}
         dotClass="fill-[#C9CCD1]"
-        className="pointer-events-none absolute top-6 left-[max(-80px,calc(50%-690px))] hidden h-[800px] w-auto md:block"
+        className="pointer-events-none absolute top-14 left-[max(-60px,calc(50%-700px))] hidden h-[880px] w-auto md:block"
         label={detections ? "Map of California with NASA FIRMS fire detections from the last 48 hours in orange" : undefined}
       />
       <div className="relative mx-auto max-w-[1132px] px-4 pt-10 text-center md:pt-12">
@@ -52,7 +52,7 @@ export function Hero() {
           <Link href="/sign-up?role=supplier" className="text-base font-medium text-foreground hover:underline">Supplier portal →</Link>
         </div>
       </div>
-      <div className="relative mx-auto mt-6 max-w-[900px] px-4 md:translate-x-10">
+      <div className="relative mx-auto mt-6 max-w-[892px] px-4 xl:translate-x-[120px]">
         <ProductShot />
       </div>
       {parts.length > 0 && (

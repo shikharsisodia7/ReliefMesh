@@ -14,7 +14,7 @@ const reveal = (delay: number, duration = 200): CSSProperties => ({ transitionDe
 const fade = "opacity-0 transition-opacity ease-out group-data-[drawn=true]:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none";
 
 function Tile({ children, small = false }: { children: ReactNode; small?: boolean }) {
-  return <span className={cn("grid shrink-0 place-items-center rounded-lg border border-sand-border bg-white", small ? "size-8" : "size-9")}>{children}</span>;
+  return <span className={cn("grid shrink-0 place-items-center rounded-lg border border-sand-border bg-white", small ? "size-7" : "size-9")}>{children}</span>;
 }
 
 // Federal agencies restrict their seals, so they get a plain text wordmark.
@@ -28,7 +28,7 @@ function Logo({ src, className }: { src: string; className?: string }) {
 }
 
 function Check({ children, at }: { children: ReactNode; at?: number }) {
-  return <p className={cn("mt-2 text-xs text-ink", at !== undefined && fade)} style={at !== undefined ? reveal(at) : undefined}><span className="mr-1 text-ok">✓</span>{children}</p>;
+  return <p className={cn("mt-2 text-[11px] whitespace-nowrap text-ink", at !== undefined && fade)} style={at !== undefined ? reveal(at) : undefined}><span className="mr-1 text-ok">✓</span>{children}</p>;
 }
 
 const card = "rounded-[14px] border border-sand-border bg-white shadow-[0_1px_2px_rgb(21_22_26/0.04),0_6px_16px_-6px_rgb(21_22_26/0.08)]";
@@ -76,8 +76,9 @@ function Evidence({ className, style, checkAt }: { className?: string; style?: C
     <div className={cn(card, "p-3", className)} style={style}>
       <p className="text-sm font-semibold text-ink">Evidence &amp; screening</p>
       <p className="mt-0.5 text-xs text-muted-foreground">Source-backed checks</p>
-      <ul className="mt-3 flex gap-2">
-        {screens.map((screen) => <li key={screen.label} className="flex flex-col items-center gap-1"><Tile small>{screen.tile}</Tile><span className="text-[9px] text-muted-foreground">{screen.label}</span></li>)}
+      {/* Fixed columns keep every tile, CRS included, inside the card; USAspending's long label gets a wider one. */}
+      <ul className="mt-3 grid grid-cols-[1fr_1fr_1.5fr_1fr_1fr]">
+        {screens.map((screen) => <li key={screen.label} className="flex flex-col items-center gap-1"><Tile small>{screen.tile}</Tile><span className="text-[8px] whitespace-nowrap text-muted-foreground">{screen.label}</span></li>)}
       </ul>
       <Check at={checkAt}>20 checks · 1 needs review</Check>
     </div>
@@ -124,12 +125,12 @@ type Edge = { d: string; delay: number; duration: number; tone?: "gray" | "signa
 const edges: Edge[] = [
   ...[64, 136, 208, 280].map((y) => ({ d: `M196 ${y} C215 ${y} 210 168 230 168`, delay: 0, duration: 250 })),
   { d: "M230 168 L326 168", delay: 250, duration: 150, end: [326, 168, 0] },
-  { d: "M446 168 L512 168", delay: 400, duration: 150, end: [512, 168, 0] },
-  { d: "M732 168 L794 168", delay: 550, duration: 150, end: [794, 168, 0] },
+  { d: "M454 168 L512 168", delay: 400, duration: 150, end: [512, 168, 0] },
+  { d: "M740 168 L794 168", delay: 550, duration: 150, end: [794, 168, 0] },
   { d: "M878 136 L878 184", delay: 700, duration: 100, end: [878, 184, 90] },
   { d: "M1217 234 C1217 264 1144 262 1144 292", delay: 700, duration: 150, end: [1144, 292, 90] },
   { d: "M1217 234 C1217 264 1259 262 1259 292", delay: 700, duration: 150, end: [1259, 292, 90] },
-  { d: "M405 404 C405 330 622 320 622 246", delay: 600, duration: 250, tone: "ai", end: [622, 246, -90] },
+  { d: "M405 404 C405 330 626 320 626 246", delay: 600, duration: 250, tone: "ai", end: [626, 246, -90] },
   { d: "M665 404 C665 350 878 350 878 298", delay: 600, duration: 250, tone: "ai", end: [878, 298, -90] },
   { d: "M925 404 C925 300 1114 250 1114 144", delay: 600, duration: 250, tone: "ai", end: [1114, 144, -90] },
   { d: "M962 232 C995 232 990 108 1016 108", delay: 850, duration: 200, tone: "signal", end: [1016, 108, 0] },
@@ -183,10 +184,10 @@ function Canvas() {
       <p className={cn(lane, "absolute")} style={at(1016, 0, 220)}>Human · approves</p>
       {sources.map((source, index) => <Node key={source.name} style={at(0, 34 + index * 72, 196, 60)} tile={<Tile>{source.tile}</Tile>} name={source.name} role={source.role} />)}
       <EdgeLabel x={278} y={150} at={250}>Wildfire · Oakland</EdgeLabel>
-      <Apify style={at(326, 110, 120)} checkAt={400} />
-      <EdgeLabel x={479} y={150} at={400}>4 suppliers</EdgeLabel>
-      <Evidence style={at(512, 96, 220)} checkAt={550} />
-      <EdgeLabel x={763} y={150} at={550}>20 checks</EdgeLabel>
+      <Apify style={at(326, 110, 128)} checkAt={400} />
+      <EdgeLabel x={483} y={150} at={400}>4 suppliers</EdgeLabel>
+      <Evidence style={at(512, 96, 228)} checkAt={550} />
+      <EdgeLabel x={767} y={150} at={550}>20 checks</EdgeLabel>
       <div className={cn(card, "absolute p-2.5")} style={at(794, 34, 168, 258)}>
         <p className="px-1 pb-2 text-sm font-semibold text-ink">Decision core</p>
         <Rules />
