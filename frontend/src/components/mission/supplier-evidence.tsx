@@ -36,9 +36,9 @@ const CLEAR = new Set(["OFAC_SCREENING:NO_MATCH", "SAM_REGISTRATION:MATCH", "FDA
 
 const words = (code: string) => code.charAt(0).toUpperCase() + code.slice(1).toLowerCase().replace(/_/g, " ");
 const SHARED_WORDS: Record<string, string> = { BLOCKED_EXTERNAL: "Not configured", UNAVAILABLE: "Unavailable" };
-const resultWords = (record: Evidence) => RESULT_WORDS[`${record.type}:${record.status}`] ?? SHARED_WORDS[record.status] ?? words(record.status);
+export const resultWords = (record: Evidence) => RESULT_WORDS[`${record.type}:${record.status}`] ?? SHARED_WORDS[record.status] ?? words(record.status);
 const isClear = (record: Evidence) => CLEAR.has(`${record.type}:${record.status}`) || (record.type === "PAID_DOSSIER" && !["UNAVAILABLE", "FAIL", "FAILED"].includes(record.status));
-const checkLabel = (type: string) => EVIDENCE_ORDER.find(([key]) => key === type)?.[1] ?? type;
+export const checkLabel = (type: string) => EVIDENCE_ORDER.find(([key]) => key === type)?.[1] ?? type;
 // "Not configured" and "unavailable" already say where the data came from.
 const showsProvenance = (record: Evidence) => record.provenance !== "BLOCKED_EXTERNAL" && record.provenance !== "UNAVAILABLE";
 
