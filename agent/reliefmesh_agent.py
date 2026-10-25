@@ -23,6 +23,8 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
+
+import continuity_answers
 from uagents import Agent, Context, Protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
@@ -199,6 +201,9 @@ def classify(text: str) -> tuple[str, dict[str, Any]]:
         return "simulate", {"supplier": simulated.group(1).strip(), "kind": kind}
     if re.search(r"\b(evidence|screen|sanction|ofac|compliance)\b", lowered):
         return "evidence", {}
+    question = continuity_answers.classify(text)
+    if question:
+        return "continuity", {"question": question, "text": text}
     if re.search(r"\b(continuity|surviv|single point|resilien|failure frontier|price shock|delay shock|"
                  r"capacity shock|los(?:e|ing)\s+(?:supplier|vendor)|biggest.*failure)\b", lowered):
         return "continuity", {}
@@ -330,15 +335,7 @@ async def run_tool(client: ReliefMeshClient, intent: str, args: dict[str, Any], 
         plan = await client.call("GET", f"/v1/plans/{result['plan_id']}")
         return describe_plan(mission, plan)
     if intent == "continuity":
-        continuity = await client.call("GET", f"/v1/missions/{mission_id}/continuity")
-        if continuity["state"] == "RUNNING":
-            return ("Continuity analysis is running in the background. It is testing hypothetical supplier failures "
-                    "against the exact plan/quote snapshot; no real supplier data is being changed. Ask again shortly.")
-        analysis = continuity.get("analysis")
-        if not analysis or continuity["state"] != "COMPLETE":
-            return ("There is no current continuity result yet. Run `optimize` after policy-eligible quotes exist; "
-                    "ReliefMesh automatically queues a deterministic HYPOTHETICAL N-1 stress test for that plan.")
-        return describe_continuity(analysis, mission_id)
+        return await answer_continuity(client, args, mission_id)
     if intent == "explain":
         explanation = await client.call("GET", f"/v1/missions/{mission_id}/explain?supplier={httpx.QueryParams({'q': args['supplier']})['q']}")
         if not explanation.get("found"):
@@ -397,6 +394,53 @@ def describe_brief(brief: dict[str, Any]) -> str:
         lines.append(f"Approval: {brief['approval']['status']}.")
     lines.extend(f"· {message}" for message in brief["recent_notifications"][:3])
     return "\n".join(lines) + link(mission["id"])
+
+
+async def answer_continuity(client: ReliefMeshClient, args: dict[str, Any], mission_id: str) -> str:
+    """Route a continuity question to an explanation of persisted Continuity Engine results.
+
+    Every number comes from GET /continuity (deterministic MILP stress tests) or from persisted plans; this
+    agent never computes a risk figure itself and has no way to start an analysis, approve, or order.
+    """
+
+    question, text = args.get("question"), args.get("text", "")
+    if question == "most_fragile":
+        overview = await client.call("GET", "/v1/agent/overview")
+        pairs = []
+        for mission in overview["missions"]:
+            view = await client.call("GET", f"/v1/missions/{mission['id']}/continuity")
+            pairs.append((mission, view.get("analysis") if view.get("state") == "COMPLETE" else None))
+        return continuity_answers.most_fragile(pairs)
+    if question == "plan_changes":
+        plans = sorted(await client.call("GET", f"/v1/missions/{mission_id}/plans"), key=lambda row: row["version"])
+        wanted = [int(v) for v in re.findall(r"\bv(?:ersion)?\s*(\d+)", text, flags=re.IGNORECASE)]
+        by_version = {plan["version"]: plan for plan in plans}
+        if len(wanted) >= 2 and wanted[0] in by_version and wanted[1] in by_version:
+            older, newer = by_version[min(wanted[:2])], by_version[max(wanted[:2])]
+        elif len(plans) >= 2:
+            older, newer = plans[-2], plans[-1]
+        else:
+            return "This mission has only one plan version so far, so there is nothing to compare." + link(mission_id)
+        return continuity_answers.plan_changes(older, newer) + link(mission_id)
+    view = await client.call("GET", f"/v1/missions/{mission_id}/continuity")
+    if view["state"] == "RUNNING":
+        progress = view.get("progress") or {}
+        done = f" ({progress['done']}/{progress['total']} scenario groups)" if progress.get("total") else ""
+        return ("Continuity analysis is running in the background" + done + ". It tests HYPOTHETICAL supplier "
+                "failures against the exact plan and quote snapshot; no real supplier data is changed. Ask again "
+                "shortly." + link(mission_id))
+    analysis = view.get("analysis")
+    if question == "single_point":
+        return continuity_answers.single_point_of_failure(analysis) + link(mission_id)
+    if question == "survive_losing":
+        return continuity_answers.survive_losing(analysis, continuity_answers.supplier_from_question(text)) + \
+            link(mission_id)
+    if question == "cheapest_resilient":
+        return continuity_answers.cheapest_resilient(analysis) + link(mission_id)
+    if not analysis or view["state"] != "COMPLETE":
+        return ("There is no current continuity result yet. Run `optimize` after policy-eligible quotes exist; "
+                "ReliefMesh automatically queues a deterministic HYPOTHETICAL N-1 stress test for that plan.")
+    return describe_continuity(analysis, mission_id)
 
 
 def describe_continuity(analysis: dict[str, Any], mission_id: str) -> str:

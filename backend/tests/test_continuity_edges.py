@@ -15,7 +15,7 @@ import pytest
 import app.planning as planning
 from app.continuity import (_capacity_shock, _price_shock, build_continuity_analysis, reality_check)
 from app.optimizer import solve
-from conftest import auth, settle_jobs, wait_for
+from conftest import auth, settle_jobs
 from test_continuity_guarantees import (_complete, _continuity, _line, _mission, _optimize, _org,
                                         _supplier_quote, _three_supplier_mission)
 

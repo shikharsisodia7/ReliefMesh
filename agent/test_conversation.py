@@ -56,6 +56,32 @@ async def main(base: str) -> None:
     assert "Plan v1" in plan and "Withheld by policy: Pioneer Logistics Supply" in plan
     why = await say("why was Pioneer rejected?")
     assert "zero allocation" in why and "SANCTIONS_POTENTIAL_MATCH" in why
+
+    # Continuity questions: every number in the reply must be the stored deterministic analysis's number.
+    def continuity_view() -> dict:
+        for _ in range(90):
+            view = http.get(f"/v1/missions/{mission_id}/continuity", headers=human).json()
+            if view["state"] == "COMPLETE":
+                return view
+            time.sleep(1)
+        raise AssertionError("continuity analysis did not complete")
+
+    analysis = continuity_view()["analysis"]
+    n1 = analysis["metrics"]["n1_survivability"]
+    spof = await say("which supplier is our biggest single point of failure?")
+    assert f"N-1 survivability {n1['survives']}/{n1['tested']}" in spof and "HYPOTHETICAL" in spof
+    allocated = analysis["n1_scenarios"][0]
+    survive = await say(f"can this plan survive losing {allocated['supplier']}?")
+    assert allocated["supplier"] in survive and allocated["status"].lower() in survive.lower()
+    resilient = await say("what's the cheapest resilient alternative?")
+    alternative = analysis["resilient_alternative"]
+    if n1["tested"] and n1["survives"] == n1["tested"]:
+        assert "costs nothing extra" in resilient
+    elif alternative["status"] == "AVAILABLE":
+        total = f"{float(alternative['total_cost']):,.2f}"
+        assert total in resilient, (total, resilient)
+    else:
+        assert "no" in resilient.lower()
     approve = http.post(f"/v1/plans/{http.get(f'/v1/missions/{mission_id}/plans', headers=human).json()[0]['id']}/approve",
                         headers=human)
     assert approve.status_code == 201
@@ -69,6 +95,10 @@ async def main(base: str) -> None:
         time.sleep(1)
     changed = await say("what changed after the disruption?")
     assert "withdrew" in changed and "v1 → v2" in changed and "invalidated" in changed
+    between = await say("what changed between plan v1 and v2?")
+    assert "Plan v1 → v2" in between
+    fragile = await say("which mission is most fragile?")
+    assert "Ranked by deterministic fragility" in fragile or "None of your missions" in fragile
     status = await say("status")
     assert "Latest plan v2" in status
     print("\nCONVERSATION OK")
