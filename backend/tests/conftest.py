@@ -37,6 +37,7 @@ class FakeUpstream:
     """Deterministic stand-in for public APIs. Unknown hosts fail like a dead network."""
 
     ofac_down: bool = False
+    down: set[str] = field(default_factory=set)  # hosts that time out, to exercise failure modes
     fda_firms: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
     gemini_answer: dict[str, Any] = field(default_factory=dict)
@@ -46,6 +47,8 @@ class FakeUpstream:
         url = str(request.url)
         self.calls.append(url)
         host, path = request.url.host, request.url.path
+        if host in self.down:
+            raise httpx.ConnectTimeout(f"simulated outage: {host}", request=request)
         if host == "sanctionslistservice.ofac.treas.gov":
             if self.ofac_down:
                 raise httpx.ConnectTimeout("simulated OFAC timeout", request=request)
