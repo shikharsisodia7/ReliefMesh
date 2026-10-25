@@ -19,6 +19,7 @@ export function RfqsTab({ invitations, quotes }: { invitations: SupplierInvitati
               <li key={invitation.id} className="grid gap-x-8 gap-y-2 border-b py-6 md:grid-cols-[1.4fr_0.8fr_auto] md:items-start">
                 <div>
                   <p className="text-lg font-semibold">{mission.name}</p>
+                  {invitation.buyer_organization && <p className="mt-0.5 text-sm">{invitation.buyer_organization}</p>}
                   <p className="mt-0.5 text-sm text-muted-foreground">{mission.requirements.map((row) => `${row.quantity.toLocaleString("en-US")} ${row.item}`).join(", ")} · {mission.delivery_location} · Deliver by {day(mission.delivery_deadline)}</p>
                 </div>
                 <p className="font-medium">{state}</p>

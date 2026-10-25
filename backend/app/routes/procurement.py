@@ -301,7 +301,10 @@ async def get_invitation(token: str, services: Services = Depends(get_services))
     mission = await services.store.get("missions", invitation["mission_id"])
     if not mission:
         raise HTTPException(status_code=404, detail="Mission not found")
+    organization = await services.store.get("organizations", mission["organization_id"])
+    # The buyer's name is already in the RFQ email this link came from.
     return {"mission": {key: mission[key] for key in MISSION_PUBLIC_FIELDS},
+            "buyer_organization": organization["name"] if organization else None,
             "supplier_email": invitation["supplier_email"], "status": invitation["status"]}
 
 
@@ -450,8 +453,10 @@ async def list_supplier_invitations(user: dict = Depends(current_user),
     for invitation in await services.store.find("invitations", supplier_email=user["email"]):
         mission = await services.store.get("missions", invitation["mission_id"])
         if mission:
+            organization = await services.store.get("organizations", mission["organization_id"])
             results.append({k: v for k, v in invitation.items() if k != "token_hash"}
-                           | {"mission": {key: mission[key] for key in MISSION_PUBLIC_FIELDS}})
+                           | {"mission": {key: mission[key] for key in MISSION_PUBLIC_FIELDS},
+                              "buyer_organization": organization["name"] if organization else None})
     return sorted(results, key=lambda row: row["created_at"], reverse=True)
 
 

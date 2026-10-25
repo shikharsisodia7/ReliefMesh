@@ -31,7 +31,7 @@ export function PageHeader({ breadcrumb, title, meta, activity, actions }: { bre
         {meta && <p className="mt-1.5 text-sm text-muted-foreground">{meta}</p>}
         {activity && <p className="mt-1 text-sm text-muted-foreground">{activity}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 max-sm:[&>button:first-child[data-variant=text]]:-ml-3">{actions}</div>}
     </header>
   );
 }

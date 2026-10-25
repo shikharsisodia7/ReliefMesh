@@ -2,7 +2,7 @@ import type { Requirement } from "@/lib/types";
 
 // The supplier's own view of the records the API returns for them.
 export type SupplierMission = { id: string; name: string; delivery_location: string; delivery_deadline: string; requirements: Requirement[] };
-export type SupplierInvitation = { id: string; status: string; mission: SupplierMission };
+export type SupplierInvitation = { id: string; status: string; mission: SupplierMission; buyer_organization?: string | null };
 export type SupplierQuote = {
   id: string; mission_id: string; status: string; version: number; shipping_cost: string; expires_at: string; supplier_name?: string | null; is_demo?: boolean;
   lines: { requirement_id?: string; item: string; available_quantity: number; unit_price: string; delivery_date: string }[];

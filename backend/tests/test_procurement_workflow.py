@@ -77,6 +77,11 @@ async def test_withdrawal_replans_and_invalidates_approval(client: httpx.AsyncCl
         )
         assert accepted.status_code == 200, accepted.text
 
+    # Suppliers see who is asking (the RFQ email already names the buyer).
+    assert (await client.get(f"/v1/supplier-invitations/{invitations[0]}")).json()["buyer_organization"] == "Harbor Response"
+    listed = (await client.get("/v1/supplier/invitations", headers=auth(supplier_one))).json()
+    assert [row["buyer_organization"] for row in listed] == ["Harbor Response"]
+
     quote_deadline = (datetime.now(UTC) + timedelta(days=2)).isoformat()
     delivery = (datetime.now(UTC) + timedelta(days=3)).isoformat()
     first_quote = await client.post(

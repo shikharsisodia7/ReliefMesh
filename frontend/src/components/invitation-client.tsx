@@ -16,7 +16,7 @@ import { api } from "@/lib/api";
 import { clearSession } from "@/lib/session";
 import type { QuoteDraft } from "@/lib/types";
 
-type Invitation = { supplier_email: string; status: string; mission: SupplierMission };
+type Invitation = { supplier_email: string; status: string; mission: SupplierMission; buyer_organization?: string | null };
 
 const needed = (mission: SupplierMission) => mission.requirements.map((row) => `${row.quantity.toLocaleString("en-US")} ${row.item}`).join(", ");
 
@@ -69,7 +69,8 @@ export function InvitationClient({ token }: { token: string }) {
   const { mission, supplier_email: email } = invitation.data;
   const active = accepted || invitation.data.status === "accepted";
   const next = encodeURIComponent(`/invitations/${token}`);
-  const summary = `${needed(mission)} needed · Deliver to ${mission.delivery_location} by ${day(mission.delivery_deadline)}`;
+  const buyer = invitation.data.buyer_organization;
+  const summary = `${buyer ? `${buyer} · ` : ""}${needed(mission)} needed · Deliver to ${mission.delivery_location} by ${day(mission.delivery_deadline)}`;
   const quote = quotes.data?.find((row) => row.mission_id === mission.id && row.status === "submitted");
 
   // Before the quote form: a centered column with the request and one action.
@@ -80,6 +81,7 @@ export function InvitationClient({ token }: { token: string }) {
           <p className="text-sm text-muted-foreground">Request for quotation</p>
           <h1 className="mt-1 text-[28px] leading-tight font-semibold tracking-tight">{mission.name}</h1>
           <dl className="mt-6 space-y-2 text-sm">
+            {buyer && <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Buyer</dt><dd>{buyer}</dd></div>}
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Needed</dt><dd>{needed(mission)}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Deliver to</dt><dd>{mission.delivery_location}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Deliver by</dt><dd>{when(mission.delivery_deadline)}</dd></div>
