@@ -57,8 +57,8 @@ and leaves financial authority with a human.
 
 After each feasible plan, a durable `continuity_analysis` job runs off the request path. The analysis has no authority
 to alter policy, quotes, plans, approvals, or purchase orders. It records `HYPOTHETICAL` provenance and a SHA-256
-input hash over the mission/plan binding, plan hash, quote versions, policy fingerprint, evidence fingerprint, and
-optimizer-input fingerprint. It then:
+input hash over the mission/plan binding, plan hash, quote versions, policy fingerprint, evidence fingerprint,
+optimizer-input fingerprint, and active purchase-order commitment fingerprint. It then:
 
 1. Removes each allocated supplier in turn and reruns the same policy-eligible MILP (N-1 survivability).
 2. Computes the smallest monotonic per-supplier price, ETA, and proportional-capacity stress that makes the current
@@ -68,8 +68,11 @@ optimizer-input fingerprint. It then:
 
 Results are cached by `(mission, plan, input_hash)`, run in a retryable background job, and are marked `STALE` when
 the plan is invalidated. The read API repeats the input-hash check, so a race cannot display outdated analysis as
-current. The Procurement Digital Twin graph is composed only from persisted mission, requirements, quotes, plan,
-approval, purchase-order, emergency, and continuity records.
+current. If a plan has active purchase orders, their lines and consumed quote capacity are fixed: the analysis scopes
+itself to the uncommitted remainder and labels that scope. If no requirement remains uncommitted, it records that no
+future procurement can truthfully be reallocated instead of inventing a recovery. The Procurement Digital Twin graph
+is composed only from persisted mission, requirements, quotes, plan, approval, purchase-order, emergency, and
+continuity records.
 
 ## What triggers recovery
 

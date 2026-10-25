@@ -181,6 +181,7 @@ export type ContinuityAnalysis = {
     critical_supplier: { supplier_id: string; supplier: string; reason: string } | null;
   };
   n1_scenarios: ContinuityScenario[]; failure_frontier: ContinuityFrontier[];
+  scope?: { kind: "FULL_MISSION" | "UNCOMMITTED_REMAINDER" | "NO_UNCOMMITTED_REQUIREMENTS"; statement: string; fixed_commitment_cost: string; fixed_commitment_count: number; full_plan_total_cost?: string };
   resilient_alternative: {
     status: "AVAILABLE" | "UNAVAILABLE"; total_cost?: string; added_cost?: string; supplier_count?: number;
     n1_survivability?: { survives: number; tested: number }; improvement?: string; reason?: string;

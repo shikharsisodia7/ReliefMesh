@@ -61,16 +61,27 @@ async def continuity_input_snapshot(services: Services, mission: dict[str, Any],
         ],
     }
     optimizer_input_fingerprint = hashlib.sha256(canonical_json(optimizer_inputs).encode()).hexdigest()
+    orders = await services.store.find("purchase_orders", mission_id=mission["id"])
+    commitment_fingerprint = hashlib.sha256(canonical_json([
+        {"id": order["id"], "plan_id": order.get("plan_id"), "status": order["status"], "lines": [
+            {"quote_id": line.get("quote_id"), "requirement_id": line.get("requirement_id"),
+             "quantity": line.get("quantity"), "line_cost": line.get("line_cost")}
+            for line in order.get("lines", [])
+        ]}
+        for order in sorted(orders, key=lambda row: row["id"])
+    ]).encode()).hexdigest()
     binding = {
         "mission_id": mission["id"], "plan_id": plan["id"], "plan_version": plan["version"],
         "plan_hash": plan["plan_hash"], "quote_versions": quote_versions,
         "policy_fingerprint": report["fingerprint"], "evidence_fingerprint": evidence_fingerprint,
         "optimizer_input_fingerprint": optimizer_input_fingerprint,
+        "commitment_fingerprint": commitment_fingerprint,
     }
     return {
         "report": report, "quotes": quotes, "eligible_quotes": eligible, "quote_versions": quote_versions,
         "policy_fingerprint": report["fingerprint"], "evidence_fingerprint": evidence_fingerprint,
         "optimizer_input_fingerprint": optimizer_input_fingerprint,
+        "commitment_fingerprint": commitment_fingerprint, "orders": orders,
         "input_hash": hashlib.sha256(canonical_json(binding).encode()).hexdigest(),
     }
 
@@ -96,12 +107,71 @@ async def compute_continuity_analysis(services: Services, mission_id: str, plan_
                   and row.get("status") == "COMPLETE"]
         if cached:
             return {"status": "cached", "analysis_id": cached[-1]["id"], "plan_id": plan_id}
-        analysis = build_continuity_analysis(
-            mission, plan, snapshot["eligible_quotes"], input_hash=snapshot["input_hash"],
-            quote_versions=snapshot["quote_versions"], policy_fingerprint=snapshot["policy_fingerprint"],
-            evidence_fingerprint=snapshot["evidence_fingerprint"],
-            optimizer_input_fingerprint=snapshot["optimizer_input_fingerprint"], created_at=now_iso(),
-        )
+        # Active purchase orders are fixed historical commitments, not inventory the
+        # optimizer is free to move. Stress-test only the uncommitted remainder and
+        # remove already-consumed quote capacity, using the same residual-problem
+        # transformation as a real replan.
+        commitments = committed_lines(snapshot["orders"])
+        analysis_mission = mission
+        analysis_plan = plan
+        analysis_quotes = snapshot["eligible_quotes"]
+        scope: dict[str, Any] = {
+            "kind": "FULL_MISSION",
+            "statement": "All feasible-plan requirements remain available for hypothetical reallocation.",
+            "fixed_commitment_cost": "0.00",
+            "fixed_commitment_count": 0,
+        }
+        if commitments:
+            remaining, adjusted_quotes, committed_cost = residual_problem(mission, snapshot["quotes"], commitments)
+            eligible_ids = {quote["id"] for quote in snapshot["eligible_quotes"]}
+            outstanding = [row for row in plan["allocations"] if not row.get("committed")]
+            analysis_mission = remaining
+            analysis_quotes = [quote for quote in adjusted_quotes if quote["id"] in eligible_ids]
+            analysis_plan = {
+                **plan,
+                "allocations": outstanding,
+                "total_cost": plan.get("new_spend") or money(cents(plan["total_cost"]) - committed_cost),
+                "latest_delivery": max((row["delivery_date"] for row in outstanding), default=None),
+            }
+            scope = {
+                "kind": "UNCOMMITTED_REMAINDER" if remaining["requirements"] else "NO_UNCOMMITTED_REQUIREMENTS",
+                "statement": (
+                    "Only requirements not already committed on active purchase orders are stress-tested."
+                    if remaining["requirements"]
+                    else "All requirements are already committed on active purchase orders; no uncommitted procurement can be reallocated."
+                ),
+                "fixed_commitment_cost": money(committed_cost),
+                "fixed_commitment_count": len(commitments),
+                "full_plan_total_cost": plan["total_cost"],
+            }
+        if not analysis_mission["requirements"]:
+            analysis = {
+                "status": "COMPLETE", "provenance": "HYPOTHETICAL",
+                "counterfactual_label": "HYPOTHETICAL STRESS TEST — does not change a supplier quote, plan, or approval.",
+                "input_hash": snapshot["input_hash"], "created_at": now_iso(), "mission_id": mission["id"],
+                "plan_id": plan["id"], "plan_version": plan["version"], "plan_hash": plan["plan_hash"],
+                "quote_versions": snapshot["quote_versions"], "policy_fingerprint": snapshot["policy_fingerprint"],
+                "evidence_fingerprint": snapshot["evidence_fingerprint"],
+                "optimizer_input_fingerprint": snapshot["optimizer_input_fingerprint"],
+                "baseline": {"total_cost": "0.00", "remaining_budget": plan["remaining_budget"],
+                             "latest_delivery": None, "supplier_concentration": []},
+                "metrics": {"n1_survivability": {"survives": 0, "tested": 0},
+                            "budget_headroom": plan["remaining_budget"], "deadline_slack_hours": None,
+                            "largest_supplier_concentration": 0, "alternative_eligible_capacity": 0,
+                            "price_shock_tolerance": None, "delay_tolerance": None,
+                            "capacity_loss_tolerance": None, "critical_supplier": None},
+                "n1_scenarios": [], "failure_frontier": [],
+                "resilient_alternative": {"status": "UNAVAILABLE", "reason": scope["statement"]},
+            }
+        else:
+            analysis = build_continuity_analysis(
+                analysis_mission, analysis_plan, analysis_quotes, input_hash=snapshot["input_hash"],
+                quote_versions=snapshot["quote_versions"], policy_fingerprint=snapshot["policy_fingerprint"],
+                evidence_fingerprint=snapshot["evidence_fingerprint"],
+                optimizer_input_fingerprint=snapshot["optimizer_input_fingerprint"], created_at=now_iso(),
+            )
+        analysis["scope"] = scope
+        analysis["commitment_fingerprint"] = snapshot["commitment_fingerprint"]
         current = await continuity_input_snapshot(services, mission, plan)
         if current["input_hash"] != snapshot["input_hash"]:
             return {"status": "stale_before_persist", "reason": "quote, evidence, or policy changed", "plan_id": plan_id}

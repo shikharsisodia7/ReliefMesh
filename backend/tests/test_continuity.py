@@ -185,3 +185,38 @@ async def test_continuity_discards_a_snapshot_when_quote_revision_races_it(app_a
 
     assert result["status"] == "stale_before_persist"
     assert len(await services.store.find("continuity_analyses", mission_id=mission_id)) == len(records_before)
+
+
+@pytest.mark.anyio
+async def test_continuity_never_reallocates_active_purchase_order_lines(app_and_client) -> None:
+    app, client = app_and_client
+    token, mission_id, plan_id, _ = await _demo_plan(client)
+    approved = await client.post(f"/v1/plans/{plan_id}/approve", headers=auth(token))
+    assert approved.status_code == 201, approved.text
+    orders = await client.post(
+        f"/v1/plans/{plan_id}/purchase-orders", headers={**auth(token), "Idempotency-Key": "continuity-po-scope"}
+    )
+    assert orders.status_code == 201, orders.text
+    for order in orders.json():
+        sent = await client.post(f"/v1/purchase-orders/{order['id']}/send", json={"confirm": True}, headers=auth(token))
+        assert sent.status_code == 200, sent.text
+
+    # The former all-open-plan result cannot masquerade as current after POs are
+    # sent; commitment status and lines participate in the analysis input hash.
+    historical = await client.get(
+        f"/v1/missions/{mission_id}/continuity", params={"plan_id": plan_id}, headers=auth(token)
+    )
+    assert historical.status_code == 200, historical.text
+    assert historical.json()["state"] == "STALE"
+
+    # Build a new plan from the same persisted state. Its active PO lines are fixed
+    # commitments, so continuity must expose no free, fictional reallocation.
+    committed_plan = await planning.compute_plan(app.state.services, mission_id, "supplier_disruption")
+    result = await planning.compute_continuity_analysis(app.state.services, mission_id, committed_plan["id"])
+    assert result["status"] in {"complete", "cached"}
+    analyses = await app.state.services.store.find("continuity_analyses", mission_id=mission_id)
+    analysis = next(row for row in analyses if row["plan_id"] == committed_plan["id"])
+    assert analysis["scope"]["kind"] == "NO_UNCOMMITTED_REQUIREMENTS"
+    assert analysis["commitment_fingerprint"]
+    assert analysis["metrics"]["n1_survivability"] == {"survives": 0, "tested": 0}
+    assert analysis["resilient_alternative"]["status"] == "UNAVAILABLE"

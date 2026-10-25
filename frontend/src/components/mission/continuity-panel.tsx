@@ -106,6 +106,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
     {state === "STALE" && analysis && <p className="mt-3 flex gap-2 rounded border border-warn/40 bg-warn/5 p-3 text-sm text-warn"><AlertTriangle className="mt-0.5 size-4 shrink-0" />This is a historical HYPOTHETICAL result for Plan v{analysis.plan_version}; quote, evidence, policy, or plan inputs changed. It is not shown as current.</p>}
     {analysis && <div className="mt-4 space-y-4">
       <p className="rounded border border-violet-400/30 bg-violet-400/5 p-2 text-[11px] text-violet-200">{analysis.counterfactual_label} Input hash {analysis.input_hash.slice(0, 12)} · analyzed {when(analysis.created_at)}</p>
+      {analysis.scope && analysis.scope.kind !== "FULL_MISSION" && <p className="rounded border border-warn/30 bg-warn/5 p-2 text-[11px] text-warn">Scope: {analysis.scope.statement} Fixed commitments: {money(analysis.scope.fixed_commitment_cost)} across {analysis.scope.fixed_commitment_count} PO line{analysis.scope.fixed_commitment_count === 1 ? "" : "s"}.</p>}
       <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="N-1 survivability" value={`${analysis.metrics.n1_survivability.survives}/${analysis.metrics.n1_survivability.tested}`} note="allocated suppliers" />
         <Metric label="Budget headroom" value={money(analysis.metrics.budget_headroom)} />
