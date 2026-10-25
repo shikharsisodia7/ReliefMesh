@@ -23,7 +23,7 @@ from ..integrations.gmail import Attachment
 from ..operations import events as ops_events
 from ..operations import templates
 from ..jobs import enqueue
-from ..planning import compute_plan, evaluate_mission, plan_hash
+from ..planning import compute_plan, evaluate_mission, mission_lock, plan_hash
 from ..requirements import assign_quote_lines, new_requirement_id
 from ..schemas import (
     CreateOrganizationRequest, FulfillmentUpdateRequest, InvitationCreateRequest, LoginRequest, MemberInviteRequest,
@@ -574,6 +574,21 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     membership = await require_org_member(plan["organization_id"], user, services)
     if user["role"] != "coordinator" or membership["role"] not in {"admin", "approver"}:
         raise HTTPException(status_code=403, detail="An organization administrator or approver must approve this plan")
+    # Check and write under the mission lock: a double-click must not create two approvals, and a quote change's
+    # invalidation must not slip between these checks and the approval write.
+    async with mission_lock(plan["mission_id"]):
+        approval, mission = await _approve_locked(plan_id, user, services)
+    await notify(services, mission, "plan_approved",
+                 f"Plan v{approval['plan_version']} approved for ${approval['amount']} "
+                 f"(expires {approval['expires_at'][:16]}Z).", "success", {"approval_id": approval["id"]})
+    await ops_events.emit(services, ops_events.PLAN_APPROVED, mission, subject_id=plan_id,
+                          version=approval["plan_version"], data={"plan_id": plan_id, "approval_id": approval["id"]})
+    return approval
+
+
+async def _approve_locked(plan_id: str, user: dict, services: Services) -> tuple[dict, dict]:
+    plan = await services.store.get("plans", plan_id)  # re-read: the state may have changed while we waited
+    assert plan
     mission = await services.store.get("missions", plan["mission_id"])
     organization = await services.store.get("organizations", plan["organization_id"])
     assert mission and organization
@@ -622,12 +637,7 @@ async def approve_plan(plan_id: str, user: dict = Depends(current_user), service
     await audit("plan.approved", user["id"], plan["organization_id"], plan["mission_id"], "approval", approval["id"],
                 services, {"plan_id": plan_id, "amount": plan["total_cost"], "plan_hash": plan["plan_hash"],
                            "expires_at": approval["expires_at"]})
-    await notify(services, mission, "plan_approved",
-                 f"Plan v{plan['version']} approved for ${plan['total_cost']} (expires {approval['expires_at'][:16]}Z).",
-                 "success", {"approval_id": approval["id"]})
-    await ops_events.emit(services, ops_events.PLAN_APPROVED, mission, subject_id=plan_id, version=plan["version"],
-                          data={"plan_id": plan_id, "approval_id": approval["id"]})
-    return approval
+    return approval, mission
 
 
 @router.get("/v1/missions/{mission_id}/approvals")
@@ -648,11 +658,28 @@ async def create_purchase_orders(plan_id: str, request: Request, user: dict = De
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
     await require_org_member(plan["organization_id"], user, services)
+    # The UI sends a fresh Idempotency-Key per click, so the key alone cannot stop a second set of orders: the
+    # approval is checked and consumed under the mission lock.
+    async with mission_lock(plan["mission_id"]):
+        return await _issue_orders_locked(plan_id, key, user, services)
+
+
+async def _newer_plan_exists(services: Services, plan: dict) -> bool:
+    return any(p["version"] > plan["version"] for p in await services.store.find("plans", mission_id=plan["mission_id"]))
+
+
+async def _issue_orders_locked(plan_id: str, key: str, user: dict, services: Services) -> list:
+    plan = await services.store.get("plans", plan_id)  # re-read under the lock
+    assert plan
     existing = await services.store.find("purchase_orders", plan_id=plan_id, idempotency_key=key)
     if existing:
         return existing
     if user["role"] != "coordinator" or plan["status"] != "approved":
         raise HTTPException(status_code=409, detail="An approved current plan is required")
+    if await _newer_plan_exists(services, plan):
+        # A newer version re-allocates these requirements; ordering this one too would buy them twice.
+        raise HTTPException(status_code=409, detail="A newer plan version exists; issue purchase orders for the "
+                                                    "latest approved plan")
     approvals = await services.store.find("approvals", plan_id=plan_id)
     active = [a for a in approvals if a["status"] == "active"]
     if not active:
@@ -733,11 +760,28 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
     order = await purchase_order_access(order_id, user, services)
     if user["role"] != "coordinator":
         raise HTTPException(status_code=403, detail="Only a coordinator can send a purchase order")
+    # Under the mission lock: a double-click must not email the PO twice, and a quote change must not void this
+    # draft while its email is going out (the replan would then re-buy units the supplier was just sent).
+    async with mission_lock(order["mission_id"]):
+        order = await _send_order_locked(order_id, user, services)
+    mission = await services.store.get("missions", order["mission_id"])
+    if mission:
+        await ops_events.emit(services, ops_events.PURCHASE_ORDER_SENT, mission, subject_id=order_id,
+                              data={"order_id": order_id})
+    return order
+
+
+async def _send_order_locked(order_id: str, user: dict, services: Services) -> dict:
+    order = await services.store.get("purchase_orders", order_id)  # re-read under the lock
+    assert order
     if order["status"] != "draft":
         raise HTTPException(status_code=409, detail="Only draft purchase orders can be sent")
     plan = await services.store.get("plans", order["plan_id"])
     if not plan or plan["status"] != "approved":
         raise HTTPException(status_code=409, detail="The plan behind this draft is no longer approved")
+    if await _newer_plan_exists(services, plan):
+        raise HTTPException(status_code=409, detail="A newer plan version supersedes this draft; send the latest "
+                                                    "approved plan's purchase orders instead")
     supplier = await services.store.get("suppliers", order["supplier_id"])
     if supplier and supplier.get("is_demo"):
         # TEST suppliers have reserved example.com addresses; record the skip instead of emailing.
@@ -766,10 +810,6 @@ async def send_purchase_order(order_id: str, payload: PurchaseOrderSendRequest, 
     await services.store.replace("purchase_orders", order_id, order)
     await audit("purchase_order.sent", user["id"], order["organization_id"], order["mission_id"], "purchase_order",
                 order_id, services)
-    mission = await services.store.get("missions", order["mission_id"])
-    if mission:
-        await ops_events.emit(services, ops_events.PURCHASE_ORDER_SENT, mission, subject_id=order_id,
-                              data={"order_id": order_id})
     return order
 
 

@@ -53,6 +53,8 @@ class OperationsService:
         self.services = services
         self.slot_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.folder_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # One archived file per document: lookup, upload, and record happen as one step per doc key.
+        self.doc_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.calendars: dict[str, str] = {}
 
     @property
@@ -459,7 +461,6 @@ class OperationsService:
 
     async def _send_drive(self, delivery: dict[str, Any]) -> dict[str, Any]:
         org, mission_id = delivery["organization_id"], delivery["mission_id"]
-        content, mime_type = await self._render_document(delivery)
         mission = await self.store.get("missions", mission_id) or {"name": mission_id}
         async with self.services.hub.client(timeout=30) as client:
             token, connection = await google_auth.access_token(
@@ -467,12 +468,18 @@ class OperationsService:
             async with self.folder_locks[org]:
                 folder = await self._mission_folder(client, token, connection, mission_id, mission["name"])
             doc_key = f"{org}:{mission_id}:{delivery['payload']['doc']}"
-            known = await self.store.get("drive_files", doc_key)
-            uploaded = await google_drive.upload(client, token, delivery["payload"]["filename"], content, mime_type,
-                                                 folder, known["file_id"] if known else None)
-        await self.store.upsert("drive_files", {"id": doc_key, "organization_id": org, "mission_id": mission_id,
-                                                "file_id": uploaded["id"], "web_view_link": uploaded.get("webViewLink"),
-                                                "filename": uploaded.get("name"), "updated_at": now_iso()})
+            # Two deliveries of one document (two POs sent together both re-archive the audit export) must update
+            # one file, so the second waits until the first has recorded the file it created. Rendering inside the
+            # lock means whichever delivery writes last also archives the freshest content.
+            async with self.doc_locks[doc_key]:
+                content, mime_type = await self._render_document(delivery)
+                known = await self.store.get("drive_files", doc_key)
+                uploaded = await google_drive.upload(client, token, delivery["payload"]["filename"], content,
+                                                     mime_type, folder, known["file_id"] if known else None)
+                await self.store.upsert("drive_files", {
+                    "id": doc_key, "organization_id": org, "mission_id": mission_id, "file_id": uploaded["id"],
+                    "web_view_link": uploaded.get("webViewLink"), "filename": uploaded.get("name"),
+                    "updated_at": now_iso()})
         latest = await connections.load(self.store, org, "google")
         if latest:
             latest.setdefault("last_success", {})["drive"] = now_iso()

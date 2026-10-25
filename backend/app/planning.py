@@ -16,6 +16,18 @@ from .optimizer import cents, money, solve
 from .policy.engine import EvidenceTTL, evaluate
 
 _mission_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+def mission_lock(mission_id: str) -> asyncio.Lock:
+    """Serializes a mission's plan-state transitions: replans, invalidation, approval, and PO issue/send.
+
+    MongoStore yields on every call, so a check-then-write that is not under this lock can interleave with another
+    request's (a double-clicked Approve, a quote change landing mid-approval). The API runs one process, so the
+    in-process lock is the serialization point. Not reentrant: never acquire it while already holding it.
+    """
+    return _mission_locks[mission_id]
+
+
 REPLAN_TRIGGERS = {"supplier_disruption", "policy_change"}
 # Purchase orders a supplier has received and not declined/cancelled: their units are already bought.
 ACTIVE_ORDER_STATUSES = {"sent", "supplier_accepted", "in_fulfillment", "completed"}
@@ -596,9 +608,17 @@ async def invalidate_for_change(services: Services, mission: dict[str, Any], act
                                 reason: str, cause: dict[str, Any] | None = None, emit: bool = True) -> list[int]:
     """Mark every current plan stale, invalidate its approvals, and void unsent POs.
 
-    ``cause`` (supplier_id/supplier/failure_type) only enriches the operations alert.
+    ``cause`` (supplier_id/supplier/failure_type) only enriches the operations alert. Runs under the mission lock,
+    so an approval or purchase-order write that is already in progress completes first and is then invalidated,
+    instead of landing after this pass and resurrecting a stale plan.
     """
 
+    async with mission_lock(mission["id"]):
+        return await _invalidate_locked(services, mission, actor_id, reason, cause, emit)
+
+
+async def _invalidate_locked(services: Services, mission: dict[str, Any], actor_id: str | None,
+                             reason: str, cause: dict[str, Any] | None, emit: bool) -> list[int]:
     affected: list[int] = []
     invalidated = flagged = 0
     plans = await services.store.find("plans", mission_id=mission["id"])

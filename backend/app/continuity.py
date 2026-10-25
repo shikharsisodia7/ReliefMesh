@@ -98,28 +98,37 @@ def _delay_shock(quotes: list[dict[str, Any]], supplier_id: str, hours: int) -> 
 
 
 def _capacity_shock(quotes: list[dict[str, Any]], supplier_id: str, loss_units: int) -> list[dict[str, Any]]:
-    """Apply a proportional capacity reduction, with stable rounding, to one supplier.
+    """Remove exactly ``loss_units`` of one supplier's quoted units, in proportion to each line's quantity.
 
-    This is a published stress-test method rather than an assertion about actual
-    inventory.  The returned ``actual_loss_units`` in the frontier tells readers
-    exactly how much quote capacity the integer rounding removed.
+    This is a published stress-test method rather than an assertion about actual inventory. The retained units
+    are apportioned with the D'Hondt highest-averages rule (ties go to the earlier line). D'Hondt is
+    house-monotone: a larger loss never leaves any line with more units than a smaller loss did. Feasibility is
+    therefore monotone in ``loss_units``, so the bisection in ``_first_infeasible`` finds the *first* loss that
+    breaks the plan rather than one boundary among several.
     """
 
     result = deepcopy(quotes)
     targets = [line for quote in result if quote["supplier_id"] == supplier_id for line in quote["lines"]]
-    total = sum(int(line["available_quantity"]) for line in targets)
+    weights = [int(line["available_quantity"]) for line in targets]
+    total = sum(weights)
     if total <= 0 or loss_units <= 0:
         return result
-    retained = max(0, total - min(loss_units, total))
-    remaining_to_assign = retained
-    for index, line in enumerate(targets):
-        original = int(line["available_quantity"])
-        if index == len(targets) - 1:
-            updated = max(0, min(original, remaining_to_assign))
-        else:
-            updated = min(original, (original * retained) // total)
-            remaining_to_assign -= updated
-        line["available_quantity"] = updated
+    retained = total - min(loss_units, total)
+    # Every D'Hondt apportionment meets the lower quota, so start there; fewer than len(targets) units remain.
+    shares = [(weight * retained) // total for weight in weights]
+    for _ in range(retained - sum(shares)):
+        best = None
+        for index, weight in enumerate(weights):
+            if shares[index] >= weight:
+                continue
+            # Highest average weight / (share + 1), compared exactly; a tie keeps the earlier line.
+            if best is None or weight * (shares[best] + 1) > weights[best] * (shares[index] + 1):
+                best = index
+        if best is None:
+            break
+        shares[best] += 1
+    for line, share in zip(targets, shares):
+        line["available_quantity"] = share
     return result
 
 
@@ -220,8 +229,10 @@ def _frontier_for_supplier(
     )
 
     deadline = _dt(mission["delivery_deadline"])
-    latest = max((_dt(line["delivery_date"]) for line in supplier_lines), default=deadline)
-    max_delay_hours = max(1, int((deadline - latest).total_seconds() // 3600) + 2)
+    # At this cap even the supplier's earliest line lands after the deadline, which equals removing the supplier.
+    # (Bounding by the latest line stopped the search before an earlier, essential line was ever pushed out.)
+    earliest = min((_dt(line["delivery_date"]) for line in supplier_lines), default=deadline)
+    max_delay_hours = max(1, int((deadline - earliest).total_seconds() // 3600) + 2)
     delay_hours = _first_infeasible(
         max_delay_hours,
         lambda value: solve(mission, _delay_shock(quotes, supplier_id, value))["status"] == "feasible",
@@ -244,8 +255,8 @@ def _frontier_for_supplier(
             "increase_percent": round(price_bps / 100, 2),
         } if price_bps is not None else None,
         "delay": {"hours": delay_hours} if delay_hours is not None else None,
-        # loss_units is the exact boundary of _capacity_shock: loss_units - 1 is survivable, loss_units is not.
-        # units_removed is what that shock removes after integer rounding across several quote lines.
+        # loss_units is the first loss _capacity_shock cannot survive: every smaller loss is survivable.
+        # units_removed is what that shock removes from the quote lines (exactly loss_units).
         "capacity": {
             "loss_units": capacity_loss,
             "units_removed": removed_units,
