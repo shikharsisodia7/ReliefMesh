@@ -13,22 +13,25 @@ import { Textarea } from "@/components/ui/textarea";
 import type { QuoteDraft, Requirement } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// Number fields start blank; a blank field counts as 0, exactly as the old pre-filled 0 did.
+const blankIsZero = <T extends z.ZodType>(schema: T) => z.preprocess((value) => (value === undefined || value === "" || Number.isNaN(value) ? 0 : value), schema);
 const line = z.object({
   requirement_id: z.string(),
   item: z.string().min(1),
-  unit_price: z.number().nonnegative(),
-  available_quantity: z.number().int().nonnegative(),
+  unit_price: blankIsZero(z.number().nonnegative()),
+  available_quantity: blankIsZero(z.number().int().nonnegative()),
   delivery_date: z.string(),
 });
 const schema = z.object({
   legal_name: z.string().min(2, "Enter the legal business name used for compliance screening"),
   website: z.string(),
-  shipping_cost: z.number().nonnegative(),
+  shipping_cost: blankIsZero(z.number().nonnegative()),
   expires_at: z.string().min(1),
   lines: z.array(line),
 });
-export type QuoteValues = z.infer<typeof schema>;
-type FieldName = Parameters<ReturnType<typeof useForm<QuoteValues>>["register"]>[0];
+export type QuoteValues = z.output<typeof schema>;
+type QuoteInput = z.input<typeof schema>;
+type FieldName = Parameters<ReturnType<typeof useForm<QuoteInput, unknown, QuoteValues>>["register"]>[0];
 
 // datetime-local inputs take local wall-clock time without a zone.
 /** ISO timestamp -> value for a datetime-local input, in the viewer's local time. */
@@ -49,11 +52,11 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft, assistan
   requirements: Requirement[]; legalName?: string | null; onSubmit: (values: QuoteValues) => Promise<void>;
   onDraft?: (text: string) => Promise<QuoteDraft>; assistant: "on" | "off" | "unknown";
 }) {
-  const form = useForm<QuoteValues>({
+  const form = useForm<QuoteInput, unknown, QuoteValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      legal_name: legalName ?? "", website: "", shipping_cost: 0, expires_at: "",
-      lines: requirements.map((requirement) => ({ requirement_id: requirement.id ?? "", item: requirement.item, unit_price: 0, available_quantity: 0, delivery_date: "" })),
+      legal_name: legalName ?? "", website: "", expires_at: "",
+      lines: requirements.map((requirement) => ({ requirement_id: requirement.id ?? "", item: requirement.item, delivery_date: "" })),
     },
   });
   const [pasted, setPasted] = useState("");
@@ -119,14 +122,14 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft, assistan
             <legend className="float-left text-base font-semibold sm:col-span-2">{requirement.quantity.toLocaleString("en-US")} {requirement.item} needed</legend>
             <input type="hidden" {...form.register(`lines.${index}.requirement_id`)} />
             <div><FieldLabel htmlFor={`item-${index}`} ai={aiFields.has(`lines.${index}.item`)}>{label(index, "Item")}</FieldLabel><Input id={`item-${index}`} className="mt-1.5" placeholder="Your product description" {...field(`lines.${index}.item`)} /></div>
-            <div><FieldLabel htmlFor={`quantity-${index}`} ai={aiFields.has(`lines.${index}.available_quantity`)}>{label(index, "Available quantity")}</FieldLabel><Input id={`quantity-${index}`} className={cn("mt-1.5", flagged(index, "available_quantity") && review)} type="number" {...field(`lines.${index}.available_quantity`, { valueAsNumber: true })} /></div>
-            <div><FieldLabel htmlFor={`price-${index}`} ai={aiFields.has(`lines.${index}.unit_price`)}>{label(index, "Unit price (USD)")}</FieldLabel><Input id={`price-${index}`} className={cn("mt-1.5", flagged(index, "unit_price") && review)} type="number" step="0.01" {...field(`lines.${index}.unit_price`, { valueAsNumber: true })} /></div>
+            <div><FieldLabel htmlFor={`quantity-${index}`} ai={aiFields.has(`lines.${index}.available_quantity`)}>{label(index, "Available quantity")}</FieldLabel><Input id={`quantity-${index}`} className={cn("mt-1.5", flagged(index, "available_quantity") && review)} type="number" placeholder="0" {...field(`lines.${index}.available_quantity`, { valueAsNumber: true })} /></div>
+            <div><FieldLabel htmlFor={`price-${index}`} ai={aiFields.has(`lines.${index}.unit_price`)}>{label(index, "Unit price (USD)")}</FieldLabel><Input id={`price-${index}`} className={cn("mt-1.5", flagged(index, "unit_price") && review)} type="number" step="0.01" placeholder="0.00" {...field(`lines.${index}.unit_price`, { valueAsNumber: true })} /></div>
             <div><FieldLabel htmlFor={`delivery-${index}`} ai={aiFields.has(`lines.${index}.delivery_date`)}>{label(index, "Delivery estimate")}</FieldLabel><Input id={`delivery-${index}`} className="mt-1.5" type="datetime-local" {...field(`lines.${index}.delivery_date`)} /></div>
             {draftLine(index) && <p className="text-xs text-muted-foreground sm:col-span-2">From your text: <q className="italic">{draftLine(index)!.source_excerpt}</q>{!draftLine(index)!.grounded && <span className="text-warn"> (not found verbatim in the pasted quote)</span>}</p>}
           </fieldset>
         ))}
         {form.formState.errors.lines?.message && <p className="text-xs text-critical sm:col-span-2">{form.formState.errors.lines.message}</p>}
-        <div className="border-t pt-5"><FieldLabel htmlFor="shipping" ai={aiFields.has("shipping_cost")}>Shipping (USD)</FieldLabel><Input id="shipping" className="mt-1.5" type="number" step="0.01" {...field("shipping_cost", { valueAsNumber: true })} /></div>
+        <div className="border-t pt-5"><FieldLabel htmlFor="shipping" ai={aiFields.has("shipping_cost")}>Shipping (USD)</FieldLabel><Input id="shipping" className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...field("shipping_cost", { valueAsNumber: true })} /></div>
         <div className="sm:border-t sm:pt-5"><FieldLabel htmlFor="expiration" ai={aiFields.has("expires_at")}>Quote expiration</FieldLabel><Input id="expiration" className="mt-1.5" type="datetime-local" {...field("expires_at")} /></div>
         <div className="mt-2 sm:col-span-2">
           <label className="flex items-center gap-3 text-sm">
