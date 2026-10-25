@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
-import { DotWordmark } from "@/components/landing/dot-wordmark";
+import { DotMonogram } from "@/components/landing/dot-monogram";
 import { pageWidth } from "@/components/layout/page-header";
 import { Drawer } from "@/components/patterns/overlays";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -82,8 +82,9 @@ function Frame({ nav, actions, mobile }: { nav?: ReactNode; actions?: ReactNode;
       <div className={pageWidth}>
         <header className="grid h-14 grid-cols-[1fr_auto] items-center rounded-xl border bg-background px-6 shadow-[0_2px_12px_rgb(32_33_36/0.08)] md:grid-cols-[1fr_auto_1fr]">
           {/* The brand mark always returns to the marketing landing page, regardless of sign-in state. */}
-          <Link href="/" className="justify-self-start text-ink" aria-label="ReliefMesh home">
-            <DotWordmark density="compact" className="block h-9 w-auto" />
+          <Link href="/" className="flex items-center gap-2 justify-self-start text-ink" aria-label="ReliefMesh home">
+            <DotMonogram className="block size-7 shrink-0" />
+            <span className="text-lg font-semibold tracking-tight">ReliefMesh</span>
           </Link>
           <div className="hidden self-stretch md:block">{nav}</div>
           <div className="hidden items-center justify-end gap-4 md:flex">{actions}</div>
