@@ -139,3 +139,15 @@ async def test_free_tier_rate_limit_is_named_and_shown_on_status(gemini_app) -> 
     client_app.state.services.status_cache.clear()
     rows = {row["id"]: row for row in (await client.get("/v1/integrations/status?refresh=true")).json()["integrations"]}
     assert rows["gemini"]["status"] == "ok"
+
+
+def test_draft_timestamps_keep_the_suppliers_wall_clock_time() -> None:
+    from app.integrations.gemini import _timestamp
+
+    # "October 26, 2026 at 12:00 PM" with no zone must stay 12:00, not be stamped UTC (which showed 05:00 AM PDT).
+    assert _timestamp("2026-10-26T12:00:00") == "2026-10-26T12:00:00"
+    assert _timestamp("2026-10-27T23:00") == "2026-10-27T23:00:00"
+    # Zoned instants stay zoned.
+    assert _timestamp("2026-10-26T19:00:00Z") == "2026-10-26T19:00:00+00:00"
+    assert _timestamp("2026-10-26T12:00:00-07:00") == "2026-10-26T12:00:00-07:00"
+    assert _timestamp("tomorrow") is None and _timestamp("") is None and _timestamp(None) is None

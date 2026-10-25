@@ -36,6 +36,8 @@ type FieldName = Parameters<ReturnType<typeof useForm<QuoteInput, unknown, Quote
 // datetime-local inputs take local wall-clock time without a zone.
 /** ISO timestamp -> value for a datetime-local input, in the viewer's local time. */
 export const toLocalInput = (iso: string) => { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
+/** Draft timestamp -> datetime-local value: a zoned instant is shown in local time; a naive wall-clock time as written. */
+export const draftToInput = (value: string) => (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? toLocalInput(value) : value.slice(0, 16));
 
 // A field label with a small gray "AI draft" marker while the value is still Gemini's.
 function FieldLabel({ htmlFor, ai, children }: { htmlFor: string; ai: boolean; children: ReactNode }) {
@@ -90,10 +92,10 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft, assistan
         fill(`lines.${index}.item`, row.item);
         if (row.available_quantity !== null) fill(`lines.${index}.available_quantity`, row.available_quantity);
         if (row.unit_price !== null) fill(`lines.${index}.unit_price`, Number(row.unit_price));
-        if (row.delivery_date) fill(`lines.${index}.delivery_date`, toLocalInput(row.delivery_date));
+        if (row.delivery_date) fill(`lines.${index}.delivery_date`, draftToInput(row.delivery_date));
       });
       if (result.shipping_cost !== null) fill("shipping_cost", Number(result.shipping_cost));
-      if (result.expires_at) fill("expires_at", toLocalInput(result.expires_at));
+      if (result.expires_at) fill("expires_at", draftToInput(result.expires_at));
       setAiFields(filled);
       setDraft(result);
     } catch (error) {
