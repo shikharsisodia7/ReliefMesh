@@ -8,6 +8,7 @@ import { Fragment, useState } from "react";
 import { Page, PageHeader } from "@/components/layout/page-header";
 import { Provenance, StatusText, ago, clock, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
 import { useSession } from "@/hooks/use-session";
 import { API_BASE_URL, api } from "@/lib/api";
 import type { IntegrationCheck } from "@/lib/types";
@@ -32,7 +33,7 @@ function CheckRow({ check, breaker }: { check: IntegrationCheck; breaker?: { fai
     <>
       <tr className="border-b hover:bg-muted [&>td]:align-middle">
         <td className="py-2.5 pr-4">
-          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="inline-flex items-center gap-1.5 rounded-sm text-left font-medium outline-none focus-visible:outline-2 focus-visible:outline-ring">
+          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="inline-flex items-center gap-1.5 rounded-sm text-left font-medium outline-hidden focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring">
             <Chevron className="size-4 text-muted-foreground" aria-hidden />{check.name}
           </button>
         </td>
@@ -131,11 +132,11 @@ export default function StatusPage() {
         return (
           <section key={category} aria-label={title} className="mt-10">
             <h2 className="text-xl font-semibold">{title}</h2>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
+            <div className="mt-2">
+              <Table>
                 <thead><tr className="border-b"><th className={`${head} w-[22%]`}>Integration</th><th className={`${head} w-[14%]`}>Status</th><th className={`${head} w-[14%]`}>Provenance</th><th className={head}>Detail</th><th className={`${head} w-[10%]`}>Current</th></tr></thead>
                 <tbody>{rows.map((check) => <Fragment key={check.id}><CheckRow check={check} breaker={status.data?.breakers?.[check.id]} /></Fragment>)}</tbody>
-              </table>
+              </Table>
             </div>
           </section>
         );

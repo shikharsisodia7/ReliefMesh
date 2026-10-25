@@ -83,7 +83,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
           <div>
             <h2 className="text-base font-semibold">Google Workspace</h2>
             <p className="text-sm text-muted-foreground">
-              {googleConnected ? <>Connected as <span className="font-mono">{google.account_email ?? "unknown account"}</span> {google.connected_at && `· ${ago(google.connected_at)}`}</>
+              {googleConnected ? <>Connected as <span className="font-medium">{google.account_email ?? "unknown account"}</span> {google.connected_at && `· ${ago(google.connected_at)}`}</>
                 : google.oauth_configured ? "Not connected. ReliefMesh asks only for: send email, manage its own calendar, and files it creates."
                   : "NOT CONFIGURED on this server (no Google OAuth client)."}
             </p>

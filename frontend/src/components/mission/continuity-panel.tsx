@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Provenance, money, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
 import type { ContinuityAnalysis, ContinuityView, Plan, RealityCheck } from "@/lib/types";
 
 const percent = (value: number) => `${Math.round(value * 100)}%`;
@@ -94,14 +95,14 @@ function CostOfResilience({ analysis, plan }: { analysis: ContinuityAnalysis; pl
       </dl>
       <p className="text-xs text-muted-foreground"><StressLabel /> · the alternative&apos;s N-1 result comes from stress-testing it the same way as the current plan.</p>
       {compare && (
-        <table className="w-full text-sm">
+        <Table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Current plan</th><th className="py-1 text-right font-medium">Resilient alternative</th></tr></thead>
           <tbody>
             {Object.keys({ ...current, ...proposed }).sort((a, b) => (names[a] ?? a).localeCompare(names[b] ?? b)).map((id) => (
               <tr key={id} className="border-t"><td className="py-1.5">{names[id] ?? id}</td><td className="tabular py-1.5 text-right">{current[id] ?? 0} units</td><td className="tabular py-1.5 text-right">{proposed[id] ?? 0} units</td></tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
       <p className="text-xs text-tertiary">A proposal only, computed by the same optimizer with a stronger concentration constraint. It cannot be approved or ordered; adopting it means setting the guardrail on the mission and re-optimizing.</p>
     </section>
@@ -173,11 +174,10 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
         : "queued";
   return (
     <section aria-label="Continuity Engine" className="space-y-5 border-t pt-6">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-        <h2 className="text-base font-semibold">Continuity</h2>
-        <span className="text-muted-foreground">·</span><Provenance value="HYPOTHETICAL" />
-        <span className="text-muted-foreground">· {summary} ·</span>
-        <button type="button" aria-expanded={open} className="font-medium hover:underline" onClick={() => setOpen(!open)}>{open ? "Hide details" : "Show details"}</button>
+      <div className="text-sm">
+        <div className="flex flex-wrap items-baseline gap-x-2"><h2 className="text-base font-semibold">Continuity</h2><span className="text-muted-foreground">·</span><Provenance value="HYPOTHETICAL" /></div>
+        {/* The result and its toggle get their own line, so a separator never starts a wrapped line. */}
+        <p className="mt-1"><span className="text-muted-foreground">{summary.charAt(0).toUpperCase() + summary.slice(1)} · </span><button type="button" aria-expanded={open} className="font-medium hover:underline" onClick={() => setOpen(!open)}>{open ? "Hide details" : "Show details"}</button></p>
       </div>
       {open && <>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -223,7 +223,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
             <CostOfResilience analysis={analysis} plan={plan} />
             <details className="text-sm" open aria-label="Failure frontier">
               <summary className="cursor-pointer font-medium">Failure frontier by supplier <StressLabel /></summary>
-              <table className="mt-2 w-full">
+              <Table className="mt-2 w-full">
                 <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Price</th><th className="py-1 text-right font-medium">ETA delay</th><th className="py-1 text-right font-medium">Capacity loss</th></tr></thead>
                 <tbody>
                   {analysis.failure_frontier.map((row) => (
@@ -237,7 +237,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </details>
           <p className="text-xs text-tertiary">Bound to plan v{analysis.plan_version} · inputs {analysis.input_hash.slice(0, 12)} · computed {when(analysis.created_at)} · deterministic optimization, no AI.</p>
         </>

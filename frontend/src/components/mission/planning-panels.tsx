@@ -7,6 +7,7 @@ import { PlanStatusText, ago, money, signedAmount } from "@/components/status-ba
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { Approval, Disruption, Plan, SupplierRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -76,7 +77,7 @@ export function CompareView({ latest, previous, approvals, onClose }: { latest: 
     <div>
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <div className="mt-1 flex items-baseline gap-3"><h3 className="text-lg font-semibold">v{plan.version}</h3><PlanStatusText value={plan.status} /></div>
-      <table className="mt-4 w-full text-sm">
+      <Table className="mt-4 w-full text-sm">
         <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 font-medium">Supplier</th><th className="py-2 text-right font-medium">Units</th><th className="py-2 text-right font-medium">Items cost</th></tr></thead>
         <tbody>
           {rows.map((row) => {
@@ -92,7 +93,7 @@ export function CompareView({ latest, previous, approvals, onClose }: { latest: 
           })}
           <tr><td className="py-2.5 text-muted-foreground">Total with shipping</td><td /><td className="py-2.5 text-right font-medium tabular">{plan.status === "infeasible" ? "—" : money(plan.total_cost)}</td></tr>
         </tbody>
-      </table>
+      </Table>
     </div>
   );
   return (

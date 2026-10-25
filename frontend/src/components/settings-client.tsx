@@ -14,6 +14,8 @@ import type { ApiError } from "@/lib/api";
 import { clearSession, signInUrl } from "@/lib/session";
 import type { Organization } from "@/lib/types";
 
+const roleWords: Record<string, string> = { admin: "Administrator", approver: "Approver", coordinator: "Coordinator" };
+
 const tabs = [
   { value: "organization", label: "Organization" },
   { value: "members", label: "Members" },
@@ -73,7 +75,7 @@ export function SettingsClient() {
                 <dl className="text-sm">
                   <Fact label="Name">{current.name}</Fact>
                   <Fact label="Type">{current.is_demo ? "Demo organization (labeled self-approval)" : "Standard: plans need an independent approver"}</Fact>
-                  <Fact label="Your role">{current.membership_role}</Fact>
+                  <Fact label="Your role">{roleWords[current.membership_role] ?? current.membership_role}</Fact>
                 </dl>
               )}
               <section>

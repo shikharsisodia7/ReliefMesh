@@ -53,7 +53,7 @@ export function NewMissionSlideOver({ open, onOpenChange, error, onSubmit }: {
             <Label htmlFor="event">Real emergency (NASA EONET, open events)</Label>
             {events.data?.[0] && <span className="text-xs text-muted-foreground"><Provenance value={events.data[0].provenance} /> · {ago(events.data[0].retrieved_at)}</span>}
           </div>
-          <select id="event" className="mt-1.5 h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus-visible:outline-2 focus-visible:outline-ring" {...form.register("emergency_event_id")}>
+          <select id="event" className="mt-1.5 h-9 w-full rounded-md border bg-background px-2 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring" {...form.register("emergency_event_id")}>
             <option value="">No linked event</option>
             {events.data?.map((event) => <option key={event.id} value={event.id}>{event.categories[0]?.title ?? "Event"} · {event.title}</option>)}
           </select>

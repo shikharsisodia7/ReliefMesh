@@ -121,7 +121,7 @@ function ApprovalRequest({ approved, onApprove }: { approved: boolean; onApprove
           <p className="text-lg font-semibold tracking-tight">Approve plan v2 · $3,466</p>
         </div>
       </div>
-      <button type="button" onClick={onApprove} disabled={approved} className="mt-4 h-11 w-full rounded-md bg-ink text-base font-semibold text-white outline-none hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:bg-ink/80">
+      <button type="button" onClick={onApprove} disabled={approved} className="mt-4 h-11 w-full rounded-md bg-ink text-base font-semibold text-white outline-hidden hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-signal disabled:bg-ink/80">
         {approved ? "Approved" : "Approve"}
       </button>
       <p className="mt-2 text-center text-xs text-muted-foreground">Demo only</p>
@@ -147,7 +147,7 @@ function Scrubber({ progress, playing, onToggle, onSeek }: { progress: number; p
   const Icon = playing ? Pause : progress >= LAST ? RotateCcw : Play;
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
-      <button type="button" onClick={onToggle} className="flex shrink-0 items-center gap-3 rounded-md py-1 text-base font-medium text-white outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal lg:-mt-2.5">
+      <button type="button" onClick={onToggle} className="flex shrink-0 items-center gap-3 rounded-md py-1 text-base font-medium text-white outline-hidden focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-4 focus-visible:outline-signal lg:-mt-2.5">
         <Icon className="size-6" strokeWidth={1.5} />
         {playing ? "Pause" : progress >= LAST ? "Replay failure" : "Simulate failure"}
       </button>

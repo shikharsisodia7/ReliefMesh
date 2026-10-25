@@ -97,7 +97,7 @@ function Approval({ className, style }: { className?: string; style?: CSSPropert
   return (
     <Node
       className={cn("border-[1.5px] border-signal", className)} style={style}
-      tile={<span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#7A7D83] text-xs font-semibold text-white">JP</span>}
+      tile={<span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted-foreground text-xs font-semibold text-white">JP</span>}
       name="Human approval" role="Independent approver"
     />
   );
@@ -165,7 +165,7 @@ function EdgeLayer() {
 function EdgeLabel({ x, y, children, at, signal = false, align = "center" }: { x: number; y: number; children: ReactNode; at: number; signal?: boolean; align?: "center" | "left" }) {
   return (
     <span
-      className={cn("absolute text-[11px] whitespace-nowrap", signal ? "text-sm font-medium text-signal" : "text-ink/80", align === "center" && "-translate-x-1/2", fade)}
+      className={cn("absolute text-[11px] whitespace-nowrap", signal ? "text-sm font-medium text-signal-text" : "text-ink/80", align === "center" && "-translate-x-1/2", fade)}
       style={{ left: x, top: y, ...reveal(at) }}
     >
       {children}
@@ -244,7 +244,7 @@ function Down({ label, signal = false }: { label?: string; signal?: boolean }) {
   return (
     <div className="flex h-12 items-center gap-3 pl-[22px]">
       <span className={cn("h-full w-px", signal ? "w-0.5 bg-signal" : "bg-[#A8A196]")} />
-      {label && <span className={cn("text-xs", signal ? "font-medium text-signal" : "text-ink/80")}>{label}</span>}
+      {label && <span className={cn("text-xs", signal ? "font-medium text-signal-text" : "text-ink/80")}>{label}</span>}
     </div>
   );
 }

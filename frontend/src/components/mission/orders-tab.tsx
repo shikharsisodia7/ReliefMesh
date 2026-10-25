@@ -6,6 +6,7 @@ import { OperationsPanel } from "@/components/mission/operations-panel";
 import { Dialog } from "@/components/patterns/overlays";
 import { amount, day, money, timeOnly } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
 import { API_BASE_URL, api } from "@/lib/api";
 import type { Approval, Plan, PurchaseOrder, Quote, SupplierRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -131,13 +132,13 @@ export function OrdersTab({ missionId, organizationId, plans, approvals, orders,
             <p className="text-xs text-muted-foreground">Recipient email</p>
             <p className="text-base">{confirming.supplier_email}</p>
             <h3 className="mt-6 text-base font-semibold">Line items</h3>
-            <table className="mt-2 w-full text-sm">
+            <Table className="mt-2 w-full text-sm">
               <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 font-medium">Item</th><th className="py-2 text-right font-medium">Qty</th><th className="py-2 text-right font-medium">Unit price</th><th className="py-2 text-right font-medium">Subtotal</th></tr></thead>
               <tbody>
                 {confirming.lines.map((line) => <tr key={`${line.quote_id}-${line.item}`} className="border-b"><td className="py-2.5">{line.item}</td><td className="py-2.5 text-right tabular">{line.quantity}</td><td className="py-2.5 text-right tabular">{money(line.unit_price)}</td><td className="py-2.5 text-right tabular">{money(line.line_cost)}</td></tr>)}
                 <tr><td colSpan={3} className="py-2.5 text-right font-medium">Total</td><td className="py-2.5 text-right font-medium tabular">{money(confirming.subtotal)}</td></tr>
               </tbody>
-            </table>
+            </Table>
             {shipping !== null && shipping > 0 && <p className="mt-2 text-xs text-muted-foreground">The supplier&apos;s quoted shipping of {money(shipping)} isn&apos;t included on the purchase order.</p>}
             <p className="mt-6">{isTest(confirming) ? "This marks the purchase order as sent. TEST suppliers aren't emailed. It can't be undone." : "This emails the purchase order to the supplier. It can't be unsent."}</p>
           </>

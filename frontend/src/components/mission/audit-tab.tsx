@@ -21,8 +21,8 @@ export function readableMessage(message: string) {
   return message
     // Unformatted amounts like "$3466.00"; amounts that already have commas are left alone.
     .replace(/\$(\d+(?:\.\d+)?)(?![\d,]|\.\d)/g, (_, value: string) => money(value))
-    // The replan delta arrives without a dollar sign: "(195.00 vs prior plan)".
-    .replace(/\((-?\d+(?:\.\d+)?) vs prior plan\)/, (_, delta: string) => `(${signedAmount(delta, true)} vs prior plan)`)
+    // The replan delta arrives without a dollar sign, signed or not: "(+195.00 vs prior plan)".
+    .replace(/\(([+-]?\d+(?:\.\d+)?) vs prior plan\)/, (_, delta: string) => `(${signedAmount(delta, true)} vs prior plan)`)
     .replace(new RegExp(String.raw` \(expires (${ISO_TIME})\)\.?$`), (_, at: string) => ` · expires ${when(at)}`)
     .replace(new RegExp(ISO_TIME, "g"), (at) => when(at));
 }

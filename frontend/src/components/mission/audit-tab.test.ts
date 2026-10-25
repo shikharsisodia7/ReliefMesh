@@ -12,6 +12,9 @@ describe("readableMessage", () => {
   it("formats replan totals and the unsigned delta", () => {
     expect(readableMessage("Plan v2 was computed after a supplier disruption: total $3466.00 (195.00 vs prior plan). A new human approval is required."))
       .toBe("Plan v2 was computed after a supplier disruption: total $3,466.00 (+$195.00 vs prior plan). A new human approval is required.");
+    expect(readableMessage("Plan v2 was computed after a supplier disruption: total $3466.00 (+195.00 vs prior plan)."))
+      .toBe("Plan v2 was computed after a supplier disruption: total $3,466.00 (+$195.00 vs prior plan).");
+    expect(readableMessage("total $3191.00 (-80.00 vs prior plan).")).toBe("total $3,191.00 (−$80.00 vs prior plan).");
   });
 
   it("formats prices and times inside sentences", () => {

@@ -19,18 +19,18 @@ import { api } from "@/lib/api";
 import { signInUrl } from "@/lib/session";
 import type { Mission, Organization } from "@/lib/types";
 
-const itemClass = "flex w-full cursor-default items-center gap-2 px-3 py-2 text-left text-sm text-foreground outline-none select-none data-[highlighted]:bg-muted";
+const itemClass = "flex w-full cursor-default items-center gap-2 px-3 py-2 text-left text-sm text-foreground outline-hidden select-none data-[highlighted]:bg-muted";
 
 // The organization as plain text with a chevron; the menu switches between the user's organizations.
 function OrganizationSwitcher({ rows, current, select }: { rows: Organization[]; current: Organization; select: (id: string) => void }) {
   return (
     <Menu.Root>
-      <Menu.Trigger className="inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Organization: ${current.name}`}>
+      <Menu.Trigger className="inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-hidden hover:text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring" aria-label={`Organization: ${current.name}`}>
         {current.name}{current.is_demo && " · DEMO ORG"}<ChevronDown className="size-4" />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner align="start" sideOffset={6} className="z-50">
-          <Menu.Popup className="w-72 rounded-lg border bg-background py-1.5 shadow-lg outline-none">
+          <Menu.Popup className="w-72 rounded-lg border bg-background py-1.5 shadow-lg outline-hidden">
             <Menu.RadioGroup value={current.id} onValueChange={(value) => select(String(value))}>
               {rows.map((row) => (
                 <Menu.RadioItem key={row.id} value={row.id} className={itemClass}>

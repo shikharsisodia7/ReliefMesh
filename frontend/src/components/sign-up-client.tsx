@@ -27,7 +27,7 @@ export function SignUpClient() {
         <legend className="sr-only">Account type</legend>
         <div className="grid grid-cols-2 gap-3">
           {roles.map((option) => (
-            <label key={option.value} className={cn("cursor-pointer rounded-md border p-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring", role === option.value && "border-foreground")}>
+            <label key={option.value} className={cn("cursor-pointer rounded-md border p-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-ring", role === option.value && "border-foreground")}>
               <input type="radio" name="role" value={option.value} checked={role === option.value} onChange={() => setRole(option.value)} className="sr-only" aria-describedby={`role-${option.value}`} />
               <span className="block text-sm font-medium">{option.title}</span>
               <span id={`role-${option.value}`} className="mt-1 block text-xs text-muted-foreground">{option.detail}</span>

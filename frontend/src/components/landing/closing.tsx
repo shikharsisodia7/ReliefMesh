@@ -50,7 +50,7 @@ export function Closing() {
             <h2 className="text-[38px] leading-[1.02] font-bold tracking-[-0.035em] md:text-[56px]">AI explains. It never approves.</h2>
             <p className="mt-4 text-lg md:text-xl">Rules decide eligibility. Math allocates. People authorize spending.</p>
           </div>
-          <Link href="/sign-up" className="inline-flex h-14 shrink-0 items-center self-start rounded-md bg-ink px-10 text-lg font-semibold text-white outline-none hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">Start a mission</Link>
+          <Link href="/sign-up" className="inline-flex h-14 shrink-0 items-center self-start rounded-md bg-ink px-10 text-lg font-semibold text-white outline-hidden hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ink">Start a mission</Link>
         </div>
         <nav aria-label="Footer" className="mt-16 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {columns.map((column) => (

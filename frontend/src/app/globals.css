@@ -28,10 +28,9 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-critical: var(--critical);
-  --color-live: var(--live);
-  --color-telemetry: var(--telemetry);
   --color-ink: var(--ink);
   --color-signal: var(--signal);
+  --color-signal-text: var(--signal-text);
   --color-sand: var(--sand);
   --color-sand-border: var(--sand-border);
   --color-charcoal: var(--charcoal);
@@ -46,7 +45,8 @@
   --background: #ffffff;
   --foreground: #202124;
   --muted-foreground: #5f6368;
-  --text-tertiary: #80868b;
+  /* Darkened from #80868b so muted rows and timestamps meet WCAG AA (4.5:1) on white and on hover rows. */
+  --text-tertiary: #6b7075;
   --border: #dadce0;
   --muted: #f8f9fa;
   --ring: #315bd6;
@@ -68,13 +68,11 @@
   --destructive: var(--critical);
   --input: var(--border);
 
-  /* Old accent names, neutral until each screen is rebuilt. */
-  --live: var(--foreground);
-  --telemetry: var(--foreground);
-
   /* Landing page only. */
   --ink: #15161a;
   --signal: #f25c1f;
+  /* Signal orange for small text on sand or white, dark enough for AA; strokes and large type keep --signal. */
+  --signal-text: #b8450f;
   --sand: #f5f2ec;
   --sand-border: #e4ded4;
   --charcoal: #17181b;
@@ -90,6 +88,49 @@
   html {
     @apply font-sans;
   }
+}
+
+@layer base {
+  /* A visible focus ring on every keyboard-focused control, including plain links and text buttons. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Every transition and animation respects reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Under 768px tables stack: one block per row, each cell labeled with its column header (set by ui/table.tsx). */
+@media (max-width: 767px) {
+  [data-slot="table"] thead { display: none; }
+  [data-slot="table"] tr { display: block; padding: 10px 0; }
+  /* The label floats left and the cell's own content (which may have a second line) sits on the right. */
+  [data-slot="table"] td {
+    display: block;
+    padding: 2px 0;
+    text-align: right;
+    white-space: normal;
+  }
+  [data-slot="table"] td::after { content: ""; display: block; clear: both; }
+  [data-slot="table"] td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    margin-right: 16px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+  [data-slot="table"] td:not([data-label]) { text-align: left; }
 }
 
 @layer utilities {

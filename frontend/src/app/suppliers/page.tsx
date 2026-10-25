@@ -101,7 +101,7 @@ export default function SuppliersPage() {
                     {suppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="cursor-pointer" onClick={() => setOpen(supplier)}>
                         <TableCell className="whitespace-normal">
-                          <button type="button" className="text-left font-medium outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring" onClick={(event) => { event.stopPropagation(); setOpen(supplier); }}>{supplier.name}</button>
+                          <button type="button" className="text-left font-medium outline-hidden hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring" onClick={(event) => { event.stopPropagation(); setOpen(supplier); }}>{supplier.name}</button>
                           {supplier.isDemo && <span className="ml-2 text-xs text-muted-foreground">TEST</span>}
                         </TableCell>
                         <TableCell className="whitespace-normal text-muted-foreground">{supplier.entries.map((entry) => entry.mission.name).join(", ")}</TableCell>
