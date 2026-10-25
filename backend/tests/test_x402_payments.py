@@ -92,3 +92,38 @@ async def test_unconfigured_payments_are_blocked_external(app_and_client) -> Non
     response = await client.post(f"/v1/missions/{mission['id']}/suppliers/{suppliers[0]['id']}/premium-dossier",
                                  headers=auth(token))
     assert response.status_code == 503 and "BLOCKED_EXTERNAL" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_public_devnet_proof_is_throttled_and_rejects_replays(app_and_client) -> None:
+    from app.payments import x402_exchange
+    from app.payments.x402_exchange import run_proof
+
+    app, client = app_and_client
+    services = app.state.services
+    services.settings.x402_pay_to, services.settings.x402_buyer_private_key = "TreasuryWallet111", "configured"
+    assert (await client.get("/v1/sandbox/x402-proof")).json()["proof"] is None  # nothing faked before a real run
+    first = await run_proof(services, buyer=fake_buyer)
+    assert first["reused"] is False and first["provenance"] == "SANDBOX" and "DEVNET TEST PAYMENT" in first["notice"]
+    assert first["proof"]["explorer_url"].endswith("?cluster=devnet")
+    again = await run_proof(services, buyer=fake_buyer)  # inside the cooldown: no second payment
+    assert again["reused"] is True and again["proof"]["transaction"] == first["proof"]["transaction"]
+    shown = (await client.get("/v1/sandbox/x402-proof")).json()
+    assert shown["proof"]["transaction"] == first["proof"]["transaction"]
+
+    rows = await services.store.find("sandbox_proofs", kind="x402")
+    for row in rows:  # age the proof past the cooldown, then a replayed settlement must be rejected
+        row["created_at"] = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
+        await services.store.replace("sandbox_proofs", row["id"], row)
+
+    async def same_tx(services_, name):
+        return {"dossier_sha256": "x"}, {"success": True, "transaction": first["proof"]["transaction"]}, 200
+    with pytest.raises(HTTPException) as replay:
+        await run_proof(services, buyer=same_tx)
+    assert replay.value.status_code == 409
+
+    services.settings.x402_buyer_private_key = None
+    with pytest.raises(HTTPException) as blocked:
+        await run_proof(services, buyer=fake_buyer)
+    assert blocked.value.status_code == 503
+    assert x402_exchange.PROOF_DAILY_LIMIT >= 1

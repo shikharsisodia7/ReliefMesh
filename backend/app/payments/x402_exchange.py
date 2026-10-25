@@ -228,3 +228,59 @@ def dossier_hash_matches(dossier: dict[str, Any]) -> bool:
 async def payments_for_mission(services: Services, mission_id: str) -> list[dict[str, Any]]:
     return sorted(await services.store.find("payments", mission_id=mission_id), key=lambda row: row["created_at"],
                   reverse=True)
+
+
+PROOF_SUBJECT = "ReliefMesh x402 devnet proof"
+PROOF_COOLDOWN_MINUTES = 10
+PROOF_DAILY_LIMIT = 10
+_proof_lock = asyncio.Lock()
+
+
+def _proof_view(row: dict[str, Any] | None) -> dict[str, Any]:
+    notice = ("DEVNET TEST PAYMENT: a real HTTP 402 payment settled in test USDC on Solana devnet. It proves "
+              "machine-to-machine payment works; no supplier is paid and no real money moves.")
+    return {"proof": row, "notice": notice, "provenance": "SANDBOX"}
+
+
+async def latest_proof(services: Services) -> dict[str, Any]:
+    rows = sorted(await services.store.find("sandbox_proofs", kind="x402"), key=lambda r: r["created_at"])
+    return _proof_view(rows[-1] if rows else None)
+
+
+async def run_proof(services: Services, buyer=pay_for_dossier) -> dict[str, Any]:
+    """Public, judge-triggered devnet payment. Throttled globally so it cannot drain the test wallet."""
+    settings = services.settings
+    if not (settings.x402_pay_to and settings.x402_buyer_private_key):
+        raise HTTPException(status_code=503, detail="BLOCKED_EXTERNAL: x402 buyer wallet or payTo is not configured")
+    async with _proof_lock:
+        rows = sorted(await services.store.find("sandbox_proofs", kind="x402"), key=lambda r: r["created_at"])
+        cutoff = (datetime.now(UTC) - timedelta(minutes=PROOF_COOLDOWN_MINUTES)).isoformat()
+        if rows and rows[-1]["created_at"] >= cutoff:
+            return {**_proof_view(rows[-1]), "reused": True}
+        today = datetime.now(UTC).date().isoformat()
+        if sum(1 for r in rows if r["created_at"][:10] == today) >= PROOF_DAILY_LIMIT:
+            raise HTTPException(status_code=429, detail="Daily devnet proof limit reached; the latest proof is shown")
+        dossier, settlement, _ = await buyer(services, PROOF_SUBJECT)
+        transaction = settlement.get("transaction")
+        if not transaction or any(r.get("transaction") == transaction for r in rows):
+            raise HTTPException(status_code=409, detail="Duplicate or missing settlement transaction rejected")
+        network, asset = _svm()
+        row = {
+            "id": new_id(), "kind": "x402", "transaction": transaction, "network": network,
+            "network_label": "solana-devnet", "asset": asset, "amount_display": f"{settings.x402_price_usd} USDC",
+            "payer": settlement.get("payer"), "pay_to": settings.x402_pay_to, "resource": DOSSIER_PATH,
+            "facilitator": settings.x402_facilitator_url, "dossier_sha256": dossier.get("dossier_sha256"),
+            "explorer_url": f"https://explorer.solana.com/tx/{transaction}?cluster=devnet", "created_at": now_iso(),
+        }
+        await services.store.insert("sandbox_proofs", row)
+        return {**_proof_view(row), "reused": False}
+
+
+@router.get("/v1/sandbox/x402-proof")
+async def get_x402_proof(services: Services = Depends(get_services)) -> dict[str, Any]:
+    return await latest_proof(services)
+
+
+@router.post("/v1/sandbox/x402-proof")
+async def post_x402_proof(services: Services = Depends(get_services)) -> dict[str, Any]:
+    return await run_proof(services)

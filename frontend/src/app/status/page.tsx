@@ -11,6 +11,7 @@ import { API_BASE_URL, api } from "@/lib/api";
 import type { IntegrationCheck } from "@/lib/types";
 
 type StatusPayload = { checked_at: string; environment: string; integrations: IntegrationCheck[] };
+type X402Proof = { notice: string; proof: { transaction: string; explorer_url: string; amount_display: string; payer: string; pay_to: string; network_label: string; created_at: string } | null; reused?: boolean };
 type CrsProof = { provider: string; notice: string; checked_at: string; results: { persona_id: string; test_identity: string; outcome: "verified" | "flagged" | "unavailable" | "not_configured"; expected?: string; messages: { code: string; text: string }[]; error?: string | null }[] };
 
 const tone = { ok: "ok", degraded: "warn", not_configured: "idle", error: "critical" } as const;
@@ -19,6 +20,15 @@ const label = { ok: "OPERATIONAL", degraded: "DEGRADED", not_configured: "NOT CO
 export default function StatusPage() {
   const [refresh, setRefresh] = useState(0);
   const status = useQuery({ queryKey: ["integration-status", refresh], queryFn: () => api<StatusPayload>(`/v1/integrations/status${refresh ? "?refresh=true" : ""}`), refetchInterval: 60_000 });
+  const x402Proof = useQuery({ queryKey: ["x402-proof"], queryFn: () => api<X402Proof>("/v1/sandbox/x402-proof") });
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const runPayment = async () => {
+    setPaying(true); setPayError(null);
+    try { await api<X402Proof>("/v1/sandbox/x402-proof", { method: "POST" }); await x402Proof.refetch(); }
+    catch (error) { setPayError(error instanceof Error ? error.message : "Payment failed"); }
+    finally { setPaying(false); }
+  };
   const crsProof = useQuery({ queryKey: ["crs-proof"], queryFn: () => api<CrsProof>("/v1/sandbox/crs-proof"), staleTime: 5 * 60_000 });
   const groups = new Map<string, IntegrationCheck[]>();
   for (const check of status.data?.integrations ?? []) groups.set(check.category, [...(groups.get(check.category) ?? []), check]);
@@ -67,6 +77,20 @@ export default function StatusPage() {
               </li>
             ))}
           </ul>
+        </section>
+        <section aria-label="Devnet payment proof" className="rounded-xl border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Sponsor sandbox proof · Coinbase x402 on Solana devnet</h2>
+            <span className="flex gap-1.5"><ProvenanceBadge value="SANDBOX" /><span className="rounded border border-violet-400/40 px-1.5 py-0.5 font-mono text-[10px] text-violet-300">DEVNET · TEST PAYMENT</span></span>
+          </div>
+          <p className="px-4 pt-3 text-xs text-muted-foreground">{x402Proof.data?.notice ?? "HTTP 402 → signed USDC transfer → facilitator settlement on Solana devnet."}</p>
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <Button variant="outline" size="sm" disabled={paying} onClick={() => void runPayment()}>{paying ? "Paying over HTTP 402…" : "Run a devnet x402 payment"}</Button>
+            {x402Proof.data?.proof ? (
+              <span className="text-sm text-muted-foreground">Last settled {ago(x402Proof.data.proof.created_at)}: {x402Proof.data.proof.amount_display} · {x402Proof.data.proof.payer.slice(0, 6)}… → {x402Proof.data.proof.pay_to.slice(0, 6)}… · <a className="font-mono text-live hover:underline" href={x402Proof.data.proof.explorer_url} target="_blank" rel="noreferrer">tx {x402Proof.data.proof.transaction.slice(0, 16)}… ↗</a></span>
+            ) : <span className="text-sm text-muted-foreground">No devnet payment run on this deployment yet.</span>}
+          </div>
+          {payError && <p className="px-4 pb-3 text-sm text-critical">{payError}</p>}
         </section>
         {status.data && <p className="text-xs text-tertiary">Environment {status.data.environment} · checked {ago(status.data.checked_at)}</p>}
       </div>
