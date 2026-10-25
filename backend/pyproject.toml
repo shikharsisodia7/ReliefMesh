@@ -6,3 +6,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+# Pinned to the rule set the project is gated on, so a newer Ruff's larger defaults do not silently change the gate.
+select = ["E4", "E7", "E9", "F"]

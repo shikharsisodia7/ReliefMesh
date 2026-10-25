@@ -47,11 +47,11 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 | --- | --- |
 | NASA EONET, NWS, NASA FIRMS, OpenFEMA, OFAC SDN/ALT, openFDA, USAspending, Apify results | `LIVE` (or `CACHED` last-known-good with its original timestamp) |
 | CRS identity verification | sponsor `SANDBOX`: CRS-published test identities only, never real supplier data; not real-world verification |
-| x402 payments | **DEVNET TEST PAYMENT** (`SANDBOX`): proves machine-to-machine payment; no real money, no supplier is paid |
+| x402 payments | **DEVNET TEST PAYMENT** (`SANDBOX`): proves machine-to-machine payment; no real money, no supplier is paid. Any signed-in user can run one from `/status` |
 | Suppliers and quotes | real accounts only (`USER_SUBMITTED`); a new mission starts with 0 suppliers and 0 quotes |
 | Demo tooling (seeded TEST suppliers, simulated disruptions) | local/test only with `RELIEFMESH_DEMO_MODE=true`; production refuses to start with it |
 | Supplier-entered quotes | `USER_SUBMITTED` |
-| SAM.gov | `NOT CONFIGURED` until a SAM API key exists (never faked) |
+| SAM.gov | `LIVE` registration lookup (registration only: not inventory, quality, or capacity). A personal key allows ~10 requests/day, so lookups are cached a day per name; past the quota a supplier shows `UNAVAILABLE`, never a fake pass |
 
 ## Sponsor integrations (verified against live services)
 
@@ -91,7 +91,7 @@ Copy `backend/.env.example` for optional keys (FIRMS, SAM.gov, CRS sandbox, Apif
 ## Tests
 
 ```bash
-cd backend && python -m pytest            # 31 tests: policy, evidence, SoD, requirement IDs, x402 guards, audit chain, abuse cases
+cd backend && python -m pytest            # 104 tests: policy, evidence, SoD, isolation break-in, failure modes, x402 + SAM.gov quota guards, audit chain
 cd frontend && npm test && npm run lint && npm run build
 cd frontend && npx playwright test        # two-supplier flow with an independent approver + live-data judge scenario
 python backend/scripts/smoke.py http://127.0.0.1:8000                 # demo deployments only (RELIEFMESH_DEMO_MODE=true)
