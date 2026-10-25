@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AppHeader } from "@/components/app-header";
+import { pageWidth } from "@/components/layout/page-header";
 import { toLocalInput } from "@/components/quote-form";
 import { money, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,7 @@ export default function SupplierPage() {
   const revise = async (event: React.FormEvent<HTMLFormElement>, quote: Quote) => { event.preventDefault(); const form = new FormData(event.currentTarget); await attempt(() => api(`/v1/quotes/${quote.id}`, { method: "PUT", token: session.token, body: JSON.stringify({ expires_at: new Date(String(form.get("expires_at"))).toISOString(), shipping_cost: Number(form.get("shipping_cost")).toFixed(2), lines: quote.lines.map((line, index) => ({ requirement_id: line.requirement_id ?? null, item: line.item, unit_price: Number(form.get(`price-${index}`)).toFixed(2), available_quantity: Number(form.get(`quantity-${index}`)), delivery_date: line.delivery_date })) }) }), quotes.refetch); };
   return (
     <main className="min-h-screen bg-background">
-      <AppHeader email={session.user.email} home="/supplier" label="Supplier" />
-      <div className="mx-auto max-w-5xl space-y-6 px-5 py-8">
+      <div className={`${pageWidth} space-y-6 pt-10 pb-16`}>
         <section><p className="font-mono text-xs uppercase tracking-[0.2em] text-live">Supplier portal</p><h1 className="mt-1 text-3xl font-semibold">RFQs and purchase orders</h1></section>
         {error && <p role="alert" className="rounded border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
         <Card><CardHeader><CardTitle>Incoming RFQs</CardTitle><CardDescription>Open the signed invitation link from your email to accept and quote a mission.</CardDescription></CardHeader><CardContent>{invitations.data?.length ? <div className="space-y-3">{invitations.data.map((invite) => <div key={invite.id} className="flex items-center justify-between rounded border p-3"><div><p className="font-medium">{invite.mission.name}</p><p className="text-sm text-muted-foreground">{invite.mission.delivery_location} · {invite.mission.requirements.map((item) => `${item.quantity} ${item.item}`).join(", ")}</p></div><span className={badge}>{invite.status}</span></div>)}</div> : <p className="text-sm text-muted-foreground">No invitations linked to this supplier email yet.</p>}</CardContent></Card>

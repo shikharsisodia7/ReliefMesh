@@ -67,18 +67,18 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
     return "Slack connected — a test message was posted to the channel.";
   });
 
-  if (view.isLoading) return <p className="text-muted-foreground">Loading integrations…</p>;
-  if (view.isError || !data) return <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{view.error?.message ?? "Integrations unavailable"}</p>;
+  if (view.isLoading) return <p className="text-sm text-muted-foreground">Loading integrations…</p>;
+  if (view.isError || !data) return <p role="alert" className="text-sm text-critical">{view.error?.message ?? "Integrations unavailable"}</p>;
   const google = data.google;
   const googleConnected = google.status === "CONNECTED" || google.status === "NEEDS_REAUTH";
   const slackConnected = data.slack.status === "CONNECTED" || data.slack.status === "NEEDS_REAUTH";
   return (
-    <div className="space-y-5">
-      {error && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{error}</p>}
-      {notice && <p className="rounded-md border border-live/30 bg-live/10 p-3 text-sm text-live">{notice}</p>}
+    <div className="space-y-8">
+      {error && <p role="alert" className="text-sm text-critical">{error}</p>}
+      {notice && <p role="status" className="text-sm font-medium">{notice}</p>}
       {!isAdmin && <p className="text-sm text-muted-foreground">Only an organization administrator can connect or test integrations.</p>}
 
-      <section aria-label="Google" className="rounded-xl border bg-card p-4">
+      <section aria-label="Google">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Google Workspace</h2>
@@ -91,12 +91,12 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
           </div>
           {isAdmin && google.oauth_configured && (
             <div className="flex gap-2">
-              <Button size="sm" disabled={busy !== null} onClick={() => void connect("google")}>{googleConnected ? "Reconnect Google" : "Connect Google"}</Button>
+              <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void connect("google")}>{googleConnected ? "Reconnect Google" : "Connect Google"}</Button>
               {googleConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void disconnect("google")}>Disconnect</Button>}
             </div>
           )}
         </div>
-        <ul className="mt-2 divide-y divide-border/60">
+        <ul className="mt-3 divide-y">
           <CapabilityRow icon={<Mail className="size-4" />} name="Gmail" status={google.capabilities.gmail} canTest={isAdmin} testing={busy === "test-gmail"} onTest={() => void test("gmail")} />
           <CapabilityRow icon={<CalendarDays className="size-4" />} name="Calendar" status={google.capabilities.calendar} canTest={isAdmin} testing={busy === "test-calendar"} onTest={() => void test("calendar")} />
           <CapabilityRow icon={<FolderArchive className="size-4" />} name="Drive archive" status={google.capabilities.drive} canTest={isAdmin} testing={busy === "test-drive"} onTest={() => void test("drive")} />
@@ -104,7 +104,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         <p className="mt-2 text-[11px] text-tertiary">Email mode <span className="font-mono">{data.email.mode}</span> · transport <span className="font-mono">{data.email.transport}</span>{data.email.allowlist_active ? " · recipient allowlist active" : ""}. Calendar events land on a dedicated “ReliefMesh Operations” calendar; ReliefMesh stays the system of record.</p>
       </section>
 
-      <section aria-label="Slack" className="rounded-xl border bg-card p-4">
+      <section aria-label="Slack" className="border-t pt-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Slack</h2>
@@ -115,7 +115,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
           </div>
           {isAdmin && (
             <div className="flex gap-2">
-              {data.slack.oauth_configured && <Button size="sm" disabled={busy !== null} onClick={() => void connect("slack")}><MessageSquare className="size-3.5" />Add to Slack</Button>}
+              {data.slack.oauth_configured && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void connect("slack")}><MessageSquare className="size-3.5" />Add to Slack</Button>}
               {slackConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void test("slack")}>Send test</Button>}
               {slackConnected && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void disconnect("slack")}>Disconnect</Button>}
             </div>
@@ -123,7 +123,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         </div>
         <div className="mt-2"><StateText state={data.slack.state} /> <span className="ml-2 text-xs text-muted-foreground">{data.slack.detail}</span></div>
         {isAdmin && !slackConnected && (
-          <form className="mt-3 space-y-2 rounded-lg border border-dashed p-3" onSubmit={(event) => { event.preventDefault(); void saveSlack(); }}>
+          <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void saveSlack(); }}>
             <div className="flex gap-3 text-xs">
               <label className="flex items-center gap-1"><input type="radio" checked={slackMode === "bot"} onChange={() => setSlackMode("bot")} />Bot token + channel</label>
               <label className="flex items-center gap-1"><input type="radio" checked={slackMode === "webhook"} onChange={() => setSlackMode("webhook")} />Incoming webhook</label>
@@ -132,12 +132,12 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
               <div className="flex flex-wrap items-end gap-2">
                 <div><Label htmlFor="slack-token" className="text-xs">Bot token (xoxb-…)</Label><Input id="slack-token" type="password" autoComplete="off" required className="mt-1 h-8 w-72" value={botToken} onChange={(event) => setBotToken(event.target.value)} /></div>
                 <div><Label htmlFor="slack-channel" className="text-xs">Channel</Label><Input id="slack-channel" required className="mt-1 h-8 w-52" value={channel} onChange={(event) => setChannel(event.target.value)} /></div>
-                <Button size="sm" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
+                <Button size="sm" variant="secondary" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-2">
                 <div><Label htmlFor="slack-webhook" className="text-xs">Webhook URL</Label><Input id="slack-webhook" type="password" autoComplete="off" required placeholder="https://hooks.slack.com/services/…" className="mt-1 h-8 w-96" value={webhook} onChange={(event) => setWebhook(event.target.value)} /></div>
-                <Button size="sm" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
+                <Button size="sm" variant="secondary" type="submit" disabled={busy !== null}>Verify &amp; connect</Button>
               </div>
             )}
             <p className="text-[11px] text-tertiary">ReliefMesh posts one real test message before saving; credentials are encrypted at rest and never shown again.</p>
@@ -145,9 +145,9 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         )}
       </section>
 
-      <section aria-label="Recent deliveries" className="rounded-xl border bg-card p-4">
+      <section aria-label="Recent deliveries" className="border-t pt-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recent external deliveries</h2>
+          <h2 className="text-base font-semibold">Recent external deliveries</h2>
           <Button size="sm" variant="text" onClick={() => void view.refetch()}><RefreshCw className={view.isFetching ? "size-3.5 animate-spin" : "size-3.5"} />Refresh</Button>
         </div>
         <DeliveryList deliveries={data.deliveries} token={token} canRetry={isAdmin} onChanged={() => void view.refetch()} showMission />

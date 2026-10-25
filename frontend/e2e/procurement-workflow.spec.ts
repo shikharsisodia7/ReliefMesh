@@ -39,7 +39,11 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await coordinator.getByRole("button", { name: "Create organization" }).click();
 
   // Coordinator B joins through a single-use invite link and becomes the independent approver.
+  // Members live in Settings, reached from the avatar menu.
   const approverEmail = `approver-${runId}@e2e.example.com`;
+  await coordinator.getByRole("button", { name: "Account menu" }).click();
+  await coordinator.getByRole("menuitem", { name: "Settings" }).click();
+  await coordinator.getByRole("tab", { name: "Members" }).click();
   await coordinator.getByLabel("Member email").fill(approverEmail);
   await coordinator.getByRole("button", { name: "Add member" }).click();
   const inviteText = await coordinator.getByText(/Invite link/).textContent();
@@ -55,6 +59,7 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await approver.goto(joinUrl!);
   await approver.getByRole("button", { name: "Accept invitation" }).click();
   await expect(approver).toHaveURL(/\/dashboard/);
+  await coordinator.getByRole("link", { name: "Missions" }).click();
   await coordinator.getByLabel("Mission name").fill("Winter response");
   await coordinator.getByLabel("Delivery location").fill("Oakland, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");

@@ -12,10 +12,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8 lg:px-10">
-        <header className="flex items-center justify-between">
-          <span className="font-mono text-sm font-bold tracking-[0.2em]">RELIEF<span className="text-live">MESH</span></span>
-          <div className="flex gap-2 text-sm"><Link className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground" href="/status">System status</Link><Link className="rounded-lg px-3 py-2 font-medium hover:bg-secondary" href="/sign-in">Sign in</Link><Link className="rounded-lg bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/85" href="/sign-up">Create account</Link></div>
-        </header>
         <div className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.15fr_.85fr]">
           <div>
             <p className="mb-5 font-mono text-xs font-medium tracking-[.22em] text-live">EMERGENCY PROCUREMENT THAT RECOVERS</p>

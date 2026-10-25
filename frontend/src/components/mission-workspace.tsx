@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AppHeader } from "@/components/app-header";
+import { pageWidth } from "@/components/layout/page-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { ContinuityPanel } from "@/components/mission/continuity-panel";
 import { MissionLifecycleControls } from "@/components/mission/lifecycle-controls";
@@ -17,9 +16,8 @@ import { Provenance, money, when } from "@/components/status-badges";
 import { signInUrl } from "@/lib/session";
 import { api } from "@/lib/api";
 import { useAppConfig } from "@/hooks/use-config";
+import { useOrganizations } from "@/hooks/use-organizations";
 import { useHydrated, useSession } from "@/hooks/use-session";
-
-type Organization = { id: string; membership_role: string; is_demo?: boolean };
 
 export function MissionWorkspace({ missionId }: { missionId: string }) {
   const router = useRouter();
@@ -30,7 +28,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const data = useMissionData(missionId, session?.token);
   const { demoMode } = useAppConfig();
-  const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
+  const { organizations } = useOrganizations(session?.token);
   const supplierOrder = useMemo(() => {
     const order: string[] = [];
     for (const plan of [...(data.plans.data ?? [])].reverse()) for (const row of plan.allocations) if (!order.includes(row.supplier_id)) order.push(row.supplier_id);
@@ -58,8 +56,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const continuityRunning = jobs.some((job) => job.type === "continuity_analysis" && (job.status === "queued" || job.status === "running"));
   return (
     <main className="min-h-screen bg-background">
-      <AppHeader email={session.user.email} home="/dashboard" label="Coordinator" />
-      <div className="mx-auto max-w-7xl space-y-5 px-5 py-6">
+      <div className={`${pageWidth} space-y-5 pt-10 pb-16`}>
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-live">Mission · {mission.delivery_location}</p>

@@ -232,3 +232,4 @@ export type IntegrationsView = {
   slack: CapabilityStatus & { oauth_configured: boolean; status: string; mode: "bot" | "webhook" | null; team_name: string | null; channel_name: string | null; connected_at: string | null };
   deliveries: OperationsDelivery[];
 };
+export type Organization = { id: string; name: string; membership_role: string; is_demo?: boolean };
