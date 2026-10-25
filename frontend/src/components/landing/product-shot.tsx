@@ -33,10 +33,13 @@ export function ProductShot() {
   return (
     <figure
       role="img"
-      aria-label="ReliefMesh Plan tab: Plan v2, rebuilt after Bayside Relief Supply Co withdrew, waiting for a new approval"
+      aria-label="Illustrative example, static demo data, not a live mission. ReliefMesh Plan tab: Plan v2, rebuilt after Bayside Relief Supply Co withdrew, waiting for a new approval"
       className="overflow-hidden rounded-[14px] border bg-background text-left shadow-[0_24px_60px_-20px_rgb(21_22_26/0.25),0_2px_8px_rgb(21_22_26/0.06)]"
     >
-      <div className="border-b bg-muted px-4 py-2 text-[11px] text-muted-foreground"><span className="font-semibold text-foreground">ReliefMesh</span> / Mission workspace</div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-muted px-4 py-2 text-[11px] text-muted-foreground">
+        <span><span className="font-semibold text-foreground">ReliefMesh</span> / Mission workspace</span>
+        <span className="font-semibold tracking-wide text-foreground" data-testid="illustrative-label">ILLUSTRATIVE EXAMPLE · static demo data, not a live mission</span>
+      </div>
       <div ref={viewport} className="relative overflow-hidden" style={{ height: VISIBLE_HEIGHT * scale }}>
         <div inert aria-hidden className="absolute top-0 left-0 origin-top-left" style={{ width: APP_WIDTH, transform: `scale(${scale})` }}>
           <div className="px-4 pt-4">
