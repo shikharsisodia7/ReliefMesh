@@ -1,83 +1,175 @@
 # Cal Hacks 13.0 track eligibility audit
 
-Audited on 2026-10-24 against the [current Cal Hacks 13.0 Devpost](https://cal-hacks-13-0.devpost.com/), the
-[Fetch event page](https://www.fetch.ai/events/calhacks-13-0), and the checked-in implementation. Devpost requires
-an accepted/check-in participant, a 2–4 person college-student team, a GitHub repository, project image, work done
-during the event, a three-minute pitch, and a live or prerecorded demo. Those are human/team facts, so this document
-does **not** mark any submission fully eligible until the owner supplies the requested submission evidence.
+Audited 2026-10-25 against the **official live prize list** (`hive.hackberkeley.org/api/live/prizes`, 58 categories,
+fetched 05:25 UTC) and the sponsor documents it links (Coinbase PDF, Atlassian doc, CRS and Hyphenate text). Evidence
+is limited to what was actually observed on production (`https://reliefmesh.us`, API `reliefmesh-api.onrender.com`) or
+in provider dashboards. An installed SDK, an env variable, an adapter, a README line or a mock never counts.
 
-Legend: `✅ VERIFIED ELIGIBLE` means meaningful, judge-visible provider use and normal submission action remain.
-`🟢 IMPLEMENTED — SUBMISSION ACTION NEEDED` means deployment proof should be re-recorded for this release.
-`🟡 PARTIAL` means a meaningful prerequisite is missing or unverified. `⚫` means the fit is forced or ineligible.
-“Proof” is a path for a judge to inspect, not an assertion that this audit reran a paid or production action.
+**Continuity Engine note:** the N-1 / failure-frontier / resilient-alternative work lives on `feat/continuity-engine`
+(+ the guarantee suite on `feat/continuity-engine-verify`) and is **not in production yet**. Rows that depend on it say
+so; they become VERIFIED only after it ships and is shown live.
 
-## Core categories
+Status legend: ✅ VERIFIED ELIGIBLE · 🟢 IMPLEMENTED — SUBMISSION ACTION NEEDED · 🟡 PARTIAL · 🔴 BLOCKED ·
+⚫ NOT ELIGIBLE / FORCED FIT — SKIP
 
-| Track / prize | Exact requirement / technology | ReliefMesh use / live evidence | Missing / risk | Status, submission + demo action |
-| --- | --- | --- | --- | --- |
-| First Overall — $3,600 | Working, original, useful project; normal submission rules | Continuity Engine: disaster → user-submitted quote → deterministic plan → N-1/failure frontier → human recovery. | Team check-in, Devpost image/video, final live smoke. | 🟢 Submit as primary story; demo the cost-vs-resilience decision. |
-| Second / Third Overall | Same core judging criteria | Same as First Overall. | Same. | 🟢 Same submission. |
-| Most Creative | Distinct, intentional experience | Procurement Digital Twin + supplier stress-test lanes make “what breaks this plan?” visible. | Browser/demo proof after deployment. | 🟢 Show concentration lanes + failure frontier. |
-| Most Technically Complex | Sound engineering depth | MILP, counterfactual re-optimization, pinned inputs, stale analysis, policy, jobs, approvals, audit chain. | Clean full test/build proof. | 🟢 Explain no LLM controls the result. |
-| People-First Social Impact | Feasible benefit for people | Emergency coordinator workflow, designed to reduce procurement disruption. | Do not claim outcomes not measured. | 🟢 Show protected units, resilience cost, human authority. |
-| Planet-First Social Impact | Environmental benefit | Disaster context exists, but product has no measured planet outcome. | Weak/forced fit. | ⚫ Skip. |
-| Best Hardware | Hardware project | No hardware. | Ineligible. | ⚫ Skip. |
-| Best Beginner | Beginner eligibility | Team experience is not audited. | Human-only eligibility. | ⚫ Skip unless organizer confirms. |
-| Best Solo | Solo eligibility | Devpost requires 2–4 team members. | Team-incompatible. | ⚫ Skip. |
-| Hacker's Choice | General submission | Coherent demo and public project. | Submission/video. | 🟢 Submit normally. |
+## Final matrix
 
-## Sponsor categories
+| Track | Status | Real integration | Live proof | Submission ready | Blocker |
+| --- | --- | --- | --- | --- | --- |
+| Cal Hacks First/Second/Third Overall | 🟢 | Whole product | reliefmesh.us, real RFQ→PO workflow verified on prod | No | Devpost + demo video (owner) |
+| Cal Hacks Most Technically Complex | 🟡 | MILP optimizer, signed audit chain, durable jobs, policy engine; Continuity Engine on branch | Prod workflow + 105 backend tests | No | Continuity Engine not yet deployed; video |
+| Cal Hacks Most Creative | 🟡 | Continuity Engine ("this plan can break") | Branch only | No | Continuity Engine not yet deployed |
+| Cal Hacks Best People-First | 🟢 | Emergency relief procurement for county OES buyers | Live EONET/NWS/FEMA context on missions | No | Devpost framing + video |
+| Cal Hacks Hacker's Choice | 🟢 | Whole product | reliefmesh.us | No | Devpost |
+| Hyphenate — Autonomous Systems for Finance | 🟢 | Autonomous procurement with limited authority, audit record, human approval | Disruption → stale → replan → re-approval verified on prod | No | Video must open with "the moment" |
+| Microsoft Grand Prize / Customer Impact | 🟢 | Production-minded agent in a high-impact domain (no MS product required) | Prod + Fetch agent | No | Devpost + video |
+| Fetch.ai — Best Use of Fetch.ai | 🟢 | uAgents mailbox agent, Agent Chat Protocol, ASI:One | Real ASI:One session created a mission and refused spend | No | 3–5 min video; continuity questions ship with the engine |
+| CRS Financial Intelligence Challenge | 🟢 | TruValidate identity check of supplier signers gates allocation | `/status` CRS sandbox proof (P01 verified, P12 flagged) | No | Show live in demo |
+| Coinbase — Best Use of x402 (Payment Agents) | 🟡 | Official x402 SDK, HTTP 402 → Solana devnet USDC settlement | Settled devnet tx from prod `/status` | No | Coinbase MCP for Agents not used; verified Coinbase account per member; builder-feedback write-up |
+| Apify — Best use of Apify | 🟢 | `compass/crawler-google-places` supplier discovery (leads only) | Prod run `6LFVdn73xb0TMjtrW` | No | Show discovery in demo |
+| MLH Best Use of Gemini API | 🟢 | Grounded, schema-constrained quote-draft assistant | Prod + e2e test with real Gemini | No | Free tier ~20 drafts/day; MLH form |
+| MLH Best Use of Gen AI | 🟢 | Same Gemini feature | Same | No | MLH form |
+| MLH Best Use of Solana | 🟢 | x402 settlement in USDC on Solana devnet | Devnet tx `jbsGqZmk…` (RPC-confirmed) | No | MLH form; label DEVNET |
+| MLH Best Use of MongoDB Atlas | 🟢 | Production system of record (M0) | Prod API `storage: mongo` | No | MLH form |
+| MLH Best Domain Name from GoDaddy Registry | 🟢 | `reliefmesh.us` via the MLH × GoDaddy Registry cart (code MLHCH2681) | `https://reliefmesh.us` live, Let's Encrypt cert | No | MLH form |
+| Armadin — Best Security Hack | 🟡 | Tenant break-in suite, signed audit heads, agent authority limits | Tests + prod | No | Criteria still "Coming soon" |
+| Anthropic | ⚫ | Product does not use Claude | — | — | Requires thoughtful use of Claude |
+| Atlassian — Agentic Workforce | ⚫ | No Forge/Jira/Confluence app | — | — | Requires a Forge app |
+| Bright Data | ⚫ | Not integrated | — | — | Bright Data must be essential |
+| Visa — Reimagining Shopping | ⚫ | B2B emergency procurement, not shopping | — | — | Forced fit |
+| All other categories (listed below) | ⚫ | Not integrated | — | — | — |
 
-| Track / prize | Exact requirement / technology | ReliefMesh use / live evidence | Missing / risk | Status, submission + demo action |
-| --- | --- | --- | --- | --- |
-| Anthropic — Claude for Public Benefit ($4,998) | Public benefit plus meaningful Claude use if current rules require it | Public-benefit workflow only; Anthropic key is configuration, not verified runtime use. | No meaningful Claude call. | 🟡 Add only a structured Continuity Brief if credits/rules permit; otherwise skip. |
-| MLH — Gemini API | Meaningful Gemini API feature | Grounded quote-draft; supplier reviews before USER_SUBMITTED quote. | Production quota/live call not rerun. | 🟢 Record a grounded draft; show AI has no policy/optimizer authority. |
-| MLH — Solana | Meaningful Solana app/payment/supply-chain prototype | x402 evidence purchase settles test USDC on Solana devnet; receipt stored. | Must label DEVNET TEST PAYMENT; rerun proof. | 🟢 Trigger devnet evidence purchase and open receipt. |
-| MLH — Tiger Data | Meaningful Tiger Data | MongoDB only. | No integration. | ⚫ Skip. |
-| MLH — Vultr | Meaningful Vultr | Deployment provider not verified as Vultr. | No provider proof. | ⚫ Skip. |
-| MLH — Commit Fellowship | Working prototype, real problem, opt-in + supplemental form | Working emergency-procurement use case. | Owner must opt in and complete form. | 🟡 Owner action only. |
-| MLH — Snowflake API | Meaningful Snowflake REST/API use | No Snowflake flow. | No integration. | ⚫ Skip. |
-| MLH — GoDaddy Registry domain | Register/use a GoDaddy Registry domain | `reliefmesh.us` is canonical public domain in code/docs. | Registrar/program provenance unverified. | 🟡 Verify registration, HTTPS, Devpost link. |
-| Hyphenate — Autonomous Systems for Finance ($16,000) | Autonomous finance; exact hackpack rules apply | Natural: deterministic policy, hash-bound approvals, invalidation, audit, devnet machine payment. | No verified Hyphenate product requirement/proof. | 🟡 Enter only if confirmed rules allow; demo “autonomous finance without autonomous authority.” |
-| Visa — Reimagining Shopping ($5,000) | Eligible shopping/purchasing experience | Institutional emergency purchasing under uncertainty is plausible. | No Visa tech; rules unverified. | 🟡 Narrative possibility; do not claim eligibility. |
-| Fetch.ai — Best Use of Fetch.ai | Meaningful Fetch/ASI:One use | Agentverse/ASI:One buyer agent uses real API, isolates conversations, and now answers deterministic continuity queries. | Active mailbox/session + video need recheck. | 🟢 Ask “single point of failure?” and show refusal to approve. |
-| Microsoft — Built for the Real World / Customer Impact | Real-world usefulness and customer impact | Multi-tenant workflow, operational degradation, human authority, auditability. | Sponsor form/rules unverified. | 🟢 Submit continuity story, deployment evidence, security posture. |
-| Meta — Bringing People Closer Together with AI | AI that connects people | Supplier/coordinator collaboration exists but not a natural social product. | Forced fit. | ⚫ Skip. |
-| Factory — Droid SDK ($2,000) | Meaningful runtime Factory Droid SDK | No runtime Factory SDK. | No integration. | ⚫ Skip. |
-| Armadin — Best Security Hack ($996) | Security innovation | Agent authority, tenant isolation, stale-approval/replay protections, tamper-evident audit. | Need sponsor rules + judge-visible attack matrix. | 🟡 Add/demo attack matrix before entering. |
-| Cartesia — Best Use of Cartesia ($1,516) | Meaningful Cartesia product | No voice workflow. | No integration. | ⚫ Skip. |
-| Convex — Best Use of Convex ($5,000) | Real Convex database/functions/workflows/sync/search | MongoDB architecture. | No integration. | ⚫ Skip. |
-| Apify — Best Use of Apify ($4,600) | Meaningful Apify use | `compass/crawler-google-places`; stores run/dataset IDs as leads only. | Repeat final live actor run. | 🟢 Show run ID and lead/quote boundary. |
-| Apify — Best Actor ($400) | Meaningful custom Actor | Existing actor only. | No custom Actor. | ⚫ Skip unless a real Emergency Supplier Intelligence Actor is published and used. |
-| CREAO — AI-First Disruptor / One-Person / Team Empowerment | Meaningful CREAO use | No CREAO product evidence. | One-person conflicts with team rule. | ⚫ Skip. |
-| Bitdeer AI Model Studio | Meaningful Bitdeer use | None. | No integration. | ⚫ Skip. |
-| Elastic — Agent Builder on Serverless | Real Elastic Agent Builder + serverless | No runtime implementation. | Optional settings are not use. | ⚫ Skip. |
-| Capital One — Nessie | Meaningful Nessie API | Optional config only. | No API flow. | ⚫ Skip. |
-| CRS — Best Use of CRS API ($3,000) | Meaningful CRS API | CRS/TruValidate sandbox signer check gates policy; SANDBOX personas only. | Fresh sandbox proof needed. | 🟢 Show P01/P12 capability and fail-closed policy. |
-| Moss — Best Use of Moss | Meaningful Moss use | None. | No integration. | ⚫ Skip. |
-| SpaceXSI — Make it Legendary | Built with Cursor; real space data | NASA EONET/FIRMS context only. | Cursor provenance and space-centric story absent. | ⚫ Skip. |
-| Figma — workflow / agent / design | Current Figma artifact and linked rules | No linked Figma file/prototype. | No required artifact. | ⚫ Skip until real artifact/rules exist. |
-| Coinbase — x402 ($4,000) | Meaningful x402 use | HTTP 402 evidence paywall → facilitator → devnet receipt; never supplier settlement. | Rerun within spend/rate cap. | 🟢 Demo evidence unlock + receipt. |
-| Notability | Meaningful Notability integration | None. | No integration. | ⚫ Skip. |
-| Spacetime | Meaningful SpacetimeDB | No SpacetimeDB. | No integration. | ⚫ Skip. |
-| Mana | Meaningful Mana use | None. | No integration. | ⚫ Skip. |
-| Bright Data — Public Web Data | Meaningful Bright Data public-web product | Apify is not Bright Data. | No Bright Data integration. | ⚫ Skip; do not duplicate Apify just for eligibility. |
-| Atlassian — Best Agent / Security Solution for Agents | Select track; linked sponsor rules apply | Fetch agent has capability restrictions and isolation. | No Atlassian product use confirmed; attack evidence needed. | 🟡 Consider Security Solution only after rules + tests are satisfied. |
+## Viable tracks in detail
 
-## Judge-visible evidence paths
+### Hyphenate — The Hyphenated Enterprise: Autonomous Systems for Finance
+- **PRIZE:** $8,000 / $5,000 / $3,000; expedited interviews for the top 5.
+- **EXACT REQUIREMENT:** Judged on: real enough (realistic data, messy problem, proof it works); would you hire it
+  (limited access, clean record of its work, knowing when to ask); something new; "the moment" (catches what others
+  missed, recovers from something going wrong, defends a decision). Video opens with the moment; live demo (judges may
+  run their own scenario); one line on the seats it fills; proof of what is real vs simulated.
+- **REQUIRED TECHNOLOGY:** None mandated.
+- **WHAT RELIEFMESH CURRENTLY USES:** Autonomous RFQ → evidence → policy → MILP plan → **human** approval → PO; the agent
+  can never approve, order or pay; every step lands in a per-mission hash chain with an HMAC-signed head.
+- **LIVE EVIDENCE:** Production run: supplier revised its quote in the portal → plan V1 marked STALE, approval
+  invalidated → V2 computed with the reason and cost delta shown → independent re-approval → PO emailed and accepted.
+- **MISSING REQUIREMENT:** The video and the one-line "seats" statement.
+- **IMPLEMENTATION VALUE:** Highest-value track for this product; the Continuity Engine (predicting the break before it
+  happens) is exactly "catches what others missed".
+- **ESTIMATED RISK:** Medium (strong field). **ELIGIBLE?** 🟢
+- **SUBMISSION ACTION:** Seats: "emergency procurement analyst — sources, screens and re-plans; never approves or pays."
+- **DEMO ACTION:** Open on the supplier backing out mid-mission and the plan rebuilding itself; then show the
+  LIVE / SANDBOX / DEVNET / HYPOTHETICAL labels as the "what's real" proof.
 
-| Integration | Evidence path | Truth boundary |
-| --- | --- | --- |
-| Continuity Engine | Mission → **Continuity Engine** → input hash, N-1 rows, failure frontier, resilient proposal | `HYPOTHETICAL STRESS TEST`; never mutates quote/plan/approval. |
-| Fetch.ai | ASI:One → Buyer Agent → “which supplier is the biggest single point of failure?” | Agent explains deterministic result; cannot approve/pay. |
-| Apify | Supplier discovery → run/dataset ID → leads | Public leads only; never inventory or submitted quote evidence. |
-| CRS | Supplier evidence → signer record | `SANDBOX`; test personas only, no real identity claim. |
-| Coinbase x402 / Solana | Evidence dossier → HTTP 402 → devnet explorer receipt | `DEVNET TEST PAYMENT`; no supplier is paid. |
-| Gemini | Supplier RFQ → grounded draft → supplier review/submission | AI only drafts values from supplied text. |
-| Security | Timeline/audit + authority matrix | Audit is tamper-evident, not immutable. |
+### Microsoft — Grand Prize: Built for the Real World (and Customer Impact Award)
+- **PRIZE:** Surface laptop per member + FDE tech talk + mentorship (Customer Impact: talk + mentorship).
+- **EXACT REQUIREMENT:** Production-minded AI agent for a meaningful problem in a high-impact domain; judged on
+  customer understanding, measurable usefulness, path to production, responsible design, end-to-end functionality.
+- **REQUIRED TECHNOLOGY:** No Microsoft product required (confirmed in the event channel).
+- **WHAT RELIEFMESH CURRENTLY USES:** Deployed agent + web app on a real domain, real email, tenant isolation, audit,
+  failure-mode handling (every external dependency down is tested).
+- **LIVE EVIDENCE:** `https://reliefmesh.us`, `/status` 18/18 live checks, real RFQ delivered with DKIM/SPF/DMARC pass.
+- **MISSING REQUIREMENT:** Submission + video. **RISK:** Medium. **ELIGIBLE?** 🟢
+- **DEMO ACTION:** Show the responsible-design boundary: the agent drafts and recommends, humans approve.
 
-## Submission gate
+### Fetch.ai — Best Use of Fetch.ai
+- **PRIZE:** $1,500 / $1,000 / $500.
+- **EXACT REQUIREMENT (HackPack):** Agentverse registration, Agent Chat Protocol, ASI:One discoverable and directly
+  usable, meaningful tools, primary workflow completable in ASI:One, public repo with agent name/address, 3–5 min video.
+- **WHAT RELIEFMESH CURRENTLY USES:** Mailbox agent `agent1qwsexvyvdavc0pjys60fgh7mev3d6xccnqfjg9famyqvnxrw4eajsxs243x`,
+  ACP manifest, scoped org token with per-conversation isolation.
+- **LIVE EVIDENCE:** Real ASI:One session: agent listed live EONET wildfires, created a mission on the production API,
+  reported truthful empty states, refused "approve the plan and pay the suppliers".
+- **MISSING REQUIREMENT:** The video. Continuity questions ("biggest single point of failure", "survive losing X",
+  "cheapest N-1 fix", "what changed V1→V2", "most fragile mission") are implemented and tested in
+  `agent/continuity_answers.py` and go live with the engine.
+- **RISK:** Low. **ELIGIBLE?** 🟢
+- **DEMO ACTION:** In ASI:One ask "Can this plan survive losing <supplier>?" and show the answer is the stored
+  deterministic result (labelled HYPOTHETICAL), then ask it to pay and show the refusal.
 
-Before selecting any `🟢` row, capture a dated screen/video of the stated path, confirm the current sponsor hackpack/form,
-and upgrade it to `✅ VERIFIED ELIGIBLE` only when the team and provider requirements are genuinely met. An SDK,
-environment variable, old receipt, or mocked call is never eligibility proof.
+### CRS Financial Intelligence Challenge
+- **PRIZE:** Best Overall $1,000; Best Financial AI Agent $500; Identity/Fraud and Most Unexpected: FDE interviews.
+- **EXACT REQUIREMENT:** Meaningful use of the CRS sandbox shown live; judged on how central CRS is (not a bolt-on),
+  working live demo, usefulness, creativity. Test identities only.
+- **WHAT RELIEFMESH CURRENTLY USES:** TransUnion TruValidate checks of each supplier's authorized signer; a failed or
+  incomplete check holds the supplier at NEEDS_REVIEW so it cannot receive an allocation.
+- **LIVE EVIDENCE:** `/status` runs P01 (verified) and P12 (flagged 2201/2202/2101) live against the sandbox, labelled
+  SANDBOX.
+- **MISSING REQUIREMENT:** None technical. Best fit sub-prize: **Identity / Fraud Innovation** (supplier-signer fraud
+  in emergency purchasing). Not a fit: Best Financial AI Agent (the agent does not call CRS).
+- **RISK:** Low–medium. **ELIGIBLE?** 🟢  **DEMO ACTION:** Show a flagged signer blocking allocation in the plan.
+
+### Coinbase — Best Use of x402 (Payment Agents track)
+- **PRIZE:** $500 USDC + recruiter call per eligible member (one winning team per track).
+- **EXACT REQUIREMENT:** "Give an agent a way to pay for things… Use the Coinbase MCP for Agents and x402." Submit
+  project summary, working example, architecture (components, controls, limitations) and builder feedback. Real money
+  not required; label simulated actions. Each member needs a verified Coinbase account (18+, US/Canada resident).
+- **WHAT RELIEFMESH CURRENTLY USES:** Official x402 Python SDK; HTTP 402 → signed USDC transfer → x402.org facilitator
+  settlement on Solana devnet; per-org daily cap, replay rejection, audited receipts; agent purchases limited to
+  privileged senders.
+- **LIVE EVIDENCE:** Signed-in users can trigger a devnet payment on `/status`; tx `jbsGqZmk…` settled (buyer 19.98 →
+  19.97, treasury 20.02 → 20.03 USDC on devnet RPC).
+- **MISSING REQUIREMENT:** Coinbase MCP for Agents is not used; verified Coinbase accounts; architecture + builder
+  feedback in the submission.
+- **RISK:** Medium–high (track names the MCP). **ELIGIBLE?** 🟡
+- **SUBMISSION ACTION:** Each member: create and verify a Coinbase account; submit under Payment Agents with the
+  architecture note and builder feedback (blocker: Coinbase Payments MCP does not pay x402 on Base Sepolia).
+
+### Apify — Best use of Apify
+- **PRIZE:** $2,000 / $1,000 / $800 / $400 / $400 (Best Actor $400 is separate).
+- **EXACT REQUIREMENT:** Use Apify in a meaningful way; project quality judged.
+- **WHAT RELIEFMESH CURRENTLY USES:** Supplier discovery through `compass/crawler-google-places`; results stored as
+  leads only (never auto-trusted), with actor, run and dataset IDs recorded.
+- **LIVE EVIDENCE:** Production run `6LFVdn73xb0TMjtrW` / dataset `pGX4l3tGzAlGYLba9`.
+- **MISSING REQUIREMENT:** None for Best use. **Best Actor: ⚫** (no custom Actor built). **RISK:** Medium. **ELIGIBLE?** 🟢
+
+### MLH category prizes (Gemini, Gen AI, Solana, MongoDB Atlas, GoDaddy Registry)
+- **Gemini / Gen AI 🟢:** grounded quote-draft assistant; every extracted value is cited from the pasted text,
+  schema-constrained, never stored or submitted without supplier review; prompt injection in the quote is ignored
+  (tested). Free tier allows ~20 drafts/day; a 429 surfaces as `GEMINI_RATE_LIMITED`.
+- **Solana 🟢:** USDC settlement on Solana devnet through x402, labelled DEVNET TEST PAYMENT.
+- **MongoDB Atlas 🟢:** production system of record.
+- **GoDaddy Registry 🟢:** `reliefmesh.us` registered through the MLH × GoDaddy Registry cart and serving the app over
+  HTTPS (www and the vercel.app fallbacks redirect to it).
+- **.Tech Domain ⚫:** no .tech domain is used.
+- **SUBMISSION ACTION:** opt into each MLH category on Devpost.
+
+### Armadin — Best Security Hack
+- **EXACT REQUIREMENT:** "Coming soon" in the official list (unpublished). **ELIGIBLE?** 🟡
+- **WHAT RELIEFMESH HAS:** OpenAPI-enumerated cross-tenant break-in tests, HMAC-signed audit chain heads, agent tokens
+  that can never reach approval/PO/payment endpoints, SSRF-safe outbound calls, prompt-injection tests.
+
+## Not eligible / forced fit (skip)
+
+| Track | Reason |
+| --- | --- |
+| Best Planet-First Hack | People-first, not planet-first |
+| Best Hardware Hack | No hardware |
+| Best Beginner Hack / Best Solo Hack | Team and experience criteria; not claimed |
+| Anthropic | Requires thoughtful use of Claude in the product; ReliefMesh uses Gemini |
+| Atlassian — Agentic Workforce (agents / security for agents) | Requires a Forge app on Jira/Confluence |
+| Bright Data | Bright Data must be essential to the core experience |
+| Visa — Reimagining Shopping | Consumer shopping; ReliefMesh is B2B emergency procurement |
+| Meta — Bringing People Closer Together | Human-connection focus |
+| Capital One Nessie | No Nessie workflow |
+| Factory Droid SDK | Droid must do runtime work in the product |
+| Creao AI (×3) | Requires a CREAO agent doing core work |
+| Cartesia | Voice must be core |
+| Bitdeer AI Model Studio | Not used |
+| Figma in the Workflow | No Figma artifacts |
+| Moss | Voice / personal agent / social examples; not used |
+| SpaceXAI / MLH SpaceXSI A-Team | Cursor/Grok raffle; not used |
+| Convex | Backend must be built on Convex |
+| Elastic / AfterQuery / Annapurna Labs | Criteria "Coming soon"; no integration |
+| Mana.space | Requires building with Mana |
+| Spacetime | Backend must be SpacetimeDB |
+| Notability | Requires Notability notes of the build process |
+| MLH ElevenLabs, Presage, Backboard, Vultr, DigitalOcean, Snowflake, Auth0, Tiger Data | Not used |
+| MLH Commit Fellowship | Separate founder-sprint application; optional for the owner |
+
+## Submission actions (owner)
+
+1. Devpost: opt into Hyphenate, Microsoft (Grand + Customer Impact), Fetch.ai, CRS (Identity/Fraud), Apify, the MLH
+   categories above, and Coinbase Payment Agents only after verifying Coinbase accounts.
+2. Demo video (3–5 min): open with the disruption-and-recovery moment (Hyphenate), show the Fetch agent in ASI:One,
+   the CRS sandbox check, the x402 devnet payment, and the data-truth labels.
+3. Do not claim any track marked 🟡 or ⚫ as eligible in the submission.
