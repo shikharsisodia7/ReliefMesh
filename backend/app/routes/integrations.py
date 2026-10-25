@@ -399,7 +399,7 @@ async def run_test(services: Services, organization_id: str, channel: str, user:
             html="<p>This is a real test message from ReliefMesh operations integrations. Procurement emails "
                  "(RFQs, approval requests, disruption alerts, purchase orders) will be sent this way.</p>",
             text="This is a real test message from ReliefMesh operations integrations.",
-            headers={"X-ReliefMesh-Event": "integration_test"}), organization_id, inline_retries=0)
+            headers={"X-ReliefMesh-Event": "integration_test"}), organization_id, inline_retries=0, gmail_only=True)
         if result.status == "failed":
             raise IntegrationError(result.error or "Gmail send failed")
         if result.status == "not_configured":

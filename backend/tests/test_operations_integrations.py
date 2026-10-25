@@ -40,6 +40,7 @@ class FakeProviders:
     gmail_fail_subject: str = ""  # inject failures only into messages whose subject contains this
     slack_failures: list[Any] = field(default_factory=list)  # HTTP status or Slack error string
     gmail_sent: list[dict[str, Any]] = field(default_factory=list)
+    resend_sent: list[dict[str, Any]] = field(default_factory=list)
     calendar_events: dict[str, dict[str, Any]] = field(default_factory=dict)
     calendar_inserts: int = 0
     slack_posts: list[dict[str, Any]] = field(default_factory=list)
@@ -74,6 +75,9 @@ class FakeProviders:
             return self.slack(request, path)
         if host == "hooks.slack.com":
             return httpx.Response(200, text="ok")
+        if host == "api.resend.com":
+            self.resend_sent.append(json.loads(request.content))
+            return httpx.Response(200, json={"id": self.next_id("re-")})
         return self.upstream(request)
 
     def google_token(self, request: httpx.Request, path: str) -> httpx.Response:
@@ -579,6 +583,35 @@ async def test_expired_google_token_blocks_google_channels_but_not_procurement(o
     assert retried.status_code == 200
     rows = await settle_deliveries(app, mission_id)
     assert next(r for r in rows if r["id"] == calendar_row["id"])["status"] == "SENT"
+
+
+@pytest.mark.anyio
+async def test_gmail_check_fails_when_only_the_resend_fallback_delivered(providers) -> None:
+    """Found on production: with Google revoked, the Gmail connection test reported SENT because the email
+    gateway fell back to Resend. Procurement email should keep flowing through the fallback, but a Gmail
+    check must say Gmail failed."""
+    app = create_app(ops_settings(email_mode="live", resend_api_key="re_test_key"),
+                     http_transport=httpx.MockTransport(providers))
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            ctx = await build_mission(client)
+            await connect_google(client, ctx["coordinator"], ctx["organization_id"])
+            store = app.state.services.store
+            connection = (await store.find("integration_connections", provider="google"))[0]
+            tokens = app.state.services.vault.open(connection["token_ciphertext"])
+            tokens["expires_at"] = "2000-01-01T00:00:00+00:00"
+            connection["token_ciphertext"] = app.state.services.vault.seal(tokens)
+            await store.replace("integration_connections", connection["id"], connection)
+            providers.refresh_invalid = True
+            resend_before, gmail_before = len(providers.resend_sent), len(providers.gmail_sent)
+            test = await client.post(f"/v1/organizations/{ctx['organization_id']}/integrations/test",
+                                     json={"channel": "gmail"}, headers=auth(ctx["coordinator"]))
+            assert test.json()["status"] == "FAILED" and "reconnect" in test.json()["last_error"].lower()
+            assert (len(providers.resend_sent), len(providers.gmail_sent)) == (resend_before, gmail_before)
+            mission_id = await create_mission(client, ctx)
+            invitation = await client.post(f"/v1/missions/{mission_id}/invitations", headers=auth(ctx["coordinator"]),
+                                           json={"supplier_email": "bayside@supply.example.com"})
+            assert invitation.json()["delivery_status"] == "sent" and len(providers.resend_sent) == resend_before + 1
 
 
 @pytest.mark.anyio

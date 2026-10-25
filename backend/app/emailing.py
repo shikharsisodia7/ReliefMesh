@@ -61,7 +61,7 @@ class EmailGateway:
         self.client = client
 
     async def send(self, message: OutgoingEmail, organization_id: str | None = None,
-                   inline_retries: int = 1) -> EmailResult:
+                   inline_retries: int = 1, gmail_only: bool = False) -> EmailResult:
         mode = self.settings.resolved_email_mode
         if mode == "disabled":
             return EmailResult(False, status="disabled", error="RELIEFMESH_EMAIL_MODE=disabled")
@@ -87,6 +87,9 @@ class EmailGateway:
                 await asyncio.sleep(1.5 * (attempt + 1))
             if gmail_result.status == "sent":
                 return gmail_result
+        if gmail_only:  # a Gmail check must not pass because the Resend fallback delivered instead
+            return gmail_result or EmailResult(False, status="not_configured", provider="gmail",
+                                               error="Gmail is not connected for this organization")
         if self.settings.resend_api_key is not None:
             return await self._resend(message)
         if gmail_result and gmail_result.status == "failed":
