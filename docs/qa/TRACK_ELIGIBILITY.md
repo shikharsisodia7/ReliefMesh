@@ -138,13 +138,41 @@ Status legend: ✅ VERIFIED ELIGIBLE · 🟢 IMPLEMENTED — SUBMISSION ACTION N
 - **WHAT RELIEFMESH HAS:** OpenAPI-enumerated cross-tenant break-in tests, HMAC-signed audit chain heads, agent tokens
   that can never reach approval/PO/payment endpoints, SSRF-safe outbound calls, prompt-injection tests.
 
+## Verified integrations that are not separate prize tracks
+
+These are real, live parts of the product (judges see them; they strengthen the core and Hyphenate/Microsoft
+submissions) but no Cal Hacks prize is specific to them.
+
+| Integration | Live evidence | Truth boundary |
+| --- | --- | --- |
+| SAM.gov entity registration | `/status` probe returns a real registration (3M COMPANY, UEI W5ZFEL43MUZ3, Active until 2027-01-12); supplier evidence uses the same API | Registration only, not inventory or capacity; personal key ≈ 10 requests/day, cached a day per name |
+| Gmail | Organization-connected Gmail sends RFQs, approval requests and POs; token refresh OK on `/status` | Per-organization OAuth; Resend (`procurement@reliefmesh.us`) is the fallback sender |
+| Google Calendar | Deadline, approval window and supplier ETA events, updated in place on replans | Per-organization OAuth |
+| Google Drive | Mission folder with plan PDFs, PO PDF and audit export | Per-organization OAuth |
+| Slack | Informational alerts (approval needed, disruption, replan, PO, delivered); never approvals | Per-organization OAuth |
+| Resend | RFQs from `procurement@reliefmesh.us` with DKIM, SPF and DMARC passing in Gmail | Sending-only key restricted to reliefmesh.us |
+
+## Judge-visible evidence paths
+
+| Integration | Where a judge sees it | Truth boundary |
+| --- | --- | --- |
+| Continuity Engine | Mission → Continuity: N-1 result, single point of failure, breakpoints, cost of resilience, actual vs earlier stress test | `HYPOTHETICAL STRESS TEST`; never mutates quotes, plans, approvals or POs; STALE when inputs change |
+| Judge guide | `/judge`: the eleven-step loop checked against a real mission's stored records | Read-only; nothing pre-seeded |
+| Fetch.ai | ASI:One → `reliefmesh-buyer-agent` → "which supplier is the biggest single point of failure?" | Explains stored deterministic results; cannot approve, order or pay |
+| Apify | Supplier discovery → run and dataset IDs → leads | Public leads only, never inventory or quote evidence |
+| CRS | Supplier evidence → signer check; `/status` sandbox proof | `SANDBOX`, CRS test identities only |
+| Coinbase x402 / Solana | `/status` → run a devnet payment → explorer link | `DEVNET TEST PAYMENT`; no supplier is paid |
+| Gemini | Supplier RFQ → paste quote → grounded draft → supplier reviews and submits | AI drafts only; the supplier owns every value |
+| Security | Mission audit tab + `/audit/verify` | Tamper-evident hash chain, not immutable |
+
 ## Not eligible / forced fit (skip)
 
 | Track | Reason |
 | --- | --- |
 | Best Planet-First Hack | People-first, not planet-first |
 | Best Hardware Hack | No hardware |
-| Best Beginner Hack / Best Solo Hack | Team and experience criteria; not claimed |
+| Best Beginner Hack | Beginner eligibility not established; organizer must confirm |
+| Best Solo Hack | Devpost requires 2–4 team members, so a team project cannot enter |
 | Anthropic | Requires thoughtful use of Claude in the product; ReliefMesh uses Gemini |
 | Atlassian — Agentic Workforce (agents / security for agents) | Requires a Forge app on Jira/Confluence |
 | Bright Data | Bright Data must be essential to the core experience |
@@ -159,12 +187,13 @@ Status legend: ✅ VERIFIED ELIGIBLE · 🟢 IMPLEMENTED — SUBMISSION ACTION N
 | Moss | Voice / personal agent / social examples; not used |
 | SpaceXAI / MLH SpaceXSI A-Team | Cursor/Grok raffle; not used |
 | Convex | Backend must be built on Convex |
-| Elastic / AfterQuery / Annapurna Labs | Criteria "Coming soon"; no integration |
+| Elastic (Devpost: Agent Builder on Serverless) / AfterQuery / Annapurna Labs | No runtime integration; optional settings are not use |
 | Mana.space | Requires building with Mana |
 | Spacetime | Backend must be SpacetimeDB |
 | Notability | Requires Notability notes of the build process |
 | MLH ElevenLabs, Presage, Backboard, Vultr, DigitalOcean, Snowflake, Auth0, Tiger Data | Not used |
-| MLH Commit Fellowship | Separate founder-sprint application; optional for the owner |
+| MLH Commit Fellowship | Not a technology track: owner may opt in and complete MLH's supplemental form |
+| Apify — Best Actor | Requires a published custom Actor; only an existing public actor is used |
 
 ## Submission actions (owner)
 

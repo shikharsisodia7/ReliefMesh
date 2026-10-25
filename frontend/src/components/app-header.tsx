@@ -21,6 +21,7 @@ const coordinatorTabs: Tab[] = [
   { label: "Missions", href: "/dashboard", active: (path) => path === "/dashboard" || path.startsWith("/missions/") },
   { label: "Suppliers", href: "/suppliers", active: (path) => path === "/suppliers" },
   { label: "Analytics", href: "/analytics", active: (path) => path === "/analytics" },
+  { label: "Judge guide", href: "/judge", active: (path) => path === "/judge" },
   { label: "System Status", href: "/status", active: (path) => path === "/status" },
 ];
 const supplierTabs: Tab[] = [
@@ -30,6 +31,7 @@ const supplierTabs: Tab[] = [
 ];
 const marketingTabs: Tab[] = [
   { label: "How it works", href: "/#how-it-works", active: () => false },
+  { label: "Judge guide", href: "/judge", active: (path) => path === "/judge" },
   { label: "System Status", href: "/status", active: (path) => path === "/status" },
 ];
 

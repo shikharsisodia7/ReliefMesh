@@ -167,7 +167,7 @@ export function PlanVersions({ plans, approvals, token, run, setNotice, order, i
   return (
     <section aria-label="Plan versions" className="rounded-xl border bg-card p-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Plan versions</h2>
-      <p className="mb-3 text-xs text-tertiary">Each version is immutable evidence (inputs, policy fingerprint, hash). A stale plan cannot be approved; an approval authorizes exactly one plan version, expires, and is single-use.</p>
+      <p className="mb-3 text-xs text-tertiary">Each version is kept as append-only, tamper-evident evidence (inputs, policy fingerprint, hash). A stale plan cannot be approved; an approval authorizes exactly one plan version, expires, and is single-use.</p>
       {plans.length === 0 ? <p className="text-sm text-muted-foreground">Run optimization after suppliers submit quotes.</p> : (
         <div className="space-y-3">
           {plans.map((plan) => {

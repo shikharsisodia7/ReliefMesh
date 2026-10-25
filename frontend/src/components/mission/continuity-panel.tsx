@@ -10,6 +10,11 @@ const percent = (value: number) => `${Math.round(value * 100)}%`;
 const signedMoney = (value?: string | null) => (value == null ? "—" : `${Number(value) >= 0 ? "+" : "−"}${money(Math.abs(Number(value)))}`);
 const hours = (value: number) => (value >= 48 ? `${Math.round((value / 24) * 10) / 10} d` : `${value} h`);
 
+// Every counterfactual carries this exact label; real events never do.
+function StressLabel() {
+  return <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Hypothetical stress test</span>;
+}
+
 function Fact({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="border-t py-2.5">
@@ -40,7 +45,7 @@ function SinglePointOfFailure({ analysis }: { analysis: ContinuityAnalysis }) {
                 <div className={`h-full rounded-sm ${isCritical ? "bg-foreground" : "bg-muted-foreground/40"}`} style={{ width: `${Math.max(2, row.unit_share * 100)}%` }} />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Stress test: {row.supplier} unavailable →{" "}
+                <StressLabel /> · Stress test: {row.supplier} unavailable →{" "}
                 {scenario?.feasible
                   ? <>recoverable at {money(scenario.new_cost)} ({signedMoney(scenario.cost_delta)}){scenario.replacement_suppliers.length > 0 && ` via ${scenario.replacement_suppliers.join(", ")}`}</>
                   : <span className={isCritical ? "font-medium text-warn" : ""}>mission infeasible{scenario ? ` · ${scenario.lost_quantity} units uncovered` : ""}{isCritical ? " · single point of failure" : ""}</span>}
@@ -87,6 +92,7 @@ function CostOfResilience({ analysis, plan }: { analysis: ContinuityAnalysis; pl
         <Fact label={`Resilient alternative (max share ≤ ${share})`} value={money(alternative.total_cost)} detail={`N-1 ${altN1.survives}/${altN1.tested}`} />
         <Fact label="Additional cost" value={signedMoney(alternative.added_cost)} detail={fullyResilient ? "Every single-supplier loss is recoverable (proven by stress test)" : "Reduces concentration; not every single-supplier loss is recoverable"} />
       </dl>
+      <p className="text-xs text-muted-foreground"><StressLabel /> · the alternative&apos;s N-1 result comes from stress-testing it the same way as the current plan.</p>
       {compare && (
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Current plan</th><th className="py-1 text-right font-medium">Resilient alternative</th></tr></thead>
@@ -118,6 +124,7 @@ function RealityChecks({ checks }: { checks: RealityCheck[] }) {
         return (
           <div key={check.supplier_id} className="grid gap-x-8 border-t pt-2 sm:grid-cols-2">
             <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Predicted counterfactual</p>
               <Provenance value="HYPOTHETICAL" />
               {earlier ? (
                 <p className="mt-1 text-sm">
@@ -132,6 +139,9 @@ function RealityChecks({ checks }: { checks: RealityCheck[] }) {
               ) : <p className="mt-1 text-sm text-muted-foreground">{check.note}</p>}
             </div>
             <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {check.actual.provenance === "USER_SUBMITTED" ? "Actual user-submitted change" : "Actual change"}
+              </p>
               <Provenance value={check.actual.provenance} />
               <p className="mt-1 text-sm">
                 {check.actual.supplier}: {actualText} → plan v{check.actual.plan_version} {check.actual.plan_total_cost ? money(check.actual.plan_total_cost) : check.actual.plan_status}
@@ -160,6 +170,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
         <div>
           <div className="flex flex-wrap items-baseline gap-3"><h2 className="text-base font-semibold">Continuity</h2><Provenance value="HYPOTHETICAL" /></div>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Would this plan survive losing a supplier? Each scenario re-runs the same optimizer and policy on copies of the exact quotes behind this plan. No quote, plan, approval, or order is changed.</p>
+          <p className="mt-1 text-xs text-muted-foreground"><StressLabel /> · every scenario on this panel is a counterfactual, not an event that happened. Real changes appear under &ldquo;Actual change vs earlier stress test&rdquo;.</p>
         </div>
         <Button size="sm" variant="secondary" type="button" onClick={onRun} disabled={!canRun || running || state === "RUNNING"}>Find resilient alternative</Button>
       </div>
@@ -197,8 +208,8 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
             <SinglePointOfFailure analysis={analysis} />
           </div>
           <CostOfResilience analysis={analysis} plan={plan} />
-          <details className="text-sm">
-            <summary className="cursor-pointer font-medium">Failure frontier by supplier</summary>
+          <details className="text-sm" open>
+            <summary className="cursor-pointer font-medium">Failure frontier by supplier <StressLabel /></summary>
             <table className="mt-2 w-full">
               <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Price</th><th className="py-1 text-right font-medium">ETA delay</th><th className="py-1 text-right font-medium">Capacity loss</th></tr></thead>
               <tbody>
