@@ -39,7 +39,7 @@ When a buyer sends an RFQ invitation, the email includes **Accept and respond in
 - `/orders`, `ACCEPT <PO number>`, `DECLINE <PO number> [reason]`, `/ship <PO number> <note>`, `/delivered <PO number> <note>`, and `CANNOT-FULFILL <PO number> <note>` for purchase order and fulfillment updates.
 - `/help` for the command list and `/stop` to pause bot replies.
 
-Existing portal suppliers can still link with **Supplier** → **Connect Telegram** → **Generate secure link**. This one-time link expires after 10 minutes.
+Suppliers can connect from the Telegram card shown in their portal after sign-up/sign-in, or later from **Supplier** → **Settings** → **Connect Telegram**. They open the one-time link and press Start in the bot; the link expires after 10 minutes. The Settings page shows the connection state and lets the supplier disconnect. Disconnecting revokes outstanding link codes and prevents `/start` from silently reconnecting the old account.
 
 ## Data and safety
 

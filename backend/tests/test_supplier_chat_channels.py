@@ -239,6 +239,34 @@ async def test_rfq_link_cannot_attach_telegram_to_an_existing_supplier_account(a
 
 
 @pytest.mark.anyio
+async def test_supplier_can_disconnect_telegram_and_revoke_pending_link_codes(app_and_client, monkeypatch) -> None:
+    app, client = app_and_client
+    enable_telegram(app)
+    replies = capture_replies(monkeypatch)
+    state = await approved_mission(client)
+    supplier_headers = auth(state["supplier"])
+    code = (await client.post("/v1/supplier/telegram/link-code", headers=supplier_headers)).json()["code"]
+    await tg(client, 1, 7373, f"/start {code}")
+
+    # Leave a second code pending to verify disconnect revokes outstanding credentials too.
+    await client.post("/v1/supplier/telegram/link-code", headers=supplier_headers)
+    response = await client.delete("/v1/supplier/telegram", headers=supplier_headers)
+    assert response.status_code == 200 and response.json() == {"disconnected": True}
+    profile = (await client.get("/v1/supplier/profile", headers=supplier_headers)).json()
+    assert profile.get("telegram_user_id") is None
+    assert (await app.state.services.store.get("telegram_subscriptions", "7373"))["active"] is False
+    link_statuses = {row["status"] for row in await app.state.services.store.find(
+        "telegram_link_tokens", supplier_id=profile["id"])}
+    assert link_statuses == {"used", "revoked"}
+    await tg(client, 2, 7373, "/start")
+    assert "connection was removed" in replies[-1]
+    assert (await app.state.services.store.get("telegram_subscriptions", "7373"))["active"] is False
+
+    coordinator_response = await client.delete("/v1/supplier/telegram", headers=auth(state["coordinator"]))
+    assert coordinator_response.status_code == 403
+
+
+@pytest.mark.anyio
 async def test_new_supplier_onboards_from_the_rfq_link(app_and_client, monkeypatch) -> None:
     app, client = app_and_client
     enable_telegram(app)

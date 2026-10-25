@@ -8,12 +8,13 @@ import { Page, PageHeader } from "@/components/layout/page-header";
 import { OrdersTab } from "@/components/supplier/orders-tab";
 import { QuotesTab } from "@/components/supplier/quotes-tab";
 import { RfqsTab } from "@/components/supplier/rfqs-tab";
+import { TelegramSettings } from "@/components/supplier/telegram-settings";
 import type { SupplierInvitation, SupplierMission, SupplierOrder, SupplierQuote } from "@/components/supplier/types";
 import { useHydrated, useSession } from "@/hooks/use-session";
 import { api } from "@/lib/api";
 import { signInUrl } from "@/lib/session";
 
-const titles: Record<string, string> = { rfqs: "RFQs", quotes: "My quotes", orders: "Purchase orders" };
+const titles: Record<string, string> = { rfqs: "RFQs", quotes: "My quotes", orders: "Purchase orders", settings: "Settings" };
 
 export default function SupplierPage() {
   return <Suspense fallback={<Page><p className="text-sm text-muted-foreground">Loading supplier portal…</p></Page>}><SupplierPortal /></Suspense>;
@@ -31,7 +32,7 @@ function SupplierPortal() {
   useEffect(() => { if (hydrated && (!session || session.user.role !== "supplier")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const token = session?.token;
   const get = <T,>(path: string) => () => api<T>(path, { token });
-  const profile = useQuery({ queryKey: ["supplier-profile", token], enabled: Boolean(token), queryFn: get<{ legal_name?: string | null }>("/v1/supplier/profile") });
+  const profile = useQuery({ queryKey: ["supplier-profile", token], enabled: Boolean(token), queryFn: get<{ legal_name?: string | null; telegram_user_id?: string | null }>("/v1/supplier/profile") });
   const invitations = useQuery({ queryKey: ["supplier-invitations"], enabled: Boolean(token), queryFn: get<SupplierInvitation[]>("/v1/supplier/invitations") });
   const quotes = useQuery({ queryKey: ["supplier-quotes"], enabled: Boolean(token), queryFn: get<SupplierQuote[]>("/v1/supplier/quotes") });
   const orders = useQuery({ queryKey: ["supplier-orders"], enabled: Boolean(token), refetchInterval: 5000, queryFn: get<SupplierOrder[]>("/v1/purchase-orders") });
@@ -51,8 +52,10 @@ function SupplierPortal() {
       <PageHeader title={titles[tab]} meta={[profile.data?.legal_name, session.user.email].filter(Boolean).join(" · ")} />
       {error && <p role="alert" className="mt-4 text-sm text-critical">{error}</p>}
       {failed && <p className="mt-4 text-sm text-critical">{failed.error?.message} <button type="button" className="font-medium text-foreground hover:underline" onClick={() => void failed.refetch()}>Retry</button></p>}
+      {tab === "rfqs" && <div className="mt-6"><TelegramSettings token={session.token} compact /></div>}
       <div className="mt-10">
-        {loading ? <div className="space-y-3" aria-label="Loading">{[0, 1].map((key) => <div key={key} className="h-16 animate-pulse rounded bg-muted motion-reduce:animate-none" />)}</div>
+        {tab === "settings" ? <TelegramSettings token={session.token} />
+          : loading ? <div className="space-y-3" aria-label="Loading">{[0, 1].map((key) => <div key={key} className="h-16 animate-pulse rounded bg-muted motion-reduce:animate-none" />)}</div>
           : tab === "orders" ? <OrdersTab orders={orders.data ?? []} token={session.token} attempt={attempt} />
             : tab === "quotes" ? <QuotesTab quotes={quotes.data ?? []} missions={missions} token={session.token} attempt={attempt} />
               : <RfqsTab invitations={invitations.data ?? []} quotes={quotes.data ?? []} />}

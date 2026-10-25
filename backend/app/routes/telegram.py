@@ -472,6 +472,14 @@ async def reply_for_telegram(services: Services, telegram_user_id: str, body: st
                    for row in link_tokens):
                 return await link_telegram_account(services, telegram_user_id, code)
             return await begin_invitation_onboarding(services, telegram_user_id, code)
+        # `/start` without a fresh one-time code may resume a valid linked chat, but must
+        # never reconnect an identity that the supplier disconnected in ReliefMesh.
+        linked_supplier = await services.store.get("suppliers", subscription.get("supplier_id", "")) if subscription else None
+        if subscription and subscription.get("supplier_id") and (
+                not linked_supplier or linked_supplier.get("telegram_user_id") != telegram_user_id):
+            subscription.update(supplier_id=None, active=False, updated_at=now_iso())
+            await services.store.replace("telegram_subscriptions", telegram_user_id, subscription)
+            return "This Telegram connection was removed. Sign in to ReliefMesh and generate a new secure link to reconnect."
         await services.store.upsert("telegram_subscriptions", {"id": telegram_user_id,
                                        "telegram_user_id": telegram_user_id,
                                        "supplier_id": subscription.get("supplier_id") if subscription else None,
@@ -699,6 +707,31 @@ async def create_telegram_link_code(user: dict = Depends(current_user),
     return {"code": code, "expires_at": token["expires_at"], "bot_username": username or None,
             "bot_url": bot_url,
             "instruction": "Open the ReliefMesh Telegram bot and send /start <code>. This code expires in 10 minutes."}
+
+
+@router.delete("/v1/supplier/telegram")
+async def disconnect_telegram(user: dict = Depends(current_user),
+                              services: Services = Depends(get_services)) -> dict[str, bool]:
+    """Disconnect only the authenticated supplier's Telegram identity."""
+    if user.get("role") != "supplier":
+        raise HTTPException(status_code=403, detail="Supplier access required")
+    supplier = await ensure_supplier(services, user)
+    telegram_user_id = supplier.pop("telegram_user_id", None)
+    supplier["updated_at"] = now_iso()
+    await services.store.replace("suppliers", supplier["id"], supplier)
+    if telegram_user_id:
+        subscription = await services.store.get("telegram_subscriptions", str(telegram_user_id))
+        if subscription and subscription.get("supplier_id") == supplier["id"]:
+            subscription.update(active=False, disconnected_at=now_iso(), updated_at=now_iso())
+            await services.store.replace("telegram_subscriptions", str(telegram_user_id), subscription)
+    for pending in await services.store.find("telegram_link_tokens", supplier_id=supplier["id"], status="pending"):
+        pending.update(status="revoked", updated_at=now_iso())
+        await services.store.replace("telegram_link_tokens", pending["id"], pending)
+    for action in await services.store.find("telegram_pending_actions", supplier_id=supplier["id"], status="pending"):
+        action.update(status="cancelled", updated_at=now_iso())
+        await services.store.replace("telegram_pending_actions", action["id"], action)
+    await audit("supplier.telegram_disconnected", user["id"], None, None, "supplier", supplier["id"], services)
+    return {"disconnected": True}
 
 
 @router.post("/v1/webhooks/telegram")

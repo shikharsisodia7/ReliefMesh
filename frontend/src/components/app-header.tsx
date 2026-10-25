@@ -27,6 +27,7 @@ const supplierTabs: Tab[] = [
   { label: "RFQs", href: "/supplier?tab=rfqs", active: (path, tab) => path.startsWith("/invitations/") || (path === "/supplier" && (tab ?? "rfqs") === "rfqs") },
   { label: "My Quotes", href: "/supplier?tab=quotes", active: (path, tab) => path === "/supplier" && tab === "quotes" },
   { label: "Purchase Orders", href: "/supplier?tab=orders", active: (path, tab) => path === "/supplier" && tab === "orders" },
+  { label: "Settings", href: "/supplier?tab=settings", active: (path, tab) => path === "/supplier" && tab === "settings" },
 ];
 const marketingTabs: Tab[] = [
   { label: "How it works", href: "/#how-it-works", active: () => false },
@@ -179,7 +180,7 @@ function AccountMenu({ session }: { session: Session }) {
             )}
             <Menu.Separator className="my-1.5 h-px bg-border" />
             {/* The island stays mounted across pages, so the menu must close itself on navigation. */}
-            {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/settings" />} className={itemClass}>Settings</Menu.LinkItem>}
+            <Menu.LinkItem closeOnClick render={<Link href={coordinator ? "/settings" : "/supplier?tab=settings"} />} className={itemClass}>Settings</Menu.LinkItem>
             {/* Coordinators reach the judge guide here; logged-out visitors see it as a marketing tab. */}
             {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/judge" />} className={itemClass}>Judge guide</Menu.LinkItem>}
             <Menu.Item className={itemClass} onClick={() => signOut(router)}>Sign out</Menu.Item>
@@ -220,7 +221,7 @@ function MobileMenu({ tabs, pathname, tab, session }: { tabs: Tab[]; pathname: s
                 ))}
               </div>
             )}
-            {coordinator && <Link href="/settings" onClick={close} className={row}>Settings</Link>}
+            <Link href={coordinator ? "/settings" : "/supplier?tab=settings"} onClick={close} className={row}>Settings</Link>
             {coordinator && <Link href="/judge" onClick={close} className={row}>Judge guide</Link>}
             <button type="button" className={row} onClick={() => { close(); signOut(router); }}>Sign out</button>
           </div>
