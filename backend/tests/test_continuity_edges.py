@@ -284,3 +284,15 @@ def test_reality_check_without_an_earlier_stress_test_says_so() -> None:
 
 def test_reality_check_is_decimal_exact() -> None:
     assert Decimal("1.15") / Decimal("1.00") - 1 == Decimal("0.15")
+
+
+def test_alternative_is_stress_tested_under_the_same_recovery_rules_as_the_current_plan() -> None:
+    # The production E2E mission: 100 blankets, $5,000; A quotes 100 @ $32, B quotes 80 @ $35.
+    mission = _unit_mission(budget="5000.00")
+    analysis = _analyse(mission, [_quote("a", [("32.00", 100, 1)]), _quote("b", [("35.00", 80, 1)])])
+    assert analysis["metrics"]["n1_survivability"] == {"survives": 0, "tested": 1}
+    alternative = analysis["resilient_alternative"]
+    assert alternative["status"] == "AVAILABLE" and alternative["total_cost"] == "3350.00"
+    # Losing B leaves A able to cover all 100 under the mission's own rules (the 50% guardrail is the proposal's,
+    # not a recovery constraint); losing A leaves 80 of 100. So the alternative is 1/2, not 0/2.
+    assert alternative["n1_survivability"] == {"survives": 1, "tested": 2}

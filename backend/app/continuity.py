@@ -283,7 +283,9 @@ def _resilient_alternative(
             "reason": "No feasible plan satisfies the 50% supplier concentration guardrail.",
         }
     proposal = {**outcome, "allocations": outcome["allocations"]}
-    scenarios = [_scenario(constrained_mission, proposal, quotes, supplier_id, names)
+    # Stress-test the alternative under the mission's real recovery rules, exactly like the current plan: after a
+    # real supplier loss the replan uses the mission's constraints, not this proposal's stronger guardrail.
+    scenarios = [_scenario(mission, proposal, quotes, supplier_id, names)
                  for supplier_id in _allocated_supplier_ids(proposal)]
     survivable = sum(row["feasible"] for row in scenarios)
     return {

@@ -170,7 +170,7 @@ def solve(mission: dict[str, Any], quotes: list[dict[str, Any]]) -> dict[str, An
                     "delivery_date": line["delivery_date"],
                 }
             )
-    total = int(round(pulp.value(total_cost)))
+    total = int(round(pulp.value(total_cost) or 0))  # an all-zero objective evaluates to None in PuLP
     concentrations = [
         {"supplier_id": supplier_id, "share": round(cost / total, 4) if total else 0}
         for supplier_id, cost in sorted(supplier_costs.items())
