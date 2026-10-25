@@ -19,6 +19,10 @@ SAM_URL = "https://api.sam.gov/entity-information/v3/entities"
 USASPENDING_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 OPENFDA_BASE = "https://api.fda.gov"
 FDA_DATASETS = ("device", "drug", "food")
+# Personal SAM.gov keys allow very few requests a day (10 without a SAM role), so lookups are cached for a day
+# per name and a 429 is never retried: it means the daily quota is spent, not a transient error.
+SAM_CACHE_SECONDS = 24 * 3600
+SAM_QUOTA_MESSAGE = "SAM.gov daily API quota reached for this key; registration lookups resume after the daily reset"
 
 
 def name_similarity(a: str, b: str) -> float:
@@ -44,9 +48,11 @@ async def sam_registration(hub: IntegrationHub, api_key: str | None, legal_name:
     else:
         params["legalBusinessName"] = legal_name
     result = await hub.fetch(
-        "sam_gov", SAM_URL, params=params, cache_key=f"{uei or normalize_name(legal_name)}", fresh_seconds=3600,
-        timeout=20, source_url=public_url,
+        "sam_gov", SAM_URL, params=params, cache_key=f"{uei or normalize_name(legal_name)}",
+        fresh_seconds=SAM_CACHE_SECONDS, timeout=20, retries=0, source_url=public_url,
     )
+    if not result.ok and (result.error or "").startswith("HTTP 429"):
+        result.error = SAM_QUOTA_MESSAGE
     if result.ok:
         entities = []
         for row in (result.data or {}).get("entityData", []) or []:

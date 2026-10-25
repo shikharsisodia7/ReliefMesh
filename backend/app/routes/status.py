@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import APIRouter, Depends
 
 from ..core import Services, get_services, now_iso, secret
-from ..integrations import apify, emergency, ofac
+from ..integrations import apify, emergency, entity, ofac
 from ..integrations.http import AdapterResult
 
 router = APIRouter()
@@ -87,14 +87,30 @@ async def check_openfda(services: Services) -> tuple[str, str, str | None]:
     return from_result(result, "device enforcement endpoint responded")
 
 
+SAM_PROBE_SECONDS = 12 * 3600  # a public page must not spend a ~10-requests/day key: probe twice a day at most
+
+
 async def check_sam(services: Services) -> tuple[str, str, str | None]:
     key = secret(services.settings.sam_gov_api_key)
     if not key:
         return "not_configured", "RELIEFMESH_SAM_GOV_API_KEY is not configured (requires a SAM.gov account)", None
-    result = await services.hub.fetch("sam_gov", "https://api.sam.gov/entity-information/v3/entities",
-                                      params={"api_key": key, "legalBusinessName": "3M Company"},
-                                      source_url="https://api.sam.gov/entity-information/v3/entities")
-    return from_result(result, "entity API accepted the key")
+    result = await services.hub.fetch(
+        "sam_gov", entity.SAM_URL, params={"api_key": key, "legalBusinessName": "3M Company",
+                                           "includeSections": "entityRegistration"},
+        cache_key="status-probe", fresh_seconds=SAM_PROBE_SECONDS, retries=0, timeout=20, source_url=entity.SAM_URL)
+    if not result.ok:
+        if (result.error or "").startswith("HTTP 429"):
+            return "degraded", entity.SAM_QUOTA_MESSAGE, None
+        return from_result(result, "")
+    rows = (result.data or {}).get("entityData") or []
+    registration = (rows[0].get("entityRegistration") or {}) if rows else {}
+    found = (f"{registration.get('legalBusinessName')} · UEI {registration.get('ueiSAM')} · "
+             f"{registration.get('registrationStatus')} until {registration.get('registrationExpirationDate')}"
+             if registration else "no entity returned")
+    if result.error:  # live request failed, last-known-good shown
+        return "degraded", f"live request failed; last successful lookup {result.retrieved_at}: {found}", "CACHED"
+    when = f"verified {result.meta['cache_age_seconds'] // 60} min ago" if result.meta.get("cache_age_seconds")         is not None else "verified just now"
+    return "ok", f"entity API accepted the key ({found}); {when}, re-probed every 12 h to respect the daily quota",         result.provenance
 
 
 async def check_apify(services: Services) -> tuple[str, str, str | None]:
