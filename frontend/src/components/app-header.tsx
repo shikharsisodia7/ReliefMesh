@@ -151,7 +151,7 @@ function AccountMenu({ session }: { session: Session }) {
   const rows = organizations.data ?? [];
   return (
     <Menu.Root>
-      <Menu.Trigger aria-label="Account menu" className="grid size-9 place-items-center rounded-full border text-xs font-semibold text-foreground outline-hidden hover:bg-muted focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring data-[popup-open]:bg-muted">
+      <Menu.Trigger aria-label={`Account menu, ${initials(session.user.email)}`} className="grid size-9 place-items-center rounded-full border text-xs font-semibold text-foreground outline-hidden hover:bg-muted focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring data-[popup-open]:bg-muted">
         {initials(session.user.email)}
       </Menu.Trigger>
       <Menu.Portal>

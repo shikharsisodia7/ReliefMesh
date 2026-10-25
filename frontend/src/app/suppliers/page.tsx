@@ -8,7 +8,7 @@ import { useOrgMissions, usePerMission } from "@/components/coordinator/use-org-
 import { Page, PageHeader } from "@/components/layout/page-header";
 import { EVIDENCE_ORDER, checkLabel, resultWords } from "@/components/mission/supplier-evidence";
 import { Drawer } from "@/components/patterns/overlays";
-import { PolicyText, Provenance, day, money, when } from "@/components/status-badges";
+import { PolicyText, Provenance, StatusText, day, money, when } from "@/components/status-badges";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useHydrated, useSession } from "@/hooks/use-session";
 import { signInUrl } from "@/lib/session";
@@ -18,6 +18,11 @@ type Entry = { mission: Mission; row: SupplierRow; quote?: Quote };
 type Supplier = { id: string; name: string; email?: string; isDemo: boolean; entries: Entry[]; screened: string | null };
 
 const latestTime = (records: Evidence[]) => records.map((record) => record.retrieved_at ?? record.created_at).filter(Boolean).sort().at(-1) ?? null;
+// A withdrawn or expired quote is the whole story for that mission, as on the mission's evidence tab.
+function Verdict({ entry }: { entry: Entry }) {
+  if (entry.quote && entry.quote.status !== "submitted") return <StatusText tone="muted" value={entry.quote.status}>{entry.quote.status.charAt(0).toUpperCase() + entry.quote.status.slice(1)}</StatusText>;
+  return <PolicyText value={entry.row.policy.status} />;
+}
 const quoteText = (quote?: Quote) => (quote ? `${quote.lines.map((line) => `${line.available_quantity} @ ${money(line.unit_price)}`).join(", ")} · v${quote.version}` : "—");
 
 // Groups each mission's supplier rows by supplier. Missions arrive newest first, so entries[0] is the latest.
@@ -49,8 +54,8 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
             <ul className="mt-2">
               {supplier.entries.map(({ mission, row, quote }) => (
                 <li key={mission.id} className="border-b py-2.5 text-sm last:border-0">
-                  <div className="flex items-baseline justify-between gap-3"><span className="font-medium">{mission.name}</span><PolicyText value={row.policy.status} /></div>
-                  <p className="mt-0.5 text-muted-foreground tabular">{quoteText(quote)}{quote ? ` · ${quote.status.charAt(0).toUpperCase()}${quote.status.slice(1)}` : ""}</p>
+                  <div className="flex items-baseline justify-between gap-3"><span className="font-medium">{mission.name}</span><Verdict entry={{ mission, row, quote }} /></div>
+                  <p className="mt-0.5 text-muted-foreground tabular">{quoteText(quote)}</p>
                   <Link className="mt-1 inline-block font-medium hover:underline" href={`/missions/${mission.id}?tab=evidence`}>Open evidence →</Link>
                 </li>
               ))}
@@ -105,8 +110,8 @@ export default function SuppliersPage() {
                           {supplier.isDemo && <span className="ml-2 text-xs text-muted-foreground">TEST</span>}
                         </TableCell>
                         <TableCell className="whitespace-normal text-muted-foreground">{supplier.entries.map((entry) => entry.mission.name).join(", ")}</TableCell>
-                        <TableCell className="tabular">{quoteText(supplier.entries[0].quote)}</TableCell>
-                        <TableCell><PolicyText value={supplier.entries[0].row.policy.status} /></TableCell>
+                        <TableCell className={supplier.entries[0].quote && supplier.entries[0].quote.status !== "submitted" ? "tabular text-tertiary" : "tabular"}>{quoteText(supplier.entries[0].quote)}</TableCell>
+                        <TableCell><Verdict entry={supplier.entries[0]} /></TableCell>
                         <TableCell className="text-right tabular" title={supplier.screened ? when(supplier.screened) : undefined}>{supplier.screened ? day(supplier.screened) : "—"}</TableCell>
                       </TableRow>
                     ))}

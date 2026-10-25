@@ -112,7 +112,7 @@ export function OrdersTab({ missionId, organizationId, plans, approvals, orders,
                     {order.status === "draft" ? <Button onClick={() => setConfirming(order)}>Confirm &amp; send</Button>
                       : ended ? null
                         : order.status === "completed" ? <p className="text-base">Delivered {day(delivered)}</p>
-                          : order.status === "sent" ? <p className="text-base">Awaiting supplier</p>
+                          : order.status === "sent" ? <><p className="text-base">Awaiting supplier</p>{latestDelivery && <p className="text-muted-foreground">Expected {day(latestDelivery)}</p>}</>
                             : <p className="text-base">Expected {day(latestDelivery)}</p>}
                     <Button variant="text" size="sm" className="mt-2 px-0" onClick={() => void run(() => downloadPdf(order.id, order.po_number, token))}>Download PDF</Button>
                   </div>

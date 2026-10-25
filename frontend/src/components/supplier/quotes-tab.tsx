@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { ConfirmDialog } from "@/components/patterns/confirm-dialog";
 import { SlideOver } from "@/components/patterns/overlays";
 import { toLocalInput } from "@/components/quote-form";
-import { day, money } from "@/components/status-badges";
+import { amount, day, money, when } from "@/components/status-badges";
 import { quoteWords, word, type SupplierMission, type SupplierQuote } from "@/components/supplier/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 
 type Attempt = (operation: () => Promise<unknown>) => Promise<void>;
 
-// "120 wool blankets at $28.50 · ETA Jan 3"
-const summary = (quote: SupplierQuote) => `${quote.lines.map((line) => `${line.available_quantity} ${line.item} at ${money(line.unit_price)}`).join("; ")} · ETA ${day(quote.lines[0]?.delivery_date)}`;
+// "120 wool blankets at $28.50 · Ship $40 · ETA Jan 3"
+const summary = (quote: SupplierQuote) => `${quote.lines.map((line) => `${line.available_quantity} ${line.item} at ${money(line.unit_price)}`).join("; ")} · Ship ${amount(quote.shipping_cost)} · ETA ${day(quote.lines[0]?.delivery_date)}`;
 
 function ReviseSlideOver({ quote, mission, token, attempt, onClose, onWithdraw }: {
   quote: SupplierQuote | null; mission?: SupplierMission; token: string; attempt: Attempt; onClose: () => void; onWithdraw: (quote: SupplierQuote) => void;
@@ -78,7 +78,7 @@ export function QuotesTab({ quotes, missions, token, attempt }: { quotes: Suppli
                   {mission && <p className={cn("mt-0.5 text-sm", !muted && "text-muted-foreground")}>{mission.delivery_location} · Deliver by {day(mission.delivery_deadline)}</p>}
                   <p className="mt-2 text-sm tabular">{summary(quote)}</p>
                 </div>
-                <div><p className="font-medium" data-status={quote.status}>{word(quoteWords, quote.status)}</p><p className="text-sm text-muted-foreground">Quote v{quote.version}</p></div>
+                <div><p className="font-medium" data-status={quote.status}>{word(quoteWords, quote.status)}</p><p className="text-sm text-muted-foreground">Quote v{quote.version}</p>{quote.status === "submitted" && <p className="text-sm text-muted-foreground">Expires {when(quote.expires_at)}</p>}</div>
                 {quote.status === "submitted" && <Button variant="text" className="justify-self-start md:-mr-4" onClick={() => setRevising(quote)}>Revise quote</Button>}
               </li>
             );

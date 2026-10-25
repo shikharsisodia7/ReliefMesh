@@ -6,7 +6,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { useOrgMissions, usePerMission } from "@/components/coordinator/use-org-records";
 import { Page, PageHeader } from "@/components/layout/page-header";
-import { isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
+import { isReplan, rebuildSeconds, secondsText } from "@/components/mission/plan-tab";
 import { useHydrated, useSession } from "@/hooks/use-session";
 import { api } from "@/lib/api";
 import { signInUrl } from "@/lib/session";
@@ -39,11 +39,11 @@ export default function AnalyticsPage() {
 
   const allMissions = missions.data ?? [];
   const allQuotes = quotes.rows.flatMap(([, rows]) => rows);
-  const replans = plans.rows.flatMap(([, rows]) => rows).filter(isReplan).map(rebuildSeconds).filter((seconds): seconds is string => seconds !== null).map(Number);
+  const replans = plans.rows.flatMap(([, rows]) => rows).filter(isReplan).map(rebuildSeconds).filter((seconds): seconds is number => seconds !== null);
   const revoked = approvals.rows.flatMap(([, rows]) => rows).filter((approval) => approval.status === "invalidated").length;
   const sentOrders = (orders.data ?? []).filter((order) => order.status !== "draft");
   const delivered = sentOrders.filter((order) => order.status === "completed").length;
-  const average = replans.length ? (replans.reduce((sum, seconds) => sum + seconds, 0) / replans.length).toFixed(1) : null;
+  const average = replans.length ? secondsText(replans.reduce((sum, seconds) => sum + seconds, 0) / replans.length) : null;
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
   return (

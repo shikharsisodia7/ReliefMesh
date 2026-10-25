@@ -12,6 +12,9 @@ import { useSession } from "@/hooks/use-session";
 import { api } from "@/lib/api";
 import type { Mission } from "@/lib/types";
 
+// Continuity states as words; the API codes stay in the stored record.
+const continuityWords: Record<string, string> = { NOT_READY: "Not run for the current plan yet", RUNNING: "Running", COMPLETE: "Current", STALE: "Out of date: inputs changed" };
+
 const THESIS = "ReliefMesh does not just create a procurement plan. It determines whether that plan can survive disruption, shows exactly what breaks it, calculates the cheapest resilient alternative, and automatically rebuilds the plan when reality changes.";
 
 const TRUTH: { title: string; items: string[] }[] = [
@@ -66,7 +69,7 @@ function MissionLoop({ missionId, token }: { missionId: string; token: string })
     { label: "Evidence", done: suppliers.length > 0, detail: suppliers.length ? `${suppliers.length} supplier${suppliers.length === 1 ? "" : "s"} screened by deterministic policy` : "No suppliers screened yet" },
     { label: "Cheapest plan (V1)", done: Boolean(first), detail: first ? `Plan v${first.version} · ${first.status} · ${money(first.total_cost)}` : "Not optimized yet" },
     { label: "Continuity analysis", done: view?.state === "COMPLETE" || view?.state === "STALE",
-      detail: analysis ? `N-1 ${analysis.metrics.n1_survivability.survives}/${analysis.metrics.n1_survivability.tested} for plan v${analysis.plan_version} · ${view?.state}` : `State: ${view?.state ?? "NOT_READY"}`, provenance: analysis ? "HYPOTHETICAL" : undefined },
+      detail: analysis ? `N-1 ${analysis.metrics.n1_survivability.survives}/${analysis.metrics.n1_survivability.tested} for plan v${analysis.plan_version} · ${continuityWords[view?.state ?? "NOT_READY"]}` : continuityWords[view?.state ?? "NOT_READY"], provenance: analysis ? "HYPOTHETICAL" : undefined },
     { label: "Stress test + resilient alternative", done: Boolean(analysis),
       detail: analysis ? `${analysis.metrics.critical_supplier ? `Single point of failure: ${analysis.metrics.critical_supplier.supplier}` : "No single point of failure"} · ${analysis.resilient_alternative.status === "AVAILABLE" ? `resilient alternative ${money(analysis.resilient_alternative.total_cost)} (+${money(analysis.resilient_alternative.added_cost)})` : "no feasible resilient alternative"}` : "Runs automatically for every feasible plan", provenance: analysis ? "HYPOTHETICAL" : undefined },
     { label: "Actual disruption", done: disruptions.length > 0 || reality.length > 0,
@@ -77,7 +80,7 @@ function MissionLoop({ missionId, token }: { missionId: string; token: string })
       detail: approvals.length ? `${approvals.length} approval${approvals.length === 1 ? "" : "s"}${revoked ? ` · ${revoked} revoked when its plan went stale` : ""}` : "Awaiting an independent approver" },
     { label: "Purchase order", done: orders.length > 0, detail: orders.length ? orders.map((row) => `${row.po_number} ${row.status}`).join(" · ") : "No purchase order yet" },
     { label: "Audit", done: Boolean(data.verification.data?.valid),
-      detail: data.verification.data ? `${data.verification.data.length} events · hash chain ${data.verification.data.valid ? "verifies (tamper-evident)" : `BROKEN: ${data.verification.data.reason}`}` : "Loading" },
+      detail: data.verification.data ? `${data.verification.data.length} event${data.verification.data.length === 1 ? "" : "s"} · hash chain ${data.verification.data.valid ? "verifies (tamper-evident)" : `BROKEN: ${data.verification.data.reason}`}` : "Loading" },
   ];
   return (
     <section aria-label="The loop on this mission" className="space-y-3">
@@ -130,9 +133,9 @@ export default function JudgePage() {
       {token ? (
         <section className="space-y-3">
           {missions.data && missions.data.length > 1 && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex max-w-full items-center gap-3 text-sm">
               Mission
-              <select className="rounded border bg-background px-2 py-1 text-sm" value={missionId ?? ""} onChange={(event) => setPicked(event.target.value)}>
+              <select className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm sm:flex-none" value={missionId ?? ""} onChange={(event) => setPicked(event.target.value)}>
                 {missions.data.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
               </select>
             </label>

@@ -13,7 +13,7 @@ function reason(approval: Approval) {
   if (approval.status === "invalidated") return `Revoked: ${approval.invalidation_reason ?? "the plan changed"}`;
   if (approval.status === "expired") return `Expired: ${approval.invalidation_reason ?? "approval window elapsed"}`;
   if (approval.status === "consumed") return `Purchase orders generated${approval.consumed_at ? ` ${when(approval.consumed_at)}` : ""}`;
-  return approval.expires_at ? `Expires ${when(approval.expires_at)}` : "";
+  return "Ready to generate purchase orders";
 }
 
 // Approval tab: where the current plan stands, and the history that shows approvals never carry over to a changed plan.
@@ -32,8 +32,9 @@ export function ApprovalTab({ plans, approvals, demoOrg, canApprove, approvalBlo
             : <p className="text-sm text-muted-foreground">Approval starts once a feasible plan exists.</p>}
         </div>
         <p className="mt-5 text-sm text-muted-foreground">
-          {/* The rail already says so when the viewer is the requester. */}
-          {demoOrg ? "Demo organization: self-approval is allowed and each one is labeled DEMO override. " : approvalBlocked ? "" : "Segregation of duties: the coordinator who requested this mission can't approve its plan. "}
+          {demoOrg ? <><span className="font-medium text-foreground">Demo organization.</span> Self-approval is allowed here and each one is labeled DEMO override. </>
+            // When the viewer is the requester, the approval chain above already says so in their terms.
+            : approvalBlocked ? null : <><span className="font-medium text-foreground">Segregation of duties.</span> The person who requested a mission can&apos;t approve its plan. </>}
           An approval covers one exact plan version, expires, and is used once to generate purchase orders.
         </p>
       </section>
@@ -42,7 +43,7 @@ export function ApprovalTab({ plans, approvals, demoOrg, canApprove, approvalBlo
         <h3 className="text-base font-semibold">Approval history</h3>
         {history.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No approvals yet.</p> : (
           <Table className="mt-3">
-            <TableHeader><TableRow><TableHead>Plan version</TableHead><TableHead>Status</TableHead><TableHead>Approver</TableHead><TableHead>Time</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Plan version</TableHead><TableHead>Status</TableHead><TableHead>Approver</TableHead><TableHead>Approved</TableHead><TableHead>Expires</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
             <TableBody>
               {history.map((approval) => {
                 const [label, tone] = STATUS[approval.status] ?? [approval.status, "neutral"];
@@ -50,10 +51,11 @@ export function ApprovalTab({ plans, approvals, demoOrg, canApprove, approvalBlo
                   <TableRow key={approval.id}>
                     <TableCell>v{approval.plan_version}</TableCell>
                     <TableCell><StatusText tone={tone} value={approval.status}>{label}</StatusText></TableCell>
-                    <TableCell>{approval.approver_email ?? "—"}{approval.segregation_of_duties === "DEMO_ORG_SELF_APPROVAL_OVERRIDE" && <span className="text-muted-foreground"> · DEMO override</span>}</TableCell>
+                    <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{approval.approver_email ?? "—"}{approval.segregation_of_duties === "DEMO_ORG_SELF_APPROVAL_OVERRIDE" && <span className="text-muted-foreground"> · DEMO override</span>}</TableCell>
                     <TableCell>{when(approval.approved_at)}</TableCell>
+                    <TableCell className="text-muted-foreground">{approval.expires_at ? when(approval.expires_at) : "—"}</TableCell>
                     <TableCell className="text-right tabular">{money(approval.amount)}</TableCell>
-                    <TableCell className="whitespace-normal text-muted-foreground">{reason(approval)}</TableCell>
+                    <TableCell className="min-w-56 whitespace-normal text-muted-foreground">{reason(approval)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -74,7 +76,7 @@ export function ApprovalTab({ plans, approvals, demoOrg, canApprove, approvalBlo
                   <TableCell>v{row.version}</TableCell>
                   <TableCell><PlanStatusText value={row.status} /></TableCell>
                   <TableCell>{when(row.computed_at)}</TableCell>
-                  <TableCell className="whitespace-normal">{row.trigger.replace(/_/g, " ")}{row.stale_reason && <span className="block text-xs text-muted-foreground">Stale: {row.stale_reason}</span>}</TableCell>
+                  <TableCell className="whitespace-normal">{row.trigger.charAt(0).toUpperCase() + row.trigger.slice(1).replace(/_/g, " ")}{row.stale_reason && <span className="block text-xs text-muted-foreground">Stale: {row.stale_reason}</span>}</TableCell>
                   <TableCell className="text-right tabular">{row.status === "infeasible" ? "—" : money(row.total_cost)}</TableCell>
                   <TableCell><span className="font-mono text-xs" title={row.plan_hash}>{row.plan_hash?.slice(0, 12)}…</span></TableCell>
                 </TableRow>

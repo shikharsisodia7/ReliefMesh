@@ -9,8 +9,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { AuditEvent, AuditVerification, Job, Notification, Payment } from "@/lib/types";
 
 const shortHash = (hash?: string | null) => (hash ? `${hash.slice(0, 4)}…${hash.slice(-4)}` : "—");
-// "purchase_order.created" → "Purchase order created".
-const eventWords = (action: string) => { const text = action.replace(/[._]/g, " "); return text.charAt(0).toUpperCase() + text.slice(1); };
+// Plain words for the actions the API records; anything new falls back to "purchase_order.created" → "Purchase order created".
+const EVENT_WORDS: Record<string, string> = {
+  "approval.invalidated": "Approval revoked", "continuity.computed": "Stress test computed", "continuity.stale": "Stress test out of date",
+  "demo.seeded": "TEST suppliers seeded", "evidence.collected": "Evidence collected", "fulfillment.updated": "Fulfillment updated",
+  "job.failed": "Background job failed", "mission.cancelled": "Mission cancelled", "mission.created": "Mission created",
+  "mission.deadline_changed": "Deadline changed", "plan.approved": "Plan approved", "plan.computed": "Plan computed", "plan.stale": "Plan went stale",
+  "purchase_order.created": "Purchase order drafted", "purchase_order.sent": "Purchase order sent", "purchase_order.supplier_response": "Supplier responded to PO",
+  "purchase_order.voided": "Purchase order voided", "quote.draft_extracted": "Quote drafted from pasted text", "quote.submitted": "Quote submitted",
+  "quote.updated": "Quote revised", "quote.withdrawn": "Quote withdrawn", "rfq.accepted": "RFQ accepted", "rfq.invited": "RFQ sent",
+  "supplier_discovery.completed": "Supplier leads discovered", "supply_chain.disrupted": "Supply chain disrupted (demo)",
+};
+const eventWords = (action: string) => {
+  if (EVENT_WORDS[action]) return EVENT_WORDS[action];
+  const text = action.replace(/[._]/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+// Suppliers aren't organization members, so their actions would otherwise show a bare user id.
+const SUPPLIER_ACTIONS = new Set(["rfq.accepted", "quote.submitted", "quote.updated", "quote.withdrawn", "quote.draft_extracted", "purchase_order.supplier_response", "fulfillment.updated"]);
+const NETWORKS: Record<string, string> = { "solana-devnet": "Solana devnet · test USDC" };
 const severityWord: Record<string, string> = { warning: "Warning", critical: "Critical" };
 
 const ISO_TIME = String.raw`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})`;
@@ -45,6 +62,10 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
 }) {
   const failed = jobs.filter((job) => job.status === "failed").slice(0, 2);
   const events = [...audit].reverse();
+  const actor = (event: AuditEvent) => {
+    const name = actorName(event.actor_id);
+    return name.startsWith("User ") && SUPPLIER_ACTIONS.has(event.action) ? `Supplier · ${name.slice(5)}` : name;
+  };
   return (
     <div className="space-y-12">
       <section aria-label="Audit trail">
@@ -62,7 +83,7 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
                   <TableCell className="tabular text-muted-foreground">{event.sequence}</TableCell>
                   <TableCell>{when(event.created_at)}</TableCell>
                   <TableCell className="whitespace-normal">{eventWords(event.action)}</TableCell>
-                  <TableCell>{actorName(event.actor_id)}</TableCell>
+                  <TableCell>{actor(event)}</TableCell>
                   <TableCell><CopyHash hash={event.event_hash} sequence={event.sequence} /></TableCell>
                 </TableRow>
               ))}
@@ -74,7 +95,7 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
       {notifications.length > 0 && (
         <section aria-label="Mission messages">
           <h3 className="text-base font-semibold">Messages</h3>
-          <ul className="mt-2 max-h-96 overflow-y-auto">
+          <ul tabIndex={0} aria-label="Mission messages, scrollable" className="mt-2 max-h-96 overflow-y-auto">
             {notifications.map((notification) => (
               <li key={notification.id} className="grid gap-x-6 border-b py-2.5 text-sm sm:grid-cols-[140px_1fr]">
                 <span className="text-muted-foreground">{when(notification.created_at)}</span>
@@ -96,7 +117,7 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
                 <TableRow key={payment.id}>
                   <TableCell>{payment.subject_name}</TableCell>
                   <TableCell className="tabular">{payment.amount_display}</TableCell>
-                  <TableCell>{payment.network_label}</TableCell>
+                  <TableCell>{NETWORKS[payment.network_label] ?? payment.network_label}</TableCell>
                   <TableCell><a className="font-medium hover:underline" href={payment.explorer_url} target="_blank" rel="noreferrer"><span className="font-mono text-xs">{shortHash(payment.transaction)}</span> →</a></TableCell>
                   <TableCell>{payment.verified ? "Verified" : <StatusText tone="muted">{payment.status}</StatusText>}<span className="block text-xs text-muted-foreground">{when(payment.created_at)} · dossier <span className="font-mono">{payment.dossier_sha256.slice(0, 12)}</span></span></TableCell>
                 </TableRow>

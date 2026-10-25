@@ -25,7 +25,7 @@ const itemClass = "flex w-full cursor-default items-center gap-2 px-3 py-2 text-
 function OrganizationSwitcher({ rows, current, select }: { rows: Organization[]; current: Organization; select: (id: string) => void }) {
   return (
     <Menu.Root>
-      <Menu.Trigger className="inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-hidden hover:text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring" aria-label={`Organization: ${current.name}`}>
+      <Menu.Trigger className="inline-flex items-center gap-1 rounded-sm text-muted-foreground outline-hidden hover:text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring" aria-label={`${current.name}${current.is_demo ? " · DEMO ORG" : ""}, switch organization`}>
         {current.name}{current.is_demo && " · DEMO ORG"}<ChevronDown className="size-4" />
       </Menu.Trigger>
       <Menu.Portal>

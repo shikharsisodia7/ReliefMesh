@@ -108,9 +108,8 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Slack</h2>
-            <p className="text-sm text-muted-foreground">
-              {slackConnected ? <>Workspace <span className="font-medium">{data.slack.team_name ?? "—"}</span> · channel <span className="font-mono">{data.slack.channel_name ?? "—"}</span> · {data.slack.mode === "bot" ? "app" : "incoming webhook"}</> : "Not connected."}
-            </p>
+            {/* The state line below already says when Slack isn't connected. */}
+            {slackConnected && <p className="text-sm text-muted-foreground">Workspace <span className="font-medium">{data.slack.team_name ?? "—"}</span> · channel <span className="font-mono">{data.slack.channel_name ?? "—"}</span> · {data.slack.mode === "bot" ? "app" : "incoming webhook"}</p>}
             <p className="mt-1 text-[11px] text-tertiary">Slack messages are informational. There is no approve button, slash command or emoji approval — every approval happens inside ReliefMesh under the approver’s own sign-in.</p>
           </div>
           {isAdmin && (
@@ -125,8 +124,8 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         {isAdmin && !slackConnected && (
           <form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void saveSlack(); }}>
             <div className="flex gap-3 text-xs">
-              <label className="flex items-center gap-1"><input type="radio" checked={slackMode === "bot"} onChange={() => setSlackMode("bot")} />Bot token + channel</label>
-              <label className="flex items-center gap-1"><input type="radio" checked={slackMode === "webhook"} onChange={() => setSlackMode("webhook")} />Incoming webhook</label>
+              <label className="flex items-center gap-1"><input type="radio" className="accent-[var(--foreground)]" checked={slackMode === "bot"} onChange={() => setSlackMode("bot")} />Bot token + channel</label>
+              <label className="flex items-center gap-1"><input type="radio" className="accent-[var(--foreground)]" checked={slackMode === "webhook"} onChange={() => setSlackMode("webhook")} />Incoming webhook</label>
             </div>
             {slackMode === "bot" ? (
               <div className="flex flex-wrap items-end gap-2">
@@ -152,7 +151,7 @@ export function IntegrationsSettings({ organizationId, token, notice: initialNot
         </div>
         <DeliveryList deliveries={data.deliveries} token={token} canRetry={isAdmin} onChanged={() => void view.refetch()} showMission />
       </section>
-      <p className="text-[11px] text-tertiary"><RotateCcw className="mr-1 inline size-3" />Failed deliveries retry automatically with backoff; an administrator can retry a failed one after fixing the connection. <Link className="underline" href="/status">System status</Link> shows the same providers from the server’s side.</p>
+      <p className="text-[11px] text-tertiary"><RotateCcw className="mr-1 inline size-3" />Failed deliveries retry automatically with backoff; an administrator can retry a failed one after fixing the connection. <Link className="font-medium text-foreground hover:underline" href="/status">System status</Link> shows the same providers from the server’s side.</p>
     </div>
   );
 }

@@ -38,8 +38,7 @@ export function MissionsMap({ missions }: { missions: Mission[] }) {
       {markers.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No mission is linked to a located event yet.</p> : (
         <div className="mt-3">
           <TileMap markers={markers} height={460} label={`Map of ${markers.length} linked NASA EONET event${markers.length === 1 ? "" : "s"}`} />
-          <p className="mt-1 text-xs font-medium">Triangle: linked event</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">NASA EONET events. Delivery locations aren&apos;t geocoded by the API, so they aren&apos;t plotted.</p>
+          <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Triangle: linked NASA EONET event.</span> Delivery locations aren&apos;t geocoded by the API, so they aren&apos;t plotted.</p>
         </div>
       )}
     </section>

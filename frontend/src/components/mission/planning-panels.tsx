@@ -68,49 +68,55 @@ export function DemoControls({ missionId, token, rows, plan, run, disruptions, s
   );
 }
 
-// Full-width, side-by-side view of the previous and current plan. Changed cells are marked by weight, not color.
+// One table comparing the previous and current plan. Changed values are marked by weight, not color.
 export function CompareView({ latest, previous, approvals, onClose }: { latest: Plan; previous: Plan; approvals: Approval[]; onClose: () => void }) {
   const invalidated = approvals.find((approval) => approval.plan_id === previous.id && approval.status === "invalidated");
   const rows = latest.difference.previous_plan_id === previous.id ? latest.difference.supplier_delta ?? [] : [];
   const delta = latest.difference.cost_delta;
-  const column = (plan: Plan, label: string, side: "before" | "after") => (
-    <div>
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <div className="mt-1 flex items-baseline gap-3"><h3 className="text-lg font-semibold">v{plan.version}</h3><PlanStatusText value={plan.status} /></div>
-      <Table className="mt-4 w-full text-sm">
-        <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 font-medium">Supplier</th><th className="py-2 text-right font-medium">Units</th><th className="py-2 text-right font-medium">Items cost</th></tr></thead>
-        <tbody>
-          {rows.map((row) => {
-            const units = side === "before" ? row.units_before : row.units_after;
-            const changed = row.units_before !== row.units_after;
-            return (
-              <tr key={row.supplier_id} className={cn("border-b", changed && "font-semibold")}>
-                <td className="py-2.5">{row.supplier}</td>
-                <td className="py-2.5 text-right tabular">{units}</td>
-                <td className="py-2.5 text-right tabular">{money(side === "before" ? row.cost_before : row.cost_after)}</td>
-              </tr>
-            );
-          })}
-          <tr><td className="py-2.5 text-muted-foreground">Total with shipping</td><td /><td className="py-2.5 text-right font-medium tabular">{plan.status === "infeasible" ? "—" : money(plan.total_cost)}</td></tr>
-        </tbody>
-      </Table>
-    </div>
-  );
+  const total = (plan: Plan) => (plan.status === "infeasible" ? "—" : money(plan.total_cost));
+  const th = (label: string, right = true) => <th className={cn("py-2 font-medium", right && "text-right")}>{label}</th>;
   return (
     <section aria-label="Plan comparison" data-testid="compare-view">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Compare v{previous.version} and v{latest.version}</h2>
         <Button variant="text" onClick={onClose}>Back to plan</Button>
       </div>
-      <div className="mt-6 grid gap-12 md:grid-cols-2">
-        {column(previous, "Previous plan", "before")}
-        {column(latest, "Current plan", "after")}
-      </div>
+      <dl className="mt-6 flex flex-wrap gap-x-12 gap-y-3 text-sm">
+        <div><dt className="text-xs font-medium text-muted-foreground">Previous plan</dt><dd className="mt-0.5">v{previous.version} · <PlanStatusText value={previous.status} /></dd></div>
+        <div><dt className="text-xs font-medium text-muted-foreground">Current plan</dt><dd className="mt-0.5">v{latest.version} · <PlanStatusText value={latest.status} /></dd></div>
+      </dl>
+      <Table className="mt-6 w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs text-muted-foreground">
+            {th("Supplier", false)}{th(`Qty v${previous.version}`)}{th(`Qty v${latest.version}`)}{th(`Items v${previous.version}`)}{th(`Items v${latest.version}`)}{th("Difference")}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const changed = row.units_before !== row.units_after || Number(row.cost_before) !== Number(row.cost_after);
+            const diff = Number(row.cost_after) - Number(row.cost_before);
+            return (
+              <tr key={row.supplier_id} className="border-b">
+                <td className="py-2.5">{row.supplier}</td>
+                <td className="py-2.5 text-right tabular text-muted-foreground">{row.units_before}</td>
+                <td className={cn("py-2.5 text-right tabular", changed && "font-semibold")}>{row.units_after}</td>
+                <td className="py-2.5 text-right tabular text-muted-foreground">{money(row.cost_before)}</td>
+                <td className={cn("py-2.5 text-right tabular", changed && "font-semibold")}>{money(row.cost_after)}</td>
+                <td className="py-2.5 text-right tabular">{Math.abs(diff) < 0.005 ? "—" : signedAmount(diff, true)}</td>
+              </tr>
+            );
+          })}
+          <tr>
+            <td colSpan={3} className="py-2.5 text-muted-foreground">Total with shipping</td>
+            <td className="py-2.5 text-right tabular text-muted-foreground">{total(previous)}</td>
+            <td className="py-2.5 text-right font-semibold tabular">{total(latest)}</td>
+            <td className="py-2.5 text-right font-semibold tabular">{delta ? signedAmount(delta, true) : "—"}</td>
+          </tr>
+        </tbody>
+      </Table>
       <dl className="mt-10 grid max-w-3xl gap-x-6 gap-y-4 text-sm sm:grid-cols-[160px_1fr]">
-        <dt className="text-muted-foreground">Cost change</dt>
-        <dd><span className="text-base font-semibold tabular">{delta ? signedAmount(delta, true) : "—"}</span></dd>
         <dt className="text-muted-foreground">Why it changed</dt>
-        <dd><ul className="space-y-1">{(latest.difference.why?.length ? latest.difference.why : [latest.trigger]).map((reason) => <li key={reason}>{reason}</li>)}</ul></dd>
+        <dd><ul className="space-y-1">{(latest.difference.why?.length ? latest.difference.why : [latest.trigger]).map((reason) => <li key={reason}>{reason}</li>)}</ul><p className="mt-1 text-xs text-muted-foreground">The reason ReliefMesh recorded with the plan.</p></dd>
         <dt className="text-muted-foreground">Approval</dt>
         <dd>{invalidated ? <><span className="font-medium">Approval revoked</span> · v{previous.version} approval for {money(invalidated.amount)}: {invalidated.invalidation_reason}</> : <span className="text-muted-foreground">Plan v{previous.version} was not approved.</span>}</dd>
       </dl>
