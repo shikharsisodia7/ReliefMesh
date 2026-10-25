@@ -72,14 +72,16 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await supplier.getByLabel("Legal business name").fill("Woolworks Supply Co");
   await supplier.getByLabel("Delivery estimate").fill("2030-01-03T09:00");
   await supplier.getByLabel("Quote expiration").fill("2030-01-02T09:00");
+  await supplier.getByLabel("I reviewed the values and confirm they are correct.").check();
   await supplier.getByRole("button", { name: "Submit binding quote" }).click();
-  await expect(supplier).toHaveURL(/\/supplier$/);
+  await supplier.getByRole("link", { name: "View in My Quotes" }).click();
+  await expect(supplier).toHaveURL(/\/supplier\?tab=quotes$/);
   await expect(supplier.getByText(/120 wool blankets at \$28\.50 · ETA/)).toBeVisible();
 
   // A supplier revising its own quote in the portal is a real disruption the buyer must see.
-  await supplier.getByText("Revise price or inventory").click();
-  await supplier.getByLabel("wool blankets price").fill("31.00");
-  await supplier.getByRole("button", { name: "Save revision" }).click();
+  await supplier.getByRole("button", { name: "Revise quote" }).click();
+  await supplier.getByLabel("Unit price for wool blankets").fill("31.00");
+  await supplier.getByRole("button", { name: "Save changes" }).click();
   await expect(supplier.getByText(/Quote v2/)).toBeVisible();
   await expect(supplier.getByText(/120 wool blankets at \$31\.00/)).toBeVisible();
 });

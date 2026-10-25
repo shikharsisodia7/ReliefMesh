@@ -16,8 +16,12 @@ async function registerSupplier(context: BrowserContext, email: string, inviteUr
   await page.getByLabel("Shipping (USD)").fill(unitPrice === "7" ? "10" : "0");
   await page.getByLabel("Delivery estimate").fill("2030-01-03T09:00");
   await page.getByLabel("Quote expiration").fill("2030-01-02T09:00");
+  await page.getByLabel("I reviewed the values and confirm they are correct.").check();
   await page.getByRole("button", { name: "Submit binding quote" }).click();
-  await expect(page).toHaveURL(/\/supplier/);
+  // The RFQ page becomes the read-only submitted quote.
+  await expect(page.getByText("Quote submitted")).toBeVisible();
+  await page.getByRole("link", { name: "View in My Quotes" }).click();
+  await expect(page).toHaveURL(/\/supplier\?tab=quotes/);
   return page;
 }
 
@@ -100,8 +104,11 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await approver.getByRole("button", { name: "Approve plan" }).click();
   await expect(approver.getByText("Approved", { exact: true }).first()).toBeVisible();
 
+  // Withdraw sits in the Revise quote slide-over and confirms first.
+  await supplierOne.getByRole("button", { name: "Revise quote" }).click();
   await supplierOne.getByRole("button", { name: "Withdraw quote" }).click();
-  await expect(supplierOne.getByText("withdrawn", { exact: true })).toBeVisible();
+  await supplierOne.getByRole("dialog", { name: "Withdraw quote" }).getByRole("button", { name: "Withdraw quote" }).click();
+  await expect(supplierOne.getByText("Withdrawn", { exact: true })).toBeVisible();
   await expect(coordinator.getByRole("heading", { name: "Plan v2" })).toBeVisible({ timeout: 20_000 });
   await expect(coordinator.getByTestId("plan-total")).toHaveText("$90");
   await expect(coordinator.getByText(/Approval revoked/).first()).toBeVisible();
@@ -116,12 +123,13 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   // The PO's progress line marks its current step.
   await expect(coordinator.locator('[aria-current="step"]')).toHaveText("Sent");
 
-  await supplierTwo.reload();
+  await supplierTwo.goto("/supplier?tab=orders");
   await expect(supplierTwo.getByRole("button", { name: "Accept" })).toBeVisible();
   await supplierTwo.getByRole("button", { name: "Accept" }).click();
-  await expect(supplierTwo.getByText("supplier_accepted", { exact: true })).toBeVisible();
+  // Status codes read as words: supplier_accepted → "Accepted", completed → "Delivered".
+  await expect(supplierTwo.locator('[data-status="supplier_accepted"]')).toHaveText("Accepted");
   await supplierTwo.getByRole("button", { name: "Mark delivered" }).click();
-  await expect(supplierTwo.getByText("completed", { exact: true })).toBeVisible();
+  await expect(supplierTwo.locator('[data-status="completed"]')).toHaveText("Delivered");
   await coordinator.getByRole("tab", { name: "Audit" }).click();
   await expect(coordinator.getByText(/Hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

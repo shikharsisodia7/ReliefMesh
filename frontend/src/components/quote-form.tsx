@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { QuoteDraft, Requirement } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const line = z.object({
   requirement_id: z.string(),
@@ -26,13 +28,27 @@ const schema = z.object({
   lines: z.array(line),
 });
 export type QuoteValues = z.infer<typeof schema>;
+type FieldName = Parameters<ReturnType<typeof useForm<QuoteValues>>["register"]>[0];
 
 // datetime-local inputs take local wall-clock time without a zone.
 /** ISO timestamp -> value for a datetime-local input, in the viewer's local time. */
 export const toLocalInput = (iso: string) => { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
 
-// One block per mission requirement; each submitted line is pinned to that requirement's stable ID.
-export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requirements: Requirement[]; legalName?: string | null; onSubmit: (values: QuoteValues) => Promise<void>; onDraft?: (text: string) => Promise<QuoteDraft> }) {
+// A field label with a small gray "AI draft" marker while the value is still Gemini's.
+function FieldLabel({ htmlFor, ai, children }: { htmlFor: string; ai: boolean; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      {ai && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkles className="size-3" aria-hidden />AI draft</span>}
+    </div>
+  );
+}
+
+// One row per mission requirement; each submitted line is pinned to that requirement's stable ID.
+export function QuoteForm({ requirements, legalName, onSubmit, onDraft, assistant }: {
+  requirements: Requirement[]; legalName?: string | null; onSubmit: (values: QuoteValues) => Promise<void>;
+  onDraft?: (text: string) => Promise<QuoteDraft>; assistant: "on" | "off" | "unknown";
+}) {
   const form = useForm<QuoteValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -44,78 +60,106 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requ
   const [drafting, setDrafting] = useState(false);
   const [draft, setDraft] = useState<QuoteDraft | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [aiFields, setAiFields] = useState<Set<string>>(new Set());
+  const [reviewed, setReviewed] = useState(false);
   const label = (index: number, base: string) => (index === 0 ? base : `${requirements[index].item}: ${base.toLowerCase()}`);
   const draftLine = (index: number) => draft?.lines.find((row) => row.requirement_id === requirements[index].id);
   const flagged = (index: number, field: "available_quantity" | "unit_price") => {
     const row = draftLine(index);
     return Boolean(row && (!row.grounded || row.unverified_fields.includes(field)));
   };
-  const review = "border-warn ring-2 ring-warn/30";
+  // Editing a field makes it the supplier's own value, so its "AI draft" marker goes away.
+  const field = (name: FieldName, options: { valueAsNumber?: boolean } = {}) => form.register(name, {
+    ...options,
+    onChange: () => setAiFields((current) => { if (!current.has(name)) return current; const next = new Set(current); next.delete(name); return next; }),
+  });
 
   const applyDraft = async () => {
     if (!onDraft) return;
     setDrafting(true); setDraftError(null);
     try {
       const result = await onDraft(pasted);
+      const filled = new Set<string>();
+      const fill = (name: FieldName, value: string | number) => { form.setValue(name, value as never, { shouldDirty: true }); filled.add(name); };
       requirements.forEach((requirement, index) => {
         const row = result.lines.find((candidate) => candidate.requirement_id === requirement.id);
         if (!row) return;
-        form.setValue(`lines.${index}.item`, row.item, { shouldDirty: true });
-        if (row.available_quantity !== null) form.setValue(`lines.${index}.available_quantity`, row.available_quantity, { shouldDirty: true });
-        if (row.unit_price !== null) form.setValue(`lines.${index}.unit_price`, Number(row.unit_price), { shouldDirty: true });
-        if (row.delivery_date) form.setValue(`lines.${index}.delivery_date`, toLocalInput(row.delivery_date), { shouldDirty: true });
+        fill(`lines.${index}.item`, row.item);
+        if (row.available_quantity !== null) fill(`lines.${index}.available_quantity`, row.available_quantity);
+        if (row.unit_price !== null) fill(`lines.${index}.unit_price`, Number(row.unit_price));
+        if (row.delivery_date) fill(`lines.${index}.delivery_date`, toLocalInput(row.delivery_date));
       });
-      if (result.shipping_cost !== null) form.setValue("shipping_cost", Number(result.shipping_cost), { shouldDirty: true });
-      if (result.expires_at) form.setValue("expires_at", toLocalInput(result.expires_at), { shouldDirty: true });
+      if (result.shipping_cost !== null) fill("shipping_cost", Number(result.shipping_cost));
+      if (result.expires_at) fill("expires_at", toLocalInput(result.expires_at));
+      setAiFields(filled);
       setDraft(result);
     } catch (error) {
       setDraftError(error instanceof Error ? error.message : "The quote assistant is unavailable; fill the form manually.");
     } finally { setDrafting(false); }
   };
 
+  const review = "border-warn";
   return (
-    <form className="grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(async (values) => {
-      const quoted = values.lines.filter((row) => row.available_quantity > 0);
-      if (quoted.length === 0) { form.setError("lines", { message: "Quote at least one requirement" }); return; }
-      if (quoted.some((row) => !row.delivery_date || row.unit_price <= 0)) { form.setError("lines", { message: "Each quoted line needs a unit price and delivery estimate" }); return; }
-      await onSubmit({ ...values, lines: quoted });
-    })}>
-      {onDraft && (
-        <div className="grid gap-2 rounded-lg border border-dashed p-3 sm:col-span-2">
-          <Label htmlFor="pasted-quote">Paste an existing quote (optional)</Label>
-          <Textarea id="pasted-quote" rows={4} maxLength={12000} placeholder="Paste the text of your emailed or PDF quote. Gemini pre-fills the form below; nothing is submitted until you review it." value={pasted} onChange={(event) => setPasted(event.target.value)} />
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="secondary" size="sm" disabled={drafting || pasted.trim().length < 20} onClick={() => void applyDraft()}>{drafting ? "Reading quote…" : "Pre-fill with Gemini"}</Button>
-            <span className="text-xs text-muted-foreground">AI draft only. It cannot mark you eligible or change screening.</span>
-          </div>
-          {draftError && <p className="text-xs text-critical">{draftError}</p>}
-          {draft && (
-            <div className="rounded-md border border-warn/40 bg-warn/10 p-2 text-xs" role="status">
-              <p className="font-medium">{draft.notice} <span className="font-mono text-muted-foreground">{draft.model}</span></p>
-              <p className="mt-1">Filled {draft.lines.length} of {requirements.length} requirements. Highlighted values were not found in the quoted text. Check them.</p>
-              {draft.unmatched_items.length > 0 && <p className="mt-1 text-muted-foreground">Not part of this RFQ: {draft.unmatched_items.join(", ")}</p>}
-            </div>
-          )}
+    <div className="grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+      <form className="grid gap-5 sm:grid-cols-2" onSubmit={form.handleSubmit(async (values) => {
+        const quoted = values.lines.filter((row) => row.available_quantity > 0);
+        if (quoted.length === 0) { form.setError("lines", { message: "Quote at least one requirement" }); return; }
+        if (quoted.some((row) => !row.delivery_date || row.unit_price <= 0)) { form.setError("lines", { message: "Each quoted line needs a unit price and delivery estimate" }); return; }
+        await onSubmit({ ...values, lines: quoted });
+      })}>
+        <div className="sm:col-span-2">
+          <h2 className="text-xl font-semibold">Your quote</h2>
+          {draft && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Sparkles className="size-3.5" aria-hidden />AI draft · review before submitting</p>}
         </div>
-      )}
-      <div><Label htmlFor="legal-name">Legal business name</Label><Input id="legal-name" className="mt-1" placeholder="As registered" {...form.register("legal_name")} />{form.formState.errors.legal_name && <p className="mt-1 text-xs text-critical">{form.formState.errors.legal_name.message}</p>}</div>
-      <div><Label htmlFor="website">Company website (optional)</Label><Input id="website" className="mt-1" {...form.register("website")} /></div>
-      <p className="text-xs text-muted-foreground sm:col-span-2">ReliefMesh screens the legal name against official public records (OFAC sanctions list, SAM.gov, openFDA recalls, USAspending awards). Free-text notes never affect eligibility.</p>
-      {requirements.map((requirement, index) => (
-        <fieldset key={requirement.id ?? requirement.item} className="grid gap-3 rounded-lg border p-3 sm:col-span-2 sm:grid-cols-2">
-          <legend className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Requirement {index + 1}: {requirement.quantity} {requirement.item} <span className="font-mono normal-case text-tertiary">{requirement.id}</span></legend>
-          <input type="hidden" {...form.register(`lines.${index}.requirement_id`)} />
-          <div><Label htmlFor={`item-${index}`}>{label(index, "Item")}</Label><Input id={`item-${index}`} className="mt-1" placeholder="Your product description" {...form.register(`lines.${index}.item`)} /></div>
-          <div><Label htmlFor={`quantity-${index}`}>{label(index, "Available quantity")}</Label><Input id={`quantity-${index}`} className={`mt-1 ${flagged(index, "available_quantity") ? review : ""}`} type="number" {...form.register(`lines.${index}.available_quantity`, { valueAsNumber: true })} /></div>
-          <div><Label htmlFor={`price-${index}`}>{label(index, "Unit price (USD)")}</Label><Input id={`price-${index}`} className={`mt-1 ${flagged(index, "unit_price") ? review : ""}`} type="number" step="0.01" {...form.register(`lines.${index}.unit_price`, { valueAsNumber: true })} /></div>
-          <div><Label htmlFor={`delivery-${index}`}>{label(index, "Delivery estimate")}</Label><Input id={`delivery-${index}`} className="mt-1" type="datetime-local" {...form.register(`lines.${index}.delivery_date`)} /></div>
-          {draftLine(index) && <p className="text-xs text-muted-foreground sm:col-span-2">From your text: <q className="italic">{draftLine(index)!.source_excerpt}</q>{!draftLine(index)!.grounded && <span className="text-warn"> (not found verbatim in the pasted quote)</span>}</p>}
-        </fieldset>
-      ))}
-      {form.formState.errors.lines?.message && <p className="text-xs text-critical sm:col-span-2">{form.formState.errors.lines.message}</p>}
-      <div><Label htmlFor="shipping">Shipping (USD)</Label><Input id="shipping" className="mt-1" type="number" step="0.01" {...form.register("shipping_cost", { valueAsNumber: true })} /></div>
-      <div><Label htmlFor="expiration">Quote expiration</Label><Input id="expiration" className="mt-1" type="datetime-local" {...form.register("expires_at")} /></div>
-      <Button className="sm:col-span-2" type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Submitting…" : "Submit binding quote"}</Button>
-    </form>
+        <div><Label htmlFor="legal-name">Legal business name</Label><Input id="legal-name" className="mt-1.5" placeholder="As registered" {...form.register("legal_name")} />{form.formState.errors.legal_name && <p className="mt-1 text-xs text-critical">{form.formState.errors.legal_name.message}</p>}</div>
+        <div><Label htmlFor="website">Company website (optional)</Label><Input id="website" className="mt-1.5" {...form.register("website")} /></div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">ReliefMesh screens the legal name against official public records (OFAC sanctions list, SAM.gov, openFDA recalls, USAspending awards). Free-text notes never affect eligibility.</p>
+        {requirements.map((requirement, index) => (
+          <fieldset key={requirement.id ?? requirement.item} className="grid gap-5 border-t pt-5 sm:col-span-2 sm:grid-cols-2">
+            <legend className="float-left text-base font-semibold sm:col-span-2">{requirement.quantity.toLocaleString("en-US")} {requirement.item} needed</legend>
+            <input type="hidden" {...form.register(`lines.${index}.requirement_id`)} />
+            <div><FieldLabel htmlFor={`item-${index}`} ai={aiFields.has(`lines.${index}.item`)}>{label(index, "Item")}</FieldLabel><Input id={`item-${index}`} className="mt-1.5" placeholder="Your product description" {...field(`lines.${index}.item`)} /></div>
+            <div><FieldLabel htmlFor={`quantity-${index}`} ai={aiFields.has(`lines.${index}.available_quantity`)}>{label(index, "Available quantity")}</FieldLabel><Input id={`quantity-${index}`} className={cn("mt-1.5", flagged(index, "available_quantity") && review)} type="number" {...field(`lines.${index}.available_quantity`, { valueAsNumber: true })} /></div>
+            <div><FieldLabel htmlFor={`price-${index}`} ai={aiFields.has(`lines.${index}.unit_price`)}>{label(index, "Unit price (USD)")}</FieldLabel><Input id={`price-${index}`} className={cn("mt-1.5", flagged(index, "unit_price") && review)} type="number" step="0.01" {...field(`lines.${index}.unit_price`, { valueAsNumber: true })} /></div>
+            <div><FieldLabel htmlFor={`delivery-${index}`} ai={aiFields.has(`lines.${index}.delivery_date`)}>{label(index, "Delivery estimate")}</FieldLabel><Input id={`delivery-${index}`} className="mt-1.5" type="datetime-local" {...field(`lines.${index}.delivery_date`)} /></div>
+            {draftLine(index) && <p className="text-xs text-muted-foreground sm:col-span-2">From your text: <q className="italic">{draftLine(index)!.source_excerpt}</q>{!draftLine(index)!.grounded && <span className="text-warn"> (not found verbatim in the pasted quote)</span>}</p>}
+          </fieldset>
+        ))}
+        {form.formState.errors.lines?.message && <p className="text-xs text-critical sm:col-span-2">{form.formState.errors.lines.message}</p>}
+        <div className="border-t pt-5"><FieldLabel htmlFor="shipping" ai={aiFields.has("shipping_cost")}>Shipping (USD)</FieldLabel><Input id="shipping" className="mt-1.5" type="number" step="0.01" {...field("shipping_cost", { valueAsNumber: true })} /></div>
+        <div className="sm:border-t sm:pt-5"><FieldLabel htmlFor="expiration" ai={aiFields.has("expires_at")}>Quote expiration</FieldLabel><Input id="expiration" className="mt-1.5" type="datetime-local" {...field("expires_at")} /></div>
+        <div className="mt-2 sm:col-span-2">
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" required className="size-4 accent-[var(--foreground)]" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} />
+            I reviewed the values and confirm they are correct.
+          </label>
+          <Button className="mt-5" size="lg" type="submit" disabled={!reviewed || form.formState.isSubmitting}>{form.formState.isSubmitting ? "Submitting…" : "Submit binding quote"}</Button>
+          {!reviewed && <p className="mt-2 text-sm text-muted-foreground">Confirm review to submit.</p>}
+        </div>
+      </form>
+
+      <aside aria-label="Draft from an existing quote">
+        <h2 className="text-base font-semibold">Draft from an existing quote</h2>
+        <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-muted-foreground"><Sparkles className="size-3.5" aria-hidden />AI · Gemini · pasted text</p>
+        {onDraft ? (
+          <div className="mt-4 grid gap-3">
+            <Label htmlFor="pasted-quote">Paste an existing quote (optional)</Label>
+            <Textarea id="pasted-quote" rows={8} maxLength={12000} placeholder="Paste the text of your emailed or PDF quote. Gemini pre-fills the form; nothing is submitted until you review it." value={pasted} onChange={(event) => setPasted(event.target.value)} />
+            <Button type="button" variant="secondary" className="justify-self-start" disabled={drafting || pasted.trim().length < 20} onClick={() => void applyDraft()}>{drafting ? "Reading quote…" : "Pre-fill with Gemini"}</Button>
+            <p className="text-xs text-muted-foreground">AI draft only. It cannot mark you eligible or change screening.</p>
+            {draftError && <p role="alert" className="text-sm text-critical">{draftError}</p>}
+            {draft && (
+              <div className="space-y-1 border-t pt-3 text-sm" role="status">
+                <p>{draft.notice} <span className="font-mono text-xs text-muted-foreground">{draft.model}</span></p>
+                <p className="text-muted-foreground">Filled {draft.lines.length} of {requirements.length} requirements. Values outlined in amber were not found in your text. Check them.</p>
+                {draft.unmatched_items.length > 0 && <p className="text-muted-foreground">Not part of this RFQ: {draft.unmatched_items.join(", ")}</p>}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">{assistant === "off" ? "Drafting from a pasted quote isn't available because Gemini isn't configured on this server. Fill the form by hand." : "Checking whether the quote assistant is available…"}</p>
+        )}
+      </aside>
+    </div>
   );
 }

@@ -46,8 +46,10 @@ test("revising a quote keeps its expiry in the supplier's local time", async ({ 
   await supplier.getByLabel("Shipping (USD)").fill("0");
   await supplier.getByLabel("Delivery estimate").fill("2030-01-03T09:00");
   await supplier.getByLabel("Quote expiration").fill("2030-01-02T23:00");
+  await supplier.getByLabel("I reviewed the values and confirm they are correct.").check();
   await supplier.getByRole("button", { name: "Submit binding quote" }).click();
-  await expect(supplier).toHaveURL(/\/supplier/);
-  await supplier.getByText("Revise price or inventory").click();
-  await expect(supplier.locator("details").getByLabel("Quote expiration")).toHaveValue("2030-01-02T23:00");
+  await supplier.getByRole("link", { name: "View in My Quotes" }).click();
+  await expect(supplier).toHaveURL(/\/supplier\?tab=quotes/);
+  await supplier.getByRole("button", { name: "Revise quote" }).click();
+  await expect(supplier.getByRole("dialog", { name: "Revise quote" }).getByLabel("Quote expiration")).toHaveValue("2030-01-02T23:00");
 });
