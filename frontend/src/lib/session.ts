@@ -37,7 +37,10 @@ export function safeNext(value: string | null | undefined): string | null {
   try {
     const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
     const url = new URL(value, origin);
-    return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : null;
+    if (url.origin !== origin) return null;
+    // Re-check what is returned: dot-segment normalization turns "/..//evil.test" into "//evil.test".
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    return path.startsWith("/") && !path.startsWith("//") ? path : null;
   } catch {
     return null;
   }
