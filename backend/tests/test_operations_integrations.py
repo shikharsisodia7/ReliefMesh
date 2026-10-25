@@ -22,7 +22,8 @@ import pytest
 
 from app.main import create_app
 from app.operations import templates
-from app.integrations import google_calendar
+from app.integrations import google_calendar, slack
+from app.integrations.connections import IntegrationError
 from conftest import FakeUpstream, auth, make_settings, register, settle_jobs, wait_for
 
 ALL_SCOPES = ("openid https://www.googleapis.com/auth/userinfo.email "
@@ -343,6 +344,24 @@ def test_calendar_bodies_and_deterministic_event_ids() -> None:
     first = google_calendar.event_id("o1", "m1", "approval")
     assert first == google_calendar.event_id("o1", "m1", "approval") != google_calendar.event_id("o1", "m1", "deadline")
     assert set(first) <= set("abcdefghijklmnopqrstuv0123456789") and 5 <= len(first) <= 1024
+
+
+@pytest.mark.parametrize("url", [
+    "http://hooks.slack.com/services/T0/B0/x",
+    "https://hooks.slack.com@169.254.169.254/services/x",
+    "https://hooks.slack.com.evil.test/services/x",
+    "https://evilhooks.slack.com/services/x",
+    "https://hooks.slack.com:8443/services/x",
+    "https://hooks.slack.com/api/x",
+    "https://169.254.169.254/services/x",
+    "https://hooks.slack.com\\@evil.test/services/x",
+    "https://localhost/services/x",
+])
+def test_admin_supplied_webhook_url_cannot_reach_other_hosts(url: str) -> None:
+    with pytest.raises(IntegrationError):
+        slack.validated_webhook(url)
+    assert slack.validated_webhook(" https://hooks.slack.com/services/T0/B0/x ") == \
+        "https://hooks.slack.com/services/T0/B0/x"
 
 
 # ---------------------------------------------------------------- OAuth + settings
