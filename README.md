@@ -82,20 +82,7 @@ purchase order, or audit record. A real change is stored separately as an **ACTU
 <!-- FINAL_SCREENSHOT: plan-continuity -->
 <!-- FINAL_SCREENSHOT: v1-v2-comparison -->
 
-## Product views for judges
 
-Final, redacted production captures are still being prepared. The README deliberately uses placeholders rather than
-inventing image paths or publishing demo/private identifiers.
-
-<!-- FINAL_SCREENSHOT: dashboard-map -->
-<!-- FINAL_SCREENSHOT: mission-context -->
-<!-- FINAL_SCREENSHOT: suppliers-evidence -->
-<!-- FINAL_SCREENSHOT: approval -->
-<!-- FINAL_SCREENSHOT: orders -->
-<!-- FINAL_SCREENSHOT: audit -->
-<!-- FINAL_SCREENSHOT: status -->
-<!-- FINAL_SCREENSHOT: fetch-asi-one -->
-<!-- FINAL_SCREENSHOT: figma-workflow -->
 
 ## How it works
 
