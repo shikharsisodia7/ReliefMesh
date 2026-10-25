@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from .http import AdapterResult, IntegrationHub
@@ -42,6 +43,8 @@ async def explain_recovery(hub: IntegrationHub, api_key: str | None, model: str,
     blocks = response.get("content") or []
     raw = "".join(str(block.get("text", "")) for block in blocks
                    if isinstance(block, dict) and block.get("type") == "text").strip()
+    # Tolerate a ```json fence despite the instruction; citations are still validated strictly below.
+    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw)
     try:
         parsed = json.loads(raw)
         rows = parsed.get("sentences") if isinstance(parsed, dict) else None

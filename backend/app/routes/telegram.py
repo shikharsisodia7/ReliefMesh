@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pymongo.errors import DuplicateKeyError
 
 from ..core import (
     Services, audit, current_user, get_services, invitation_from_token, new_id, now_iso, notify, secret, token_hash,
@@ -74,24 +75,17 @@ async def begin_invitation_onboarding(services: Services, telegram_user_id: str,
     except HTTPException:
         return "That RFQ link is invalid or expired. Ask the buyer to resend the invitation email."
     if invitation.get("status") != "sent":
-        if invitation.get("status") == "accepted":
-            supplier = await services.store.get("suppliers", invitation.get("accepted_by_user_id", ""))
-            if supplier and supplier.get("email", "").casefold() == invitation["supplier_email"].casefold():
-                if supplier.get("telegram_user_id") not in (None, telegram_user_id):
-                    return "This supplier profile is connected to a different Telegram account. Contact the buyer to update access."
-                supplier.update(telegram_user_id=telegram_user_id, updated_at=now_iso())
-                await services.store.replace("suppliers", supplier["id"], supplier)
-                await services.store.upsert("telegram_subscriptions", {
-                    "id": telegram_user_id, "telegram_user_id": telegram_user_id,
-                    "supplier_id": supplier["id"], "active": True, "updated_at": now_iso(),
-                })
-                return f"Telegram connected to {supplier.get('legal_name') or 'your supplier profile'}. Text /help to continue."
-        return f"This RFQ is already {invitation.get('status', 'closed')}. Text /rfqs to see other requests."
+        # RFQ links are single use (REL-004): a used link must not bind a new Telegram account to the profile.
+        return (f"This RFQ is already {invitation.get('status', 'closed')}. To use Telegram with an existing supplier "
+                "profile, sign in to ReliefMesh and generate a Telegram link code.")
 
-    supplier = next((row for row in await services.store.find("suppliers", email=invitation["supplier_email"].casefold())
-                     if row.get("telegram_user_id") in (None, telegram_user_id)), None)
-    if supplier and supplier.get("telegram_user_id") not in (None, telegram_user_id):
-        return "This supplier profile is connected to a different Telegram account. Contact the buyer to update access."
+    # The RFQ link proves control of one invitation, not of an existing supplier account. Only a profile that was
+    # created in Telegram by this same chat may be reused; portal accounts must link with a signed-in link code.
+    existing = await services.store.find("suppliers", email=invitation["supplier_email"].casefold())
+    if any(row.get("user_id") or row.get("telegram_user_id") not in (None, telegram_user_id) for row in existing):
+        return ("This email already has a ReliefMesh supplier account. Sign in to accept the RFQ in the portal, or "
+                "generate a Telegram link code there to connect this chat.")
+    supplier = next((row for row in existing if row.get("telegram_user_id") == telegram_user_id), None)
     state = {
         "id": telegram_user_id, "telegram_user_id": telegram_user_id,
         "invitation_id": invitation["id"], "supplier_email": invitation["supplier_email"].casefold(),
@@ -157,6 +151,11 @@ async def finish_invitation_onboarding(services: Services, telegram_user_id: str
         await services.store.replace("telegram_onboarding", telegram_user_id, state)
         return "This RFQ is no longer available. Ask the buyer to send a new invitation."
     supplier = await services.store.get("suppliers", state.get("supplier_id") or "")
+    if supplier and (supplier.get("user_id") or supplier.get("telegram_user_id") not in (None, telegram_user_id)):
+        return "This supplier profile belongs to a ReliefMesh account. Sign in to the portal to respond to this RFQ."
+    if not supplier and await services.store.find("suppliers", email=state["supplier_email"]):
+        # A portal account was created for this email while onboarding was pending.
+        return "This email now has a ReliefMesh supplier account. Sign in to the portal to respond to this RFQ."
     if choice == "DECLINE":
         invitation.update(status="declined", declined_at=now_iso(), declined_via="telegram")
         await services.store.replace("invitations", invitation["id"], invitation)
@@ -611,27 +610,43 @@ async def process_telegram_update(update: dict[str, Any], services: Services) ->
         return
     update_id = str(update["update_id"])
     async with services.telegram_locks[update_id]:
-        if await services.store.get("telegram_updates", update_id):
+        record = {"id": update_id, "status": "processing", "created_at": now_iso()}
+        try:
+            # Reserve the update before any mutation. The unique Mongo index makes a redelivery to another worker
+            # (Telegram retries until it sees a 2xx) a no-op instead of a second quote change.
+            await services.store.insert("telegram_updates", record)
+        except (DuplicateKeyError, ValueError):
             return
-        message = update.get("message") or update.get("edited_message")
-        if not isinstance(message, dict):
-            await services.store.insert("telegram_updates", {"id": update_id, "status": "ignored",
-                                        "created_at": now_iso()})
+        # Only new messages are commands; an edit must not replay CONFIRM/SUBMIT under a new update_id.
+        message = update.get("message")
+        sender = (message or {}).get("from") or {}
+        chat = (message or {}).get("chat") or {}
+        text = (message or {}).get("text")
+        if (not isinstance(message, dict) or sender.get("is_bot") or not isinstance(text, str)
+                or not isinstance(sender.get("id"), (int, str))):
+            record.update(status="ignored")
+            await services.store.replace("telegram_updates", update_id, record)
             return
-        sender = message.get("from") or {}
-        chat = message.get("chat") or {}
-        text = message.get("text")
-        if sender.get("is_bot") or not isinstance(text, str) or not isinstance(sender.get("id"), (int, str)):
-            await services.store.insert("telegram_updates", {"id": update_id, "status": "ignored",
-                                        "created_at": now_iso()})
-            return
+        record["telegram_user_id"] = str(sender["id"])
         if chat.get("type") != "private":
             reply = "For privacy, use ReliefMesh in a private chat with this bot."
         else:
-            reply = await reply_for_telegram(services, str(sender["id"]), text[:1200])
-        await telegram_send_message(services, chat.get("id", sender["id"]), reply)
-        await services.store.insert("telegram_updates", {"id": update_id, "telegram_user_id": str(sender["id"]),
-                                    "status": "replied", "reply": reply[:4000], "created_at": now_iso()})
+            try:
+                reply = await reply_for_telegram(services, str(sender["id"]), text[:1200])
+            except Exception:
+                logger.exception("Telegram update processing failed")
+                reply = "ReliefMesh couldn't process that message right now. Please retry or use the supplier portal."
+        record.update(reply=reply[:4000], status="processed", processed_at=now_iso())
+        await services.store.replace("telegram_updates", update_id, record)
+        try:
+            await telegram_send_message(services, chat.get("id", sender["id"]), reply)
+        except HTTPException:
+            # The update is already applied and recorded; a failed reply must not make Telegram redeliver it.
+            record.update(status="reply_failed")
+            await services.store.replace("telegram_updates", update_id, record)
+            return
+        record.update(status="replied")
+        await services.store.replace("telegram_updates", update_id, record)
 
 
 async def poll_telegram_updates(services: Services) -> None:
@@ -646,7 +661,7 @@ async def poll_telegram_updates(services: Services) -> None:
             async with services.hub.client(timeout=40) as client:
                 response = await client.get(url, params={
                     "timeout": 30,
-                    "allowed_updates": '["message","edited_message"]',
+                    "allowed_updates": '["message"]',
                     **({"offset": offset} if offset is not None else {}),
                 })
                 response.raise_for_status()

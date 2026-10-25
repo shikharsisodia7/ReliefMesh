@@ -23,6 +23,8 @@ async def review_public_web(lead_id: str, principal: dict = Depends(current_prin
     mission, _ = await require_mission_access(lead["mission_id"], principal, services)
     if principal["role"] not in {"coordinator", "agent"}:
         raise HTTPException(status_code=403, detail="Only coordinators can review supplier websites")
+    # Each review is a metered Bright Data request; share the per-user assistant budget.
+    services.assist_limiter.check(f"public-web:{principal['id']}")
     result = await brightdata.fetch_public_page(
         services.hub, secret(services.settings.bright_data_api_key), services.settings.bright_data_zone,
         lead.get("website") or "",

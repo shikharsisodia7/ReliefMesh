@@ -73,7 +73,9 @@ async def fetch_public_page(hub: IntegrationHub, api_key: str | None, zone: str 
         return hub.blocked("bright_data", "Supplier website resolves to a non-public address", safe_url)
     result = await hub.fetch(
         "bright_data", API_URL, method="POST", headers={"Authorization": f"Bearer {api_key}"},
-        json_body={"zone": zone, "url": safe_url, "format": "raw", "data_format": "markdown"},
+        # "json" returns the {status_code, headers, body} envelope parsed below; "raw" would return the page itself.
+        # The body stays HTML so the <title>/<meta> extraction below has something to match.
+        json_body={"zone": zone, "url": safe_url, "format": "json"},
         timeout=45, retries=1, source_url=safe_url,
     )
     if not result.ok:

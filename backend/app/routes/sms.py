@@ -148,15 +148,16 @@ async def reply_for_message(services: Services, phone: str, body: str) -> str:
     if command.upper() == "STATUS":
         return await supplier_status(services, supplier["id"])
 
-    intent = await parse_sms_intent(services, command)
-    if intent["intent"] == "status":
-        return await supplier_status(services, supplier["id"])
-    if intent["intent"] != "price_change":
-        match = STRICT_PRICE.fullmatch(command)
-        if not match:
-            return "I couldn't read that request. Text STATUS or PRICE <exact item name> <new unit price>. Text HELP for examples."
+    # Exact commands are parsed locally; only free-form text is sent to the third-party intent model.
+    match = STRICT_PRICE.fullmatch(command)
+    if match:
         item, price = match.group(1).strip(), match.group(2)
     else:
+        intent = await parse_sms_intent(services, command)
+        if intent["intent"] == "status":
+            return await supplier_status(services, supplier["id"])
+        if intent["intent"] != "price_change":
+            return "I couldn't read that request. Text STATUS or PRICE <exact item name> <new unit price>. Text HELP for examples."
         item, price = intent["item"], intent["unit_price"]
     try:
         amount = Decimal(str(price))

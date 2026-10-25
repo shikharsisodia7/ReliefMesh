@@ -22,7 +22,7 @@ async def main() -> None:
             response = await client.post(
                 f"https://api.telegram.org/bot{bot_token}/setWebhook",
                 json={"url": webhook_url, "secret_token": webhook_secret,
-                      "allowed_updates": ["message", "edited_message"]},
+                      "allowed_updates": ["message"]},
             )
             response.raise_for_status()
             payload = response.json()
