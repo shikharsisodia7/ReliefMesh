@@ -4,10 +4,6 @@
 
 [Live Demo](https://reliefmesh.us) · [Judge Guide](https://reliefmesh.us/judge) · [System Status](https://reliefmesh.us/status)
 
-> Release / production SHA: **a1fc478** (web on Vercel and API on Render; main = release/final).
-
-<!-- FINAL_SCREENSHOT: landing -->
-
 ## The 30-second version
 
 A disaster-response coordinator tells ReliefMesh what people need, where it needs to go, when it must arrive, and
@@ -79,24 +75,6 @@ For each plan, ReliefMesh runs the same deterministic procurement rules on a cop
 These are labeled **HYPOTHETICAL STRESS TEST**. They do not change a quote, supplier, policy decision, approval,
 purchase order, or audit record. A real change is stored separately as an **ACTUAL USER-SUBMITTED CHANGE**.
 
-<!-- FINAL_SCREENSHOT: plan-continuity -->
-<!-- FINAL_SCREENSHOT: v1-v2-comparison -->
-
-## Product views for judges
-
-Final, redacted production captures are still being prepared. The README deliberately uses placeholders rather than
-inventing image paths or publishing demo/private identifiers.
-
-<!-- FINAL_SCREENSHOT: dashboard-map -->
-<!-- FINAL_SCREENSHOT: mission-context -->
-<!-- FINAL_SCREENSHOT: suppliers-evidence -->
-<!-- FINAL_SCREENSHOT: approval -->
-<!-- FINAL_SCREENSHOT: orders -->
-<!-- FINAL_SCREENSHOT: audit -->
-<!-- FINAL_SCREENSHOT: status -->
-<!-- FINAL_SCREENSHOT: fetch-asi-one -->
-<!-- FINAL_SCREENSHOT: figma-workflow -->
-
 ## How it works
 
 1. Create a mission with a need, destination, deadline, budget, and disaster context.
@@ -144,9 +122,6 @@ The production workflow is designed to be truthful about its boundaries:
 - x402 and Solana activity is devnet test payment activity; suppliers are not paid through it.
 - The audit is **tamper-evident**, not immutable.
 - Delivery jobs use idempotency keys; the verified replay above created no duplicates.
-
-See [the final status ledger](docs/FINAL_STATUS.md) and [track audit](docs/qa/TRACK_ELIGIBILITY.md) for claims that
-must be reconciled before submission.
 
 ## Built with
 
@@ -198,28 +173,6 @@ must be reconciled before submission.
 
 - Figma: design system, page specs, and mockups in [`design/`](design/)
 
-## Sponsors and tracks
-
-| Sponsor / track | ReliefMesh usage | Submission status |
-| --- | --- | --- |
-| Hyphenate | Autonomous procurement recovery with human financial authority | `SUBMIT` |
-| Microsoft | Deployed operational system with explicit AI and authority boundaries | `SUBMIT` |
-| Fetch.ai | ASI:One / Agentverse procurement agent | `SUBMIT` |
-| CRS | Sandbox signer identity / fraud verification | `SUBMIT` |
-| Apify | Public supplier-lead discovery | `SUBMIT` |
-| Gemini | Grounded supplier quote drafting | `SUBMIT` |
-| Solana | Devnet settlement | `SUBMIT` |
-| GoDaddy | `reliefmesh.us` | `SUBMIT` |
-| Armadin | Replay protection, authority boundaries, audit | `SUBMIT` |
-| Coinbase x402 | Machine-paid evidence over x402 | `SUBMIT` |
-| Figma | Design system and mockups the redesign was built from | `SUBMIT` |
-| Bright Data | Public-website review of supplier leads | `SUBMIT` |
-| Anthropic / Claude | Cited recovery-plan explanations | `SUBMIT` |
-| Telegram | Supplier bot for RFQs, quotes, and orders | `SUBMIT` |
-| Twilio | Opt-in supplier SMS channel | `SUBMIT` |
-
-Track details and evidence boundaries live in [docs/qa/TRACK_ELIGIBILITY.md](docs/qa/TRACK_ELIGIBILITY.md).
-
 ## Architecture
 
 ```mermaid
@@ -268,7 +221,5 @@ cd frontend && npx playwright test
 - [Devpost copy](docs/DEVPOST.md)
 - [Pitch](docs/PITCH.md)
 - [Judge cheat sheet](docs/JUDGE_CHEATSHEET.md)
-- [Final status ledger](docs/FINAL_STATUS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations integrations](docs/OPERATIONS_INTEGRATIONS.md)
-- [Track eligibility](docs/qa/TRACK_ELIGIBILITY.md)
