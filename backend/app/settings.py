@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     twilio_auth_token: SecretStr | None = None
     twilio_phone_number: str | None = None
     openrouter_api_key: SecretStr | None = None
-    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_model: str = "openrouter/free"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.5-flash"  # free tier, ~4 s; 2.5 is closed to new projects, 3.8 takes 60 s+

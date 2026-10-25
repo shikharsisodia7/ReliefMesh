@@ -63,7 +63,7 @@ services:
       - key: RELIEFMESH_OPENROUTER_API_KEY
         sync: false
       - key: RELIEFMESH_OPENROUTER_MODEL
-        value: openai/gpt-4o-mini
+        value: openrouter/free
       - key: RELIEFMESH_OPENROUTER_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: RELIEFMESH_CRS_USERNAME
