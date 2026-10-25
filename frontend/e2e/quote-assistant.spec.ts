@@ -39,7 +39,17 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await expect(supplier).toHaveURL(/\/supplier/);
   await supplier.goto(inviteUrl!);
   await supplier.getByRole("button", { name: "Accept RFQ" }).click();
-  await supplier.getByLabel("Paste an existing quote (optional)").fill(QUOTE);
+  // The product hides the assistant when the API reports quote_assistant=false (no Gemini key). Read that
+  // truthful state from the rendered form before touching the paste box, and cross-check it with /v1/config.
+  await expect(supplier.getByRole("button", { name: "Submit binding quote" })).toBeVisible();
+  const pasteBox = supplier.getByLabel("Paste an existing quote (optional)");
+  const assistantShown = await pasteBox.isVisible();
+  if (process.env.E2E_API_URL) {
+    const config = await (await fetch(`${process.env.E2E_API_URL}/v1/config`)).json();
+    expect(assistantShown, "UI must match the API's quote_assistant flag").toBe(Boolean(config.quote_assistant));
+  }
+  test.skip(!assistantShown, "Quote assistant NOT_CONFIGURED on this deployment (no Gemini key); the form hides it");
+  await pasteBox.fill(QUOTE);
   await supplier.getByRole("button", { name: "Pre-fill with Gemini" }).click();
   const drafted = supplier.getByText(/Draft extracted by Gemini/);
   const notConfigured = supplier.getByText(/GEMINI_NOT_CONFIGURED/);
