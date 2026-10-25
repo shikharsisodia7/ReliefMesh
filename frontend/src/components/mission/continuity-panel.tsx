@@ -164,62 +164,75 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
   const current = state === "COMPLETE" && analysis;
   const metrics = analysis?.metrics;
   const progress = view?.progress;
+  const [open, setOpen] = useState(false);
+  // Collapsed by default to one line with the key result.
+  const summary = !plan ? "needs a feasible plan" : !canRun ? `plan v${plan.version} is ${plan.status}`
+    : state === "RUNNING" ? `running${progress?.total ? ` · ${progress.done} / ${progress.total} scenarios` : ""}`
+      : state === "STALE" ? "result is out of date" : current && metrics
+        ? `${metrics.n1_survivability.survives} of ${metrics.n1_survivability.tested} supplier losses recoverable${metrics.critical_supplier ? ` · critical supplier: ${metrics.critical_supplier.supplier}` : ""}`
+        : "queued";
   return (
     <section aria-label="Continuity Engine" className="space-y-5 border-t pt-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-baseline gap-3"><h2 className="text-base font-semibold">Continuity</h2><Provenance value="HYPOTHETICAL" /></div>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Would this plan survive losing a supplier? Each scenario re-runs the same optimizer and policy on copies of the exact quotes behind this plan. No quote, plan, approval, or order is changed.</p>
-          <p className="mt-1 text-xs text-muted-foreground"><StressLabel /> · every scenario on this panel is a counterfactual, not an event that happened. Real changes appear under &ldquo;Actual change vs earlier stress test&rdquo;.</p>
-        </div>
-        <Button size="sm" variant="secondary" type="button" onClick={onRun} disabled={!canRun || running || state === "RUNNING"}>Find resilient alternative</Button>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+        <h2 className="text-base font-semibold">Continuity</h2>
+        <span className="text-muted-foreground">·</span><Provenance value="HYPOTHETICAL" />
+        <span className="text-muted-foreground">· {summary} ·</span>
+        <button type="button" aria-expanded={open} className="font-medium hover:underline" onClick={() => setOpen(!open)}>{open ? "Hide details" : "Show details"}</button>
       </div>
-
-      {!plan && <p className="text-sm text-muted-foreground">Create a feasible plan first. Every feasible plan is stress-tested automatically.</p>}
-      {plan && !canRun && <p className="text-sm text-muted-foreground">Plan v{plan.version} is {plan.status}; only a feasible or approved plan can be stress-tested.</p>}
-      {plan && canRun && state === "RUNNING" && (
-        <p className="text-sm text-muted-foreground" role="status">
-          Continuity analysis running…{progress?.total ? ` ${progress.done} / ${progress.total} scenarios` : ""}{progress?.label && progress.done ? ` · ${progress.label}` : ""}
-        </p>
-      )}
-      {plan && canRun && state === "NOT_READY" && <p className="text-sm text-muted-foreground">Queued automatically after optimization.</p>}
-      {analysis && state === "STALE" && <p className="text-sm text-muted-foreground">Stale: the result for plan v{analysis.plan_version} no longer matches its quotes, evidence, or policy, so it is not shown as current.</p>}
-
-      {current && metrics && (
-        <>
-          {analysis.scope && analysis.scope.kind !== "FULL_MISSION" && <p className="text-sm text-muted-foreground">{analysis.scope.statement} Already committed on purchase orders: {money(analysis.scope.fixed_commitment_cost)}.</p>}
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-            <div role="region" aria-label="N-1 survivability">
-              <p className="text-xs font-medium text-muted-foreground">N-1 survivability</p>
-              <p className="tabular text-4xl font-semibold">{metrics.n1_survivability.survives} / {metrics.n1_survivability.tested}</p>
-              <p className="text-xs text-muted-foreground">allocated suppliers whose loss is recoverable</p>
-              <dl className="mt-4 grid grid-cols-2 gap-x-6">
-                <Fact label="Critical supplier" value={metrics.critical_supplier?.supplier ?? "None"} />
-                <Fact label="Budget headroom" value={money(metrics.budget_headroom)} />
-                <Fact label="Largest supplier share" value={percent(metrics.largest_supplier_concentration)} />
-                <Fact label="Deadline slack" value={metrics.deadline_slack_hours == null ? "—" : hours(metrics.deadline_slack_hours)} />
-                <Fact label="Price tolerance" value={metrics.price_shock_tolerance ? `+${metrics.price_shock_tolerance.increase_percent}%` : "No breakpoint"} />
-                <Fact label="Delay tolerance" value={metrics.delay_tolerance ? hours(metrics.delay_tolerance.hours) : "No breakpoint"} />
-                <Fact label="Capacity tolerance" value={metrics.capacity_loss_tolerance ? `${metrics.capacity_loss_tolerance.loss_units} units` : "No breakpoint"} />
-                <Fact label="Alternative eligible capacity" value={`${metrics.alternative_eligible_capacity} units`} />
-              </dl>
-              <p className="mt-2 text-xs text-tertiary">Tolerances are the smallest shock to one supplier that makes the mission infeasible; one step less still has a feasible plan. “No breakpoint” means no single-supplier shock can break this plan.</p>
-            </div>
-            <SinglePointOfFailure analysis={analysis} />
+      {open && <>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="max-w-3xl text-sm text-muted-foreground">Would this plan survive losing a supplier? Each scenario re-runs the same optimizer and policy on copies of the exact quotes behind this plan. No quote, plan, approval, or order is changed.</p>
+            <p className="mt-1 text-xs text-muted-foreground"><StressLabel /> · every scenario on this panel is a counterfactual, not an event that happened. Real changes appear under &ldquo;Actual change vs earlier stress test&rdquo;.</p>
           </div>
-          <CostOfResilience analysis={analysis} plan={plan} />
-          <details className="text-sm" open aria-label="Failure frontier">
-            <summary className="cursor-pointer font-medium">Failure frontier by supplier <StressLabel /></summary>
-            <table className="mt-2 w-full">
-              <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Price</th><th className="py-1 text-right font-medium">ETA delay</th><th className="py-1 text-right font-medium">Capacity loss</th></tr></thead>
-              <tbody>
-                {analysis.failure_frontier.map((row) => (
-                  <tr key={row.supplier_id} className="border-t">
-                    <td className="py-1.5">{row.supplier}</td>
-                    {row.note ? <td colSpan={3} className="py-1.5 text-right text-muted-foreground">Recoverable without it: no breakpoint</td> : <>
-                      <td className="tabular py-1.5 text-right">{row.price ? `+${row.price.increase_percent}%` : "—"}</td>
-                      <td className="tabular py-1.5 text-right">{row.delay ? hours(row.delay.hours) : "—"}</td>
-                      <td className="tabular py-1.5 text-right">{row.capacity ? `${row.capacity.loss_units} units` : "—"}</td>
+          <Button size="sm" variant="secondary" type="button" onClick={onRun} disabled={!canRun || running || state === "RUNNING"}>Find resilient alternative</Button>
+        </div>
+
+        {!plan && <p className="text-sm text-muted-foreground">Create a feasible plan first. Every feasible plan is stress-tested automatically.</p>}
+        {plan && !canRun && <p className="text-sm text-muted-foreground">Plan v{plan.version} is {plan.status}; only a feasible or approved plan can be stress-tested.</p>}
+        {plan && canRun && state === "RUNNING" && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Continuity analysis running…{progress?.total ? ` ${progress.done} / ${progress.total} scenarios` : ""}{progress?.label && progress.done ? ` · ${progress.label}` : ""}
+          </p>
+        )}
+        {plan && canRun && state === "NOT_READY" && <p className="text-sm text-muted-foreground">Queued automatically after optimization.</p>}
+        {analysis && state === "STALE" && <p className="text-sm text-muted-foreground">Stale: the result for plan v{analysis.plan_version} no longer matches its quotes, evidence, or policy, so it is not shown as current.</p>}
+
+        {current && metrics && (
+          <>
+            {analysis.scope && analysis.scope.kind !== "FULL_MISSION" && <p className="text-sm text-muted-foreground">{analysis.scope.statement} Already committed on purchase orders: {money(analysis.scope.fixed_commitment_cost)}.</p>}
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div role="region" aria-label="N-1 survivability">
+                <p className="text-xs font-medium text-muted-foreground">N-1 survivability</p>
+                <p className="tabular text-4xl font-semibold">{metrics.n1_survivability.survives} / {metrics.n1_survivability.tested}</p>
+                <p className="text-xs text-muted-foreground">allocated suppliers whose loss is recoverable</p>
+                <dl className="mt-4 grid grid-cols-2 gap-x-6">
+                  <Fact label="Critical supplier" value={metrics.critical_supplier?.supplier ?? "None"} />
+                  <Fact label="Budget headroom" value={money(metrics.budget_headroom)} />
+                  <Fact label="Largest supplier share" value={percent(metrics.largest_supplier_concentration)} />
+                  <Fact label="Deadline slack" value={metrics.deadline_slack_hours == null ? "—" : hours(metrics.deadline_slack_hours)} />
+                  <Fact label="Price tolerance" value={metrics.price_shock_tolerance ? `+${metrics.price_shock_tolerance.increase_percent}%` : "No breakpoint"} />
+                  <Fact label="Delay tolerance" value={metrics.delay_tolerance ? hours(metrics.delay_tolerance.hours) : "No breakpoint"} />
+                  <Fact label="Capacity tolerance" value={metrics.capacity_loss_tolerance ? `${metrics.capacity_loss_tolerance.loss_units} units` : "No breakpoint"} />
+                  <Fact label="Alternative eligible capacity" value={`${metrics.alternative_eligible_capacity} units`} />
+                </dl>
+                <p className="mt-2 text-xs text-tertiary">Tolerances are the smallest shock to one supplier that makes the mission infeasible; one step less still has a feasible plan. “No breakpoint” means no single-supplier shock can break this plan.</p>
+              </div>
+              <SinglePointOfFailure analysis={analysis} />
+            </div>
+            <CostOfResilience analysis={analysis} plan={plan} />
+            <details className="text-sm" open aria-label="Failure frontier">
+              <summary className="cursor-pointer font-medium">Failure frontier by supplier <StressLabel /></summary>
+              <table className="mt-2 w-full">
+                <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Price</th><th className="py-1 text-right font-medium">ETA delay</th><th className="py-1 text-right font-medium">Capacity loss</th></tr></thead>
+                <tbody>
+                  {analysis.failure_frontier.map((row) => (
+                    <tr key={row.supplier_id} className="border-t">
+                      <td className="py-1.5">{row.supplier}</td>
+                      {row.note ? <td colSpan={3} className="py-1.5 text-right text-muted-foreground">Recoverable without it: no breakpoint</td> : <>
+                        <td className="tabular py-1.5 text-right">{row.price ? `+${row.price.increase_percent}%` : "—"}</td>
+                        <td className="tabular py-1.5 text-right">{row.delay ? hours(row.delay.hours) : "—"}</td>
+                        <td className="tabular py-1.5 text-right">{row.capacity ? `${row.capacity.loss_units} units` : "—"}</td>
                     </>}
                   </tr>
                 ))}
@@ -230,6 +243,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
         </>
       )}
       <RealityChecks checks={view?.reality_check ?? []} />
+      </>}
     </section>
   );
 }

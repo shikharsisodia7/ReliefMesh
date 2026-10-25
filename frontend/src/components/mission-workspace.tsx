@@ -38,7 +38,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const [explaining, setExplaining] = useState(false);
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace(signInUrl()); }, [hydrated, router, session]);
   const data = useMissionData(missionId, session?.token);
-  const { demoMode } = useAppConfig();
+  const { demoMode, approvalTtlMinutes } = useAppConfig();
   const { organizations } = useOrganizations(session?.token);
   const mission = data.mission.data;
   // Members give the requester's email for the approval chain.
@@ -144,7 +144,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
               <PlanTab
                 mission={mission} plans={plans} approvals={data.approvals.data ?? []} quotes={quotes} suppliers={suppliers} continuity={data.continuity.data} disruptions={data.disruptions.data ?? []}
                 token={token} run={run} setNotice={setNotice} onTab={setTab} onOptimize={optimize}
-                canApprove={canApprove} approvalBlocked={approvalBlocked} requester={requester} showDemo={demoMode && isAdmin && suppliers.length > 0}
+                canApprove={canApprove} approvalBlocked={approvalBlocked} requester={requester} showDemo={demoMode && isAdmin && suppliers.length > 0} approvalTtlMinutes={approvalTtlMinutes}
                 busy={replanning} continuityRunning={continuityRunning} eligibleCount={eligible} quoteCount={submitted}
               />
             </TabPanel>

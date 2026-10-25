@@ -46,6 +46,8 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   // The counterfactual analysis runs off the request path and must remain visibly
   // labeled as hypothetical before the judge performs a real supplier change.
   await expect(page.getByLabel("Continuity Engine")).toBeVisible();
+  // The section is collapsed to one summary line by default.
+  await page.getByLabel("Continuity Engine").getByRole("button", { name: "Show details" }).click();
   await expect(page.getByLabel("N-1 survivability")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByLabel("Failure frontier")).toBeVisible();
   await expect(page.getByText("HYPOTHETICAL STRESS TEST").first()).toBeVisible();
