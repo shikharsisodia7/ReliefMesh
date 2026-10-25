@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
-import httpx
 import pytest
 
 from conftest import auth, register, settle_jobs

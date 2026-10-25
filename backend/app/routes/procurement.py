@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from .. import documents
 from ..auth import create_access_token, hash_password, verify_password
 from ..core import (
-    Services, audit, secret, current_principal, current_user, get_services, invitation_from_token, new_id, notify, now_iso,
+    Services, audit, audit_head_key, secret, current_principal, current_user, get_services, invitation_from_token, new_id, notify, now_iso,
     public_user, record_email, require_admin, require_mission_access, require_org_member, token_hash, verify_chain,
 )
 from ..integrations import emergency, gemini
@@ -851,7 +851,8 @@ async def verify_mission_audit(mission_id: str, principal: dict = Depends(curren
                                services: Services = Depends(get_services)) -> dict:
     await require_mission_access(mission_id, principal, services)
     events = await services.store.find("audit_events", chain_key=f"mission:{mission_id}")
-    return verify_chain(events, await services.store.get("audit_chain_heads", f"mission:{mission_id}"))
+    head = await services.store.get("audit_chain_heads", f"mission:{mission_id}")
+    return verify_chain(events, head, secret_key=audit_head_key(services))
 
 
 @router.get("/v1/missions/{mission_id}/notifications")

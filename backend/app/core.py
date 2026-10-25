@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any, Awaitable, Callable
@@ -167,6 +168,17 @@ def event_digest(event: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json({key: event.get(key) for key in HASHED_FIELDS}).encode()).hexdigest()
 
 
+def head_mac(secret_key: str, chain_key: str, sequence: int, event_hash: str) -> str:
+    """HMAC over the chain head with a server-side secret that is never stored in the database, so someone who
+    can write the database cannot rewrite the head to hide removed events."""
+    message = f"reliefmesh-audit-head:{chain_key}:{sequence}:{event_hash}".encode()
+    return hmac.new(hashlib.sha256(f"audit-head:{secret_key}".encode()).digest(), message, hashlib.sha256).hexdigest()
+
+
+def audit_head_key(services: Services) -> str:
+    return services.settings.jwt_secret.get_secret_value()
+
+
 async def audit(
     action: str,
     actor_id: str | None,
@@ -198,14 +210,17 @@ async def audit(
         }
         event["event_hash"] = event_digest(event)
         await services.store.insert("audit_events", event)
-        await services.store.upsert(
-            "audit_chain_heads", {"id": chain_key, "sequence": event["sequence"], "event_hash": event["event_hash"]}
-        )
+        await services.store.upsert("audit_chain_heads", {
+            "id": chain_key, "sequence": event["sequence"], "event_hash": event["event_hash"],
+            "mac": head_mac(audit_head_key(services), chain_key, event["sequence"], event["event_hash"]),
+        })
         return event
 
 
-def verify_chain(events: list[dict[str, Any]], head: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Recompute the hash chain; with the stored chain head, also detect events removed from the end."""
+def verify_chain(events: list[dict[str, Any]], head: dict[str, Any] | None = None, *,
+                 secret_key: str | None = None) -> dict[str, Any]:
+    """Recompute the hash chain. With ``secret_key`` the signed chain head is required too, which detects events
+    removed from the end, a deleted head, and a head rewritten without the server-side key."""
     ordered = sorted(events, key=lambda row: row.get("sequence", 0))
     previous = GENESIS_HASH
     for expected_sequence, event in enumerate(ordered, start=1):
@@ -219,9 +234,17 @@ def verify_chain(events: list[dict[str, Any]], head: dict[str, Any] | None = Non
             return {"valid": False, "length": len(ordered), "broken_at": expected_sequence,
                     "reason": "event contents do not match their hash"}
         previous = event["event_hash"]
-    if head and (head.get("sequence") != len(ordered) or head.get("event_hash") != previous):
-        return {"valid": False, "length": len(ordered), "broken_at": len(ordered) + 1,
-                "reason": "chain head does not match: events were removed or replaced at the end"}
+    if secret_key is not None and ordered:
+        failure = None
+        if head is None:
+            failure = "chain head record is missing: it was deleted or never written"
+        elif head.get("sequence") != len(ordered) or head.get("event_hash") != previous:
+            failure = "chain head does not match: events were removed or replaced at the end"
+        elif not hmac.compare_digest(str(head.get("mac") or ""),
+                                     head_mac(secret_key, head["id"], head["sequence"], head["event_hash"])):
+            failure = "chain head signature is invalid: the head was rewritten outside ReliefMesh"
+        if failure:
+            return {"valid": False, "length": len(ordered), "broken_at": len(ordered) + 1, "reason": failure}
     return {"valid": True, "length": len(ordered), "head_hash": previous, "broken_at": None, "reason": None}
 
 
