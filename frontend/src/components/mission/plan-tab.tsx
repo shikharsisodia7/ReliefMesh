@@ -110,8 +110,8 @@ function Step({ done, children }: { done: boolean; children: ReactNode }) {
 
 const linkClass = "text-sm font-medium hover:underline";
 
-function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, requester, token, run, setNotice, onTab }: {
-  plan: Plan; approvals: Approval[]; canApprove: boolean; approvalBlocked: string | null; requester: string;
+export function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, requester, ttlMinutes, token, run, setNotice, onTab }: {
+  plan: Plan; approvals: Approval[]; canApprove: boolean; approvalBlocked: string | null; requester: string; ttlMinutes: number;
   token: string; run: Run; setNotice: (value: string) => void; onTab: (tab: string) => void;
 }) {
   const approval = approvals.find((row) => row.plan_id === plan.id && (row.status === "active" || row.status === "consumed" || row.status === "expired"));
@@ -131,6 +131,7 @@ function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, request
           <div className="mt-5">
             <Button className="w-full" onClick={() => void approve()}>Approve plan v{plan.version}</Button>
             <p className="mt-2 text-sm text-muted-foreground">Approves this exact version.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Approval expires {ttlMinutes % 60 === 0 ? `${ttlMinutes / 60} h` : `${ttlMinutes} min`} after it&apos;s given.</p>
           </div>
         ) : <p className="mt-5 text-sm text-muted-foreground">{approvalBlocked ?? "Only an organization admin or approver can approve this plan."}</p>}
       </>
@@ -158,7 +159,7 @@ function ApprovalSection({ plan, approvals, canApprove, approvalBlocked, request
 export type PlanTabProps = {
   mission: Mission; plans: Plan[]; approvals: Approval[]; quotes: Quote[]; suppliers: SupplierRow[]; continuity?: ContinuityView; disruptions: Disruption[];
   token: string; run: Run; setNotice: (value: string) => void; onTab: (tab: string) => void; onOptimize: () => void;
-  canApprove: boolean; approvalBlocked: string | null; requester: string; showDemo: boolean;
+  canApprove: boolean; approvalBlocked: string | null; requester: string; showDemo: boolean; approvalTtlMinutes: number;
   busy: boolean; continuityRunning: boolean; eligibleCount: number; quoteCount: number;
 };
 
@@ -317,7 +318,7 @@ export function PlanTab(props: PlanTabProps) {
 
       <aside className="min-w-0">
         <RailSection title="Approval">
-          <ApprovalSection plan={plan} approvals={approvals} canApprove={props.canApprove} approvalBlocked={props.approvalBlocked} requester={props.requester} token={token} run={run} setNotice={setNotice} onTab={onTab} />
+          <ApprovalSection plan={plan} approvals={approvals} canApprove={props.canApprove} approvalBlocked={props.approvalBlocked} requester={props.requester} ttlMinutes={props.approvalTtlMinutes} token={token} run={run} setNotice={setNotice} onTab={onTab} />
         </RailSection>
         {missionFacts}
         {previous && (

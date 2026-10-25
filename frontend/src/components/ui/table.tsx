@@ -3,14 +3,42 @@
 import * as React from "react"
 import { cn } from "cn"
 
+// Gives each body cell its column header as data-label, which globals.css shows when the table stacks under 768px.
+// Re-labels whenever rows change; it only writes attributes, so it never re-triggers itself.
+function useStackLabels(ref: React.RefObject<HTMLTableElement | null>) {
+  React.useEffect(() => {
+    const table = ref.current
+    if (!table) return
+    const label = () => {
+      const heads = [...table.querySelectorAll("thead th")].map((th) => th.textContent?.trim() ?? "")
+      table.querySelectorAll("tbody tr").forEach((row) => {
+        let column = 0
+        for (const cell of row.children) {
+          const span = (cell as HTMLTableCellElement).colSpan || 1
+          if (span === 1 && heads[column]) cell.setAttribute("data-label", heads[column])
+          else cell.removeAttribute("data-label")
+          column += span
+        }
+      })
+    }
+    label()
+    const observer = new MutationObserver(label)
+    observer.observe(table, { childList: true, subtree: true, characterData: true })
+    return () => observer.disconnect()
+  }, [ref])
+}
+
 // Open rows: 1px dividers, no header fill, no striping. Right-align numeric cells with "text-right tabular".
 function Table({ className, ...props }: React.ComponentProps<"table">) {
+  const ref = React.useRef<HTMLTableElement>(null)
+  useStackLabels(ref)
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
       <table
+        ref={ref}
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}

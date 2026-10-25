@@ -40,6 +40,20 @@ async def emergency_event(event_id: str, services: Services = Depends(get_servic
     return result.data
 
 
+# California as a center and half-width in degrees; the landing page clips detections to the state outline.
+CALIFORNIA_BOX = {"lat": 37.25, "lon": -119.3, "radius_deg": 5.25}
+
+
+@router.get("/v1/fire-detections/california")
+async def california_fire_detections(services: Services = Depends(get_services)) -> dict:
+    """Public NASA FIRMS detections over California in the last 48 h, for the landing page map."""
+    result = await emergency.firms_detections(services.hub, secret(services.settings.nasa_firms_map_key), days=2,
+                                              **CALIFORNIA_BOX)
+    points = [{"latitude": row["latitude"], "longitude": row["longitude"], "acquired_at": row["acquired_at"]}
+              for row in result.data or []] if result.ok else []
+    return {**section(result, data=points), "meta": result.meta if result.ok else {}}
+
+
 async def build_context(services: Services, mission: dict[str, Any]) -> dict[str, Any]:
     event = mission.get("emergency_event")
     point = (event or {}).get("point")

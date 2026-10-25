@@ -12,6 +12,8 @@ test("RFQ link opened under a coordinator session switches to a new supplier acc
   await expect(page).toHaveURL(/\/dashboard/);
   await page.getByPlaceholder("Organization name").fill("Link Check Response");
   await page.getByRole("button", { name: "Create organization" }).click();
+  // The mission form lives in the New mission slide-over.
+  await page.getByRole("button", { name: "New mission" }).click();
   await page.getByLabel("Mission name").fill("Link check");
   await page.getByLabel("Delivery location").fill("Oakland, CA");
   await page.getByLabel("Delivery deadline").fill("2030-01-05T10:00");
@@ -22,8 +24,10 @@ test("RFQ link opened under a coordinator session switches to a new supplier acc
   await expect(page).toHaveURL(/\/missions\//);
 
   const supplierEmail = `supplier-links-${runId}@e2e.example.com`;
-  await page.getByLabel("Supplier email").fill(supplierEmail);
+  // Send RFQ opens a dialog with the supplier email.
   await page.getByRole("button", { name: "Send RFQ" }).click();
+  await page.getByLabel("Supplier email").fill(supplierEmail);
+  await page.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
   const inviteUrl = (await page.getByText(/Development invitation:/).textContent())?.match(/https?:\/\/\S+/)?.[0];
   expect(inviteUrl).toBeTruthy();
 

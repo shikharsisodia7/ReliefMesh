@@ -26,8 +26,10 @@ def main(base: str) -> None:
     headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
     org = client.post("/v1/organizations", json={"name": f"Smoke Relief {stamp}", "demo": True}, headers=headers).json()
     events = client.get("/v1/emergency-events").json()
+    # Prefer an open California event (the demo is set in Oakland), then any US event, then the first one.
+    california = [e for e in events if e.get("state") == "CA"]
     us_events = [e for e in events if e.get("state")] or events
-    event = us_events[0]
+    event = (california or us_events)[0]
     print(f"EONET event: {event['id']} {event['title']} [{event['provenance']}] state={event.get('state')}")
     mission = client.post("/v1/missions", headers=headers, json={
         "organization_id": org["id"], "name": "Smoke: shelter blankets", "emergency_event_id": event["id"],

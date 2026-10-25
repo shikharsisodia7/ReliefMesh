@@ -21,7 +21,6 @@ const coordinatorTabs: Tab[] = [
   { label: "Missions", href: "/dashboard", active: (path) => path === "/dashboard" || path.startsWith("/missions/") },
   { label: "Suppliers", href: "/suppliers", active: (path) => path === "/suppliers" },
   { label: "Analytics", href: "/analytics", active: (path) => path === "/analytics" },
-  { label: "Judge guide", href: "/judge", active: (path) => path === "/judge" },
   { label: "System Status", href: "/status", active: (path) => path === "/status" },
 ];
 const supplierTabs: Tab[] = [
@@ -34,6 +33,8 @@ const marketingTabs: Tab[] = [
   { label: "Judge guide", href: "/judge", active: (path) => path === "/judge" },
   { label: "System Status", href: "/status", active: (path) => path === "/status" },
 ];
+
+const roleWords: Record<string, string> = { admin: "Administrator", approver: "Approver", coordinator: "Coordinator" };
 
 // Sign-in, sign-up, and join are a bare centered column without the island.
 const bare = (path: string) => path === "/sign-in" || path === "/sign-up" || path.startsWith("/join/");
@@ -109,9 +110,11 @@ function TabNav({ tabs, pathname, tab }: { tabs: Tab[]; pathname: string; tab: s
     measure();
     // Turn the transition on after the first placement, so the bar doesn't sweep in on load.
     const frame = requestAnimationFrame(() => { bar.dataset.ready = "true"; });
-    window.addEventListener("resize", measure);
+    // Re-measure whenever the tabs' layout changes (fonts loading, resizes, tabs added).
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
     void document.fonts?.ready.then(measure);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", measure); };
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [activeIndex]);
   return (
     <nav ref={listRef} aria-label="Main" className="relative flex h-full items-center gap-8">
@@ -139,7 +142,7 @@ function MarketingActions() {
   );
 }
 
-const itemClass = "flex w-full cursor-default items-center gap-2 px-3 py-2 text-left text-sm text-foreground outline-none select-none data-[highlighted]:bg-muted";
+const itemClass = "flex w-full cursor-default items-center gap-2 px-3 py-2 text-left text-sm text-foreground outline-hidden select-none data-[highlighted]:bg-muted";
 
 function AccountMenu({ session }: { session: Session }) {
   const router = useRouter();
@@ -148,15 +151,15 @@ function AccountMenu({ session }: { session: Session }) {
   const rows = organizations.data ?? [];
   return (
     <Menu.Root>
-      <Menu.Trigger aria-label="Account menu" className="grid size-9 place-items-center rounded-full border text-xs font-semibold text-foreground outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[popup-open]:bg-muted">
+      <Menu.Trigger aria-label="Account menu" className="grid size-9 place-items-center rounded-full border text-xs font-semibold text-foreground outline-hidden hover:bg-muted focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring data-[popup-open]:bg-muted">
         {initials(session.user.email)}
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner align="end" sideOffset={10} className="z-50">
-          <Menu.Popup className="w-80 rounded-lg border bg-background py-1.5 shadow-lg outline-none transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none">
+          <Menu.Popup className="w-80 rounded-lg border bg-background py-1.5 shadow-lg outline-hidden transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none">
             <div className="px-3 py-2">
               <p className="truncate text-sm font-medium">{session.user.email}</p>
-              <p className="text-xs text-muted-foreground">{coordinator ? "Coordinator" : "Supplier"}{current ? ` · ${current.membership_role}` : ""}</p>
+              <p className="text-xs text-muted-foreground">{coordinator ? "Coordinator" : "Supplier"}{current ? ` · ${roleWords[current.membership_role] ?? current.membership_role}` : ""}</p>
             </div>
             {rows.length > 0 && (
               <>
@@ -177,6 +180,8 @@ function AccountMenu({ session }: { session: Session }) {
             <Menu.Separator className="my-1.5 h-px bg-border" />
             {/* The island stays mounted across pages, so the menu must close itself on navigation. */}
             {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/settings" />} className={itemClass}>Settings</Menu.LinkItem>}
+            {/* Coordinators reach the judge guide here; logged-out visitors see it as a marketing tab. */}
+            {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/judge" />} className={itemClass}>Judge guide</Menu.LinkItem>}
             <Menu.Item className={itemClass} onClick={() => signOut(router)}>Sign out</Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
@@ -216,6 +221,7 @@ function MobileMenu({ tabs, pathname, tab, session }: { tabs: Tab[]; pathname: s
               </div>
             )}
             {coordinator && <Link href="/settings" onClick={close} className={row}>Settings</Link>}
+            {coordinator && <Link href="/judge" onClick={close} className={row}>Judge guide</Link>}
             <button type="button" className={row} onClick={() => { close(); signOut(router); }}>Sign out</button>
           </div>
         ) : (

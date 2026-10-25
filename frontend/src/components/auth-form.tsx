@@ -47,15 +47,15 @@ export function AuthForm({
       <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
-        {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
+        {form.formState.errors.email && <p className="text-sm text-critical">{form.formState.errors.email.message}</p>}
       </div>
       <div className="grid gap-2">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} {...form.register("password")} />
-        {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
+        <Input id="password" type="password" placeholder={mode === "register" ? "At least 12 characters" : undefined} autoComplete={mode === "login" ? "current-password" : "new-password"} {...form.register("password")} />
+        {form.formState.errors.password && <p className="text-sm text-critical">{form.formState.errors.password.message}</p>}
       </div>
-      {error && <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Working…" : action}</Button>
+      {error && <p role="alert" className="text-sm text-critical">{error}</p>}
+      <Button type="submit" size="lg" className="mt-1 w-full" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Working…" : action}</Button>
     </form>
   );
 }

@@ -74,6 +74,12 @@ async def test_eonet_event_is_stored_on_mission_with_provenance(client: httpx.As
 
 
 @pytest.mark.anyio
+async def test_public_california_fire_detections_are_never_faked(client: httpx.AsyncClient) -> None:
+    body = (await client.get("/v1/fire-detections/california")).json()
+    assert body["status"] == "BLOCKED_EXTERNAL" and body["data"] == []  # no MAP_KEY in tests
+
+
+@pytest.mark.anyio
 async def test_policy_blocked_cheapest_supplier_gets_zero_allocation(client: httpx.AsyncClient) -> None:
     ctx = await demo_mission(client)
     plan = await optimize(client, ctx)

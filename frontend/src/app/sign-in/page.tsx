@@ -5,15 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CenteredColumn } from "@/components/layout/centered-column";
 import { safeNext, saveSession } from "@/lib/session";
 
 function SignIn() {
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
-  return <main className="grid min-h-screen place-items-center bg-background px-5"><Card className="w-full max-w-md"><CardHeader><CardTitle>Sign in to ReliefMesh</CardTitle><CardDescription>Use the account associated with your organization or supplier profile.</CardDescription></CardHeader><CardContent><AuthForm mode="login" onAuthenticated={(token, user) => { saveSession(token, user); router.push(next ?? (user.role === "supplier" ? "/supplier" : "/dashboard")); }} /><p className="mt-5 text-center text-sm text-muted-foreground">New here? <Link className="font-medium text-foreground underline" href={next ? `/sign-up?next=${encodeURIComponent(next)}` : "/sign-up"}>Create an account</Link></p></CardContent></Card></main>;
+  return (
+    <CenteredColumn title="Sign in" subtitle="Use the account for your organization or supplier profile.">
+      <AuthForm mode="login" onAuthenticated={(token, user) => { saveSession(token, user); router.push(next ?? (user.role === "supplier" ? "/supplier" : "/dashboard")); }} />
+      <p className="mt-6 text-center text-sm text-muted-foreground">New to ReliefMesh? <Link className="font-medium text-foreground hover:underline" href={next ? `/sign-up?next=${encodeURIComponent(next)}` : "/sign-up"}>Create an account</Link></p>
+    </CenteredColumn>
+  );
 }
 
 export default function SignInPage() {
-  return <Suspense fallback={<main className="grid min-h-screen place-items-center">Loading sign-in…</main>}><SignIn /></Suspense>;
+  return <Suspense fallback={<main className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading sign-in…</main>}><SignIn /></Suspense>;
 }

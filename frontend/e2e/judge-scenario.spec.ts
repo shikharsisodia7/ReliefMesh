@@ -10,13 +10,23 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByLabel("Password").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Create coordinator account" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
+  // Coordinators reach the judge guide from the avatar menu, not the tabs.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Judge guide" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Judge guide" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByPlaceholder("Organization name").fill("Bay Area Emergency Logistics");
   await page.getByLabel("Demo organization (labeled self-approval)").check();
   await page.getByRole("button", { name: "Create organization" }).click();
 
+  // The mission form lives in the New mission slide-over.
+  await page.getByRole("button", { name: "New mission" }).click();
   const eventSelect = page.getByLabel("Real emergency (NASA EONET, open events)");
   await expect(eventSelect.locator("option")).not.toHaveCount(1, { timeout: 30_000 });
-  const eventId = await eventSelect.locator("option").nth(1).getAttribute("value");
+  // Link an open California event when EONET has one (the demo is set in Oakland); otherwise the first event.
+  const california = eventSelect.locator("option", { hasText: /, California$/ });
+  const eventOption = (await california.count()) > 0 ? california.first() : eventSelect.locator("option").nth(1);
+  const eventId = await eventOption.getAttribute("value");
   await eventSelect.selectOption(eventId!);
   await page.getByLabel("Mission name").fill("Shelter blankets");
   await page.getByLabel("Delivery location").fill("Oakland, CA");
@@ -34,9 +44,10 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
 
   await page.getByRole("button", { name: "Seed TEST suppliers" }).click();
   const pioneer = page.getByTestId("supplier-Pioneer Logistics Supply");
-  await expect(pioneer.getByText(/OFAC POTENTIAL_MATCH/)).toBeVisible({ timeout: 60_000 });
+  // Check lines read "OFAC · Potential match"; the raw result code stays in data-result.
+  await expect(pioneer.getByRole("button", { name: /^OFAC · Potential match/ })).toBeVisible({ timeout: 60_000 });
   await expect(pioneer.getByText(/needs review/i).first()).toBeVisible();
-  await expect(page.getByText(/OFAC NO_MATCH/)).toHaveCount(3, { timeout: 30_000 });
+  await expect(page.locator('[data-check="OFAC_SCREENING"][data-result="NO_MATCH"]')).toHaveCount(3, { timeout: 30_000 });
 
   await page.getByRole("tab", { name: "Plan" }).click();
   await page.getByRole("button", { name: "Run optimization" }).click();
@@ -46,12 +57,14 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   // The counterfactual analysis runs off the request path and must remain visibly
   // labeled as hypothetical before the judge performs a real supplier change.
   await expect(page.getByLabel("Continuity Engine")).toBeVisible();
+  // The section is collapsed to one summary line by default.
+  await page.getByLabel("Continuity Engine").getByRole("button", { name: "Show details" }).click();
   await expect(page.getByLabel("N-1 survivability")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByLabel("Failure frontier")).toBeVisible();
   await expect(page.getByText("HYPOTHETICAL STRESS TEST").first()).toBeVisible();
 
   await page.getByRole("tab", { name: "Suppliers & Evidence" }).click();
-  await pioneer.getByText(/OFAC POTENTIAL_MATCH/).click();
+  await pioneer.getByRole("button", { name: /^OFAC · Potential match/ }).click();
   await expect(page.getByRole("dialog", { name: "Evidence detail" }).getByText(/PIONEER LOGISTICS/).first()).toBeVisible();
   await page.getByRole("button", { name: "Close evidence" }).click();
 
@@ -79,20 +92,28 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByRole("button", { name: "Approve plan" }).click();
   await page.getByRole("button", { name: "Generate POs" }).click();
   await page.getByRole("tab", { name: "Orders" }).click();
+  // Each draft opens a confirmation dialog; sending is a separate, explicit step.
   const sends = page.getByRole("button", { name: "Confirm & send" });
+  const confirm = page.getByRole("dialog", { name: "Confirm & send" });
   await expect(sends).toHaveCount(2);
-  await sends.first().click();
-  await expect(sends).toHaveCount(1);
-  await sends.first().click();
-  await expect(sends).toHaveCount(0);
+  for (const remaining of [1, 0]) {
+    await sends.first().click();
+    await confirm.getByRole("button", { name: "Confirm & send" }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(sends).toHaveCount(remaining);
+  }
 
   // OFAC false positive, and (when the CRS sandbox is configured) the failed signer identity check.
   for (let index = 0; index < 3; index += 1) {
     await page.getByRole("tab", { name: "Suppliers & Evidence" }).click();
     await expect(pioneer).toBeVisible();
     if ((await pioneer.getByRole("button", { name: "Clear finding" }).count()) === 0) break;
-    await pioneer.getByLabel("Clear finding reason").first().fill("Distinct US entity; signer and EIN verified by phone");
+    // Clear finding opens a dialog that requires a reason.
     await pioneer.getByRole("button", { name: "Clear finding" }).first().click();
+    const clearDialog = page.getByRole("dialog", { name: "Clear finding" });
+    await clearDialog.getByLabel("Clear finding reason").fill("Distinct US entity; signer and EIN verified by phone");
+    await clearDialog.getByRole("button", { name: "Clear finding" }).click();
+    await expect(clearDialog).toHaveCount(0);
     await page.waitForTimeout(1500);
   }
   await page.getByRole("tab", { name: "Plan" }).click();
@@ -100,5 +121,5 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   // Units already on sent purchase orders stay committed: the policy change must not re-buy them.
   await expect(page.getByText(/Committed on POs \$3,466\.00 · New spend \$0\.00/)).toBeVisible();
   await page.getByRole("tab", { name: "Audit" }).click();
-  await expect(page.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

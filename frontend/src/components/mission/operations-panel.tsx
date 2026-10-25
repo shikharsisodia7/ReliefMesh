@@ -20,20 +20,21 @@ export function OperationsPanel({ missionId, organizationId, token, isAdmin }: {
   const rows = all.filter((row) => row.status !== "NOT_CONFIGURED");
   const channels = [...new Set(notConnected.map((row) => row.channel))].map((channel) => ({ gmail: "Gmail", slack: "Slack", calendar: "Google Calendar", drive: "Google Drive" })[channel] ?? channel);
   const failed = rows.filter((row) => row.status === "FAILED").length;
+  const settings = `/settings?tab=integrations&org=${organizationId}`;
   return (
-    <section aria-label="External notifications" className="rounded-xl border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">External notifications</h2>
-        <span className="text-xs text-muted-foreground">
-          {rows.filter((row) => row.status === "SENT").length} sent{failed ? ` · ${failed} failed` : ""} · <Link className="underline" href={`/settings/integrations?org=${organizationId}`}>Gmail · Calendar · Slack · Drive settings</Link>
+    <section aria-label="External notifications" className="mt-12">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold">Notifications</h3>
+        <span className="text-sm text-muted-foreground">
+          {rows.filter((row) => row.status === "SENT").length} sent{failed ? ` · ${failed} failed` : ""} · <Link className="font-medium text-foreground hover:underline" href={settings}>Integration settings →</Link>
         </span>
       </div>
-      {deliveries.isError ? <p className="mt-2 text-sm text-critical">{deliveries.error.message}</p>
+      {deliveries.isError ? <p className="mt-2 text-sm text-critical">{deliveries.error.message} <button type="button" className="font-medium text-foreground hover:underline" onClick={() => void deliveries.refetch()}>Retry</button></p>
         : <>
             {(rows.length > 0 || notConnected.length === 0) && <DeliveryList deliveries={rows} token={token} canRetry={isAdmin} onChanged={() => void deliveries.refetch()} />}
             {notConnected.length > 0 && (
-              <details className="mt-2 rounded-md border border-dashed px-3 py-2 text-sm">
-                <summary className="cursor-pointer text-muted-foreground">{notConnected.length} notification{notConnected.length === 1 ? "" : "s"} not sent: {channels.join(", ")} {channels.length === 1 ? "is" : "are"} not connected for this organization. <Link className="underline" href={`/settings/integrations?org=${organizationId}`}>Connect</Link>, then retry.</summary>
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer text-muted-foreground">{notConnected.length} notification{notConnected.length === 1 ? "" : "s"} not sent: {channels.join(", ")} {channels.length === 1 ? "is" : "are"} not connected for this organization. <Link className="font-medium text-foreground hover:underline" href={settings}>Connect</Link>, then retry.</summary>
                 <DeliveryList deliveries={notConnected} token={token} canRetry={isAdmin} onChanged={() => void deliveries.refetch()} />
               </details>
             )}

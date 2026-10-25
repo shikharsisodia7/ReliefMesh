@@ -18,6 +18,8 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await expect(coordinator).toHaveURL(/\/dashboard/);
   await coordinator.getByPlaceholder("Organization name").fill("Paste Test Relief");
   await coordinator.getByRole("button", { name: "Create organization" }).click();
+  // The mission form lives in the New mission slide-over.
+  await coordinator.getByRole("button", { name: "New mission" }).click();
   await coordinator.getByLabel("Mission name").fill("Shelter blankets");
   await coordinator.getByLabel("Delivery location").fill("Oakland, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");
@@ -26,8 +28,10 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await coordinator.getByLabel("Quantity").fill("100");
   await coordinator.getByRole("button", { name: "Create mission" }).click();
   await expect(coordinator).toHaveURL(/\/missions\//);
-  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  // Send RFQ opens a dialog with the supplier email.
   await coordinator.getByRole("button", { name: "Send RFQ" }).click();
+  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  await coordinator.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
   const inviteUrl = (await coordinator.getByText(/Development invitation:/).textContent())?.match(/https?:\/\/\S+/)?.[0];
   expect(inviteUrl).toBeTruthy();
 
@@ -68,14 +72,16 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await supplier.getByLabel("Legal business name").fill("Woolworks Supply Co");
   await supplier.getByLabel("Delivery estimate").fill("2030-01-03T09:00");
   await supplier.getByLabel("Quote expiration").fill("2030-01-02T09:00");
+  await supplier.getByLabel("I reviewed the values and confirm they are correct.").check();
   await supplier.getByRole("button", { name: "Submit binding quote" }).click();
-  await expect(supplier).toHaveURL(/\/supplier$/);
+  await supplier.getByRole("link", { name: "View in My Quotes" }).click();
+  await expect(supplier).toHaveURL(/\/supplier\?tab=quotes$/);
   await expect(supplier.getByText(/120 wool blankets at \$28\.50 · ETA/)).toBeVisible();
 
   // A supplier revising its own quote in the portal is a real disruption the buyer must see.
-  await supplier.getByText("Revise price or inventory").click();
-  await supplier.getByLabel("wool blankets price").fill("31.00");
-  await supplier.getByRole("button", { name: "Save revision" }).click();
+  await supplier.getByRole("button", { name: "Revise quote" }).click();
+  await supplier.getByLabel("Unit price for wool blankets").fill("31.00");
+  await supplier.getByRole("button", { name: "Save changes" }).click();
   await expect(supplier.getByText(/Quote v2/)).toBeVisible();
   await expect(supplier.getByText(/120 wool blankets at \$31\.00/)).toBeVisible();
 });

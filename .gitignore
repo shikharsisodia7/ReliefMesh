@@ -4,6 +4,9 @@ frontend/.next/
 frontend/test-results/
 frontend/playwright-report/
 
+# Design review screenshots (local only)
+design/review/
+
 # Python
 backend/.venv/
 backend/**/__pycache__/

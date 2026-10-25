@@ -16,7 +16,7 @@ function localInput(iso: string) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-const itemClass = "flex w-full cursor-default items-center px-3 py-2 text-left text-sm outline-none select-none data-[highlighted]:bg-muted";
+const itemClass = "flex w-full cursor-default items-center px-3 py-2 text-left text-sm outline-hidden select-none data-[highlighted]:bg-muted";
 
 // The header's "⋯" menu: coordinator controls that change the procurement record itself.
 // The calendar mirror follows via operations events.
@@ -43,7 +43,7 @@ export function MissionMenu({ mission, token, run, setNotice }: {
         <Menu.Trigger aria-label="Mission actions" render={<Button variant="text" size="icon" />}><Ellipsis /></Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner align="end" sideOffset={6} className="z-50">
-            <Menu.Popup className="w-56 rounded-lg border bg-background py-1.5 shadow-lg outline-none">
+            <Menu.Popup className="w-56 rounded-lg border bg-background py-1.5 shadow-lg outline-hidden">
               <Menu.Item className={itemClass} onClick={() => setDialog("deadline")}>Change deadline…</Menu.Item>
               <Menu.Item className={itemClass} onClick={() => setDialog("cancel")}>Cancel mission…</Menu.Item>
             </Menu.Popup>

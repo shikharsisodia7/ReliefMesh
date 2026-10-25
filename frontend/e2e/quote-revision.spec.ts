@@ -15,6 +15,8 @@ test("revising a quote keeps its expiry in the supplier's local time", async ({ 
   await expect(coordinator).toHaveURL(/\/dashboard/);
   await coordinator.getByPlaceholder("Organization name").fill("Revision Check Response");
   await coordinator.getByRole("button", { name: "Create organization" }).click();
+  // The mission form lives in the New mission slide-over.
+  await coordinator.getByRole("button", { name: "New mission" }).click();
   await coordinator.getByLabel("Mission name").fill("Revision check");
   await coordinator.getByLabel("Delivery location").fill("Ukiah, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");
@@ -24,8 +26,10 @@ test("revising a quote keeps its expiry in the supplier's local time", async ({ 
   await coordinator.getByRole("button", { name: "Create mission" }).click();
   await expect(coordinator).toHaveURL(/\/missions\//);
   const supplierEmail = `supplier-revise-${runId}@e2e.example.com`;
-  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  // Send RFQ opens a dialog with the supplier email.
   await coordinator.getByRole("button", { name: "Send RFQ" }).click();
+  await coordinator.getByLabel("Supplier email").fill(supplierEmail);
+  await coordinator.getByRole("dialog", { name: "Send RFQ" }).getByRole("button", { name: "Send RFQ" }).click();
   const inviteUrl = (await coordinator.getByText(/Development invitation:/).textContent())?.match(/https?:\/\/\S+/)?.[0];
   expect(inviteUrl).toBeTruthy();
 
@@ -42,8 +46,10 @@ test("revising a quote keeps its expiry in the supplier's local time", async ({ 
   await supplier.getByLabel("Shipping (USD)").fill("0");
   await supplier.getByLabel("Delivery estimate").fill("2030-01-03T09:00");
   await supplier.getByLabel("Quote expiration").fill("2030-01-02T23:00");
+  await supplier.getByLabel("I reviewed the values and confirm they are correct.").check();
   await supplier.getByRole("button", { name: "Submit binding quote" }).click();
-  await expect(supplier).toHaveURL(/\/supplier/);
-  await supplier.getByText("Revise price or inventory").click();
-  await expect(supplier.locator("details").getByLabel("Quote expiration")).toHaveValue("2030-01-02T23:00");
+  await supplier.getByRole("link", { name: "View in My Quotes" }).click();
+  await expect(supplier).toHaveURL(/\/supplier\?tab=quotes/);
+  await supplier.getByRole("button", { name: "Revise quote" }).click();
+  await expect(supplier.getByRole("dialog", { name: "Revise quote" }).getByLabel("Quote expiration")).toHaveValue("2030-01-02T23:00");
 });
