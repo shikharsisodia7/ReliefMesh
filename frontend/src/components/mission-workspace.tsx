@@ -8,9 +8,9 @@ import { Page, PageHeader } from "@/components/layout/page-header";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MissionMenu } from "@/components/mission/lifecycle-controls";
 import { LeadsSection, MarketActions } from "@/components/mission/market-panel";
-import { OperationsPanel } from "@/components/mission/operations-panel";
+import { OrdersTab } from "@/components/mission/orders-tab";
 import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
-import { OrdersPanel, PaymentsPanel, PlanVersions, Timeline } from "@/components/mission/planning-panels";
+import { PaymentsPanel, PlanVersions, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { showToast } from "@/components/patterns/toast";
@@ -147,10 +147,8 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
             </TabPanel>
             <TabPanel value="approval"><PlanVersions plans={plans} approvals={data.approvals.data ?? []} token={token} run={run} setNotice={setNotice} order={supplierOrder} isAdmin={canApprove} approvalBlocked={approvalBlocked} /></TabPanel>
             <TabPanel value="orders">
-              <div className="space-y-5">
-                <OrdersPanel orders={data.orders.data ?? []} token={token} run={run} setNotice={setNotice} />
-                <OperationsPanel missionId={missionId} organizationId={mission.organization_id} token={token} isAdmin={isAdmin} />
-              </div>
+              <OrdersTab missionId={missionId} organizationId={mission.organization_id} plans={plans} approvals={data.approvals.data ?? []} orders={data.orders.data ?? []} quotes={quotes} suppliers={suppliers}
+                token={token} run={run} setNotice={setNotice} isAdmin={isAdmin} onTab={setTab} />
             </TabPanel>
             <TabPanel value="audit">
               <div className="space-y-5">

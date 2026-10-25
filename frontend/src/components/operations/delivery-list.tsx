@@ -34,25 +34,25 @@ export function DeliveryList({ deliveries, token, canRetry, onChanged, showMissi
   return (
     <div className="mt-2">
       {error && <p role="alert" className="mb-2 text-sm text-critical">{error}</p>}
-      <ol className="max-h-[28rem] divide-y divide-border/50 overflow-y-auto pr-1">
+      <ol className="max-h-[28rem] overflow-y-auto">
         {deliveries.map((row) => {
           const Icon = icons[row.channel];
           return (
-            <li key={row.id} className="grid gap-x-3 gap-y-0.5 py-2 text-sm sm:grid-cols-[22px_1fr_auto]">
+            <li key={row.id} className="grid gap-x-3 gap-y-0.5 border-b py-3 text-sm sm:grid-cols-[22px_1fr_auto]">
               <Icon className="mt-0.5 size-4 text-muted-foreground" aria-label={row.channel} />
               <div className="min-w-0">
                 <p className="truncate"><span className="font-medium">{eventLabel[row.event_type] ?? row.event_type}</span> · <span className="text-muted-foreground">{row.subject ?? row.summary}</span></p>
-                <p className="truncate font-mono text-[10px] text-tertiary">
+                <p className="truncate text-xs text-muted-foreground">
                   {row.channel} → {row.target}{row.operation ? ` (${row.operation})` : ""} · {when(row.created_at)} · attempt {row.attempts}/{row.max_attempts}
                   {row.provider_id ? ` · id ${row.provider_id.slice(0, 18)}` : ""}
                   {showMission && row.mission_id && <> · <Link className="underline" href={`/missions/${row.mission_id}`}>mission</Link></>}
                 </p>
-                {row.last_error && <p className="text-xs text-critical/90">{row.last_error}</p>}
+                {row.last_error && <p className="text-xs text-critical">{row.last_error}</p>}
               </div>
               <div className="flex items-center gap-2 sm:justify-end">
                 <StatusText tone={tone[row.status]} value={row.status} className="text-xs tracking-wide">{row.status.replace("_", " ")}</StatusText>
                 {row.provider_url && <a className="text-muted-foreground hover:text-foreground" href={row.provider_url} target="_blank" rel="noreferrer" aria-label="Open in provider"><ExternalLink className="size-3.5" /></a>}
-                {canRetry && (row.status === "FAILED" || row.status === "NOT_CONFIGURED") && row.event_type !== "integration_test" && <Button size="sm" variant="secondary" className="h-6 px-2 text-xs" onClick={() => void retry(row.id)}>Retry</Button>}
+                {canRetry && (row.status === "FAILED" || row.status === "NOT_CONFIGURED") && row.event_type !== "integration_test" && <Button size="sm" variant="text" onClick={() => void retry(row.id)}>Retry</Button>}
               </div>
             </li>
           );

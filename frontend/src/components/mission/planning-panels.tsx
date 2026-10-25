@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Download, Hash, Link2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Hash, Link2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "@/components/patterns/overlays";
@@ -8,7 +8,7 @@ import { PlanStatusText, Provenance, StatusText, ago, money, signedAmount, when 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { API_BASE_URL, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Notification, Payment, Plan, PurchaseOrder, SupplierRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -188,40 +188,6 @@ export function PlanVersions({ plans, approvals, token, run, setNotice, order, i
               </article>
             );
           })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-async function downloadPdf(orderId: string, poNumber: string, token: string) {
-  const response = await fetch(`${API_BASE_URL}/v1/purchase-orders/${orderId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error("Could not download the purchase order PDF");
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${poNumber}.pdf`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-export function OrdersPanel({ orders, token, run, setNotice }: { orders: PurchaseOrder[]; token: string; run: Run; setNotice: (value: string) => void }) {
-  return (
-    <section aria-label="Purchase orders" className="rounded-xl border bg-card p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Purchase orders</h2>
-      <p className="mb-3 text-xs text-tertiary">Drafts are not binding. Sending requires a separate confirmation. Drafts from a plan that goes stale are voided automatically.</p>
-      {orders.length === 0 ? <p className="text-sm text-muted-foreground">No purchase orders generated.</p> : (
-        <div className="space-y-2">
-          {orders.map((order) => (
-            <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-              <div><p className="font-mono font-medium">{order.po_number}</p><p className="text-sm text-muted-foreground">{order.supplier_email} · plan v{order.plan_version} · {money(order.subtotal)}{order.plan_stale ? " · plan since replaced" : ""}</p></div>
-              <div className="flex items-center gap-2">
-                <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase">{order.status}</span>
-                <Button size="sm" variant="text" aria-label={`Download ${order.po_number} PDF`} onClick={() => void run(() => downloadPdf(order.id, order.po_number, token))}><Download className="size-3.5" /></Button>
-                {order.status === "draft" && <Button size="sm" onClick={() => void run(async () => { await api(`/v1/purchase-orders/${order.id}/send`, { method: "POST", token, body: JSON.stringify({ confirm: true }) }); setNotice(`${order.po_number} sent to supplier.`); })}>Confirm &amp; send</Button>}
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </section>

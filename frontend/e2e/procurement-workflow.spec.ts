@@ -110,7 +110,9 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await coordinator.getByRole("tab", { name: "Orders" }).click();
   await expect(coordinator.getByRole("button", { name: "Confirm & send" })).toBeVisible();
   await coordinator.getByRole("button", { name: "Confirm & send" }).click();
-  await expect(coordinator.getByText("sent", { exact: true })).toBeVisible();
+  await coordinator.getByRole("dialog", { name: "Confirm & send" }).getByRole("button", { name: "Confirm & send" }).click();
+  // The PO's progress line marks its current step.
+  await expect(coordinator.locator('[aria-current="step"]')).toHaveText("Sent");
 
   await supplierTwo.reload();
   await expect(supplierTwo.getByRole("button", { name: "Accept" })).toBeVisible();

@@ -82,12 +82,16 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByRole("button", { name: "Approve plan" }).click();
   await page.getByRole("button", { name: "Generate POs" }).click();
   await page.getByRole("tab", { name: "Orders" }).click();
+  // Each draft opens a confirmation dialog; sending is a separate, explicit step.
   const sends = page.getByRole("button", { name: "Confirm & send" });
+  const confirm = page.getByRole("dialog", { name: "Confirm & send" });
   await expect(sends).toHaveCount(2);
-  await sends.first().click();
-  await expect(sends).toHaveCount(1);
-  await sends.first().click();
-  await expect(sends).toHaveCount(0);
+  for (const remaining of [1, 0]) {
+    await sends.first().click();
+    await confirm.getByRole("button", { name: "Confirm & send" }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(sends).toHaveCount(remaining);
+  }
 
   // OFAC false positive, and (when the CRS sandbox is configured) the failed signer identity check.
   for (let index = 0; index < 3; index += 1) {
