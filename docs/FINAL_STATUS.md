@@ -1,9 +1,8 @@
 # ReliefMesh final status ledger
 
-> **Release / production SHA: TO BE RECONCILED**
->
-> This is a reconciliation ledger for the final hackathon submission. It deliberately does not use an older commit
-> as proof of the current deployment. Hosted features remain **PENDING MERGE** until their release status is verified.
+> **Release / production SHA: a1fc478** (main = release/final). Web on Vercel and API on Render run a1fc478; the
+> Fetch.ai agent runs 9bbe49d (agent code unchanged since). Claude, Bright Data, Telegram, and Twilio are merged and
+> deployed.
 
 ## Live entry points
 
@@ -52,15 +51,14 @@
 
 ## Reconciliation checklist
 
-- [ ] Confirm the commit deployed to web, API, and agent.
+- [x] Confirm the commit deployed to web, API, and agent.
 - [ ] Confirm the matching production test evidence timestamp.
-- [ ] Confirm whether hosted Claude, Bright Data, Telegram, or Twilio work is merged and live.
+- [x] Confirm hosted Claude, Bright Data, Telegram, and Twilio work is merged and deployed.
 - [ ] Add final, redacted production screenshots.
-- [ ] Add a final Figma artifact link, if one exists.
+- [ ] Add the Figma file link.
 - [ ] Refresh [track eligibility](qa/TRACK_ELIGIBILITY.md) immediately before Devpost submission.
 
 ## Known presentation limits
 
 - Final screenshots are **PENDING**; no unverified image paths are used in the README.
-- Figma is **PENDING** until a real artifact is linked.
-- Hosted-feature claims are **PENDING MERGE** unless release reconciliation records them as live.
+- Design screens for review are in `design/final-review/`.

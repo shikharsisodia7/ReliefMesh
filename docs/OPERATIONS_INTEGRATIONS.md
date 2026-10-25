@@ -3,7 +3,7 @@
 > **Historical channel-verification detail.** The run counts below document an earlier integration exercise; they are
 > not the final presentation totals. Use [FINAL_STATUS.md](FINAL_STATUS.md) for the latest reconciled recovery proof
 > (2 delivered POs, 32 audit events, 29 / 29 idempotency keys after replay, and zero duplicates). Production SHA:
-> **TO BE RECONCILED**.
+> **a1fc478**.
 
 ReliefMesh stays the system of record. These integrations carry procurement events into the tools an
 emergency-management team already uses; none of them can approve, order, or pay.

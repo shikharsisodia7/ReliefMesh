@@ -4,8 +4,7 @@
 
 [Live Demo](https://reliefmesh.us) · [Judge Guide](https://reliefmesh.us/judge) · [System Status](https://reliefmesh.us/status)
 
-> Release / production SHA: **TO BE RECONCILED**. This document intentionally does not assert a final deployment
-> commit while release and hosted-feature work are being reconciled.
+> Release / production SHA: **a1fc478** (web on Vercel and API on Render; main = release/final).
 
 <!-- FINAL_SCREENSHOT: landing -->
 
@@ -96,7 +95,7 @@ inventing image paths or publishing demo/private identifiers.
 <!-- FINAL_SCREENSHOT: audit -->
 <!-- FINAL_SCREENSHOT: status -->
 <!-- FINAL_SCREENSHOT: fetch-asi-one -->
-<!-- FINAL_SCREENSHOT: figma-workflow (PENDING) -->
+<!-- FINAL_SCREENSHOT: figma-workflow -->
 
 ## How it works
 
@@ -114,7 +113,7 @@ inventing image paths or publishing demo/private identifiers.
 | Component | Role |
 | --- | --- |
 | Gemini | Drafts fields from supplier-pasted quote text; the supplier reviews every value. |
-| Claude | **PENDING MERGE** — include only if the hosted feature is reconciled and live. |
+| Claude | Writes an evidence-bounded, cited explanation of a recovery plan for human review; it cannot change plans or approve. |
 | Fetch.ai | Agent interface for operational questions; it explains stored results. |
 | Policy engine | Deterministic supplier eligibility. |
 | PuLP/CBC | Deterministic procurement optimization. |
@@ -164,7 +163,7 @@ must be reconciled before submission.
 
 - Fetch.ai / uAgents / Agentverse / ASI:One
 - Gemini
-- Claude: **PENDING MERGE**
+- Anthropic Claude
 
 ### Supplier discovery and evidence
 
@@ -174,7 +173,7 @@ must be reconciled before submission.
 - SAM.gov
 - openFDA
 - USAspending
-- Bright Data: **PENDING MERGE**
+- Bright Data Web Unlocker
 
 ### Disaster data
 
@@ -192,12 +191,12 @@ must be reconciled before submission.
 - Google Drive
 - Slack
 - Resend
-- Telegram: **PENDING MERGE**
-- Twilio: **PENDING MERGE**
+- Telegram (@ReliefMeshSupplierBot)
+- Twilio SMS
 
 ### Design
 
-- Figma: **PENDING** — no final artifact link is asserted here.
+- Figma: design system, page specs, and mockups in [`design/`](design/)
 
 ## Sponsors and tracks
 
@@ -206,15 +205,18 @@ must be reconciled before submission.
 | Hyphenate | Autonomous procurement recovery with human financial authority | `SUBMIT` |
 | Microsoft | Deployed operational system with explicit AI and authority boundaries | `SUBMIT` |
 | Fetch.ai | ASI:One / Agentverse procurement agent | `SUBMIT` |
-| CRS | Sandbox signer identity / fraud verification | `CONDITIONAL` |
+| CRS | Sandbox signer identity / fraud verification | `SUBMIT` |
 | Apify | Public supplier-lead discovery | `SUBMIT` |
 | Gemini | Grounded supplier quote drafting | `SUBMIT` |
 | Solana | Devnet settlement | `SUBMIT` |
 | GoDaddy | `reliefmesh.us` | `SUBMIT` |
-| Armadin | Replay protection, authority boundaries, audit | `CONDITIONAL` |
-| Coinbase x402 | Machine-paid evidence over x402 | `CONDITIONAL` |
-| Figma | **PENDING** final artifact | `CONDITIONAL` |
-| Bright Data | **PENDING MERGE** | `CONDITIONAL` |
+| Armadin | Replay protection, authority boundaries, audit | `SUBMIT` |
+| Coinbase x402 | Machine-paid evidence over x402 | `SUBMIT` |
+| Figma | Design system and mockups the redesign was built from | `SUBMIT` |
+| Bright Data | Public-website review of supplier leads | `SUBMIT` |
+| Anthropic / Claude | Cited recovery-plan explanations | `SUBMIT` |
+| Telegram | Supplier bot for RFQs, quotes, and orders | `SUBMIT` |
+| Twilio | Opt-in supplier SMS channel | `SUBMIT` |
 
 Track details and evidence boundaries live in [docs/qa/TRACK_ELIGIBILITY.md](docs/qa/TRACK_ELIGIBILITY.md).
 

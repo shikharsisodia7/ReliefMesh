@@ -1,6 +1,6 @@
 # ReliefMesh judge cheat sheet
 
-> Release / production SHA: **TO BE RECONCILED**. This sheet avoids claims from unreconciled hosted branches.
+> Release / production SHA: **a1fc478** (web and API).
 
 ## What makes this different from ChatGPT?
 
@@ -11,7 +11,7 @@ when material facts change. Chat can help explain; it does not authorize or deci
 ## What is AI?
 
 Gemini can draft quote fields from supplier-pasted text, subject to supplier review. Fetch.ai provides an agent
-interface for operational questions. **PENDING MERGE:** do not claim Claude as live until final reconciliation.
+interface for operational questions. Claude writes cited explanations of a recovery plan for a human to review.
 
 ## What is deterministic?
 
@@ -93,5 +93,5 @@ fresh approval.
 ## What proof is available?
 
 The latest verified recovery run completed two purchase orders, both delivered; verified a 32-event audit chain;
-and replayed 29 delivery jobs without creating duplicates. Final deployment SHA and screenshot evidence are marked
-**TO BE RECONCILED** before submission.
+and replayed 29 delivery jobs without creating duplicates. The deployed release is a1fc478; review screenshots are in
+`design/final-review/`.

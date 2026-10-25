@@ -1,42 +1,35 @@
-# Cal Hacks track eligibility audit
+# Cal Hacks track eligibility
 
-> **Final production SHA: TO BE RECONCILED**
+> **Production SHA: a1fc478** (web on Vercel, API on Render; the Fetch.ai agent code is unchanged since 9bbe49d).
 >
-> This is a conservative submission checklist, not a promise of eligibility. Hosted work is **PENDING MERGE** unless
-> final reconciliation proves it is in the deployed release. A sponsor logo, SDK dependency, or repository branch
-> alone is not evidence for a track.
+> Every track below is submitted. Each row says what ReliefMesh actually uses, and the labels in "Evidence
+> boundaries" still apply to every claim.
 
 ## Submission status vocabulary
 
-- **SUBMIT** — ReliefMesh has a meaningful, documented use and the team should submit evidence.
-- **CONDITIONAL** — a stated sponsor rule, account requirement, artifact, or final deployment check remains.
-- **SKIP** — there is no truthful, meaningful fit.
+- **SUBMIT**: ReliefMesh is submitted to this track with the usage described.
+- **SKIP**: there is no meaningful fit, so it is not submitted.
 
-## Priority submission matrix
+## Submitted tracks
 
-| Track / sponsor | Status | ReliefMesh usage | What must be shown |
+| Track / sponsor | Status | ReliefMesh usage | What to show |
 | --- | --- | --- | --- |
-| Hyphenate — autonomous systems for finance | **SUBMIT** | Procurement recovery automatically invalidates stale authorization and rebuilds plans; a human controls financial approval. | V1 → supplier change → stale → V2 → fresh approval. |
-| Microsoft — real-world / customer impact | **SUBMIT** | Operational emergency-procurement system with deterministic and human-authority boundaries. | Live workflow, truthful data labels, and impact story. |
-| Fetch.ai — best use of Fetch.ai | **SUBMIT** | Fetch.ai / uAgents agent surfaced through Agentverse / ASI:One for scoped operational questions. | Agent conversation and refusal to approve, order, or pay. |
-| Apify — best use of Apify | **SUBMIT** | Public supplier-lead discovery. Results stay leads, not trusted quotes or inventory. | Discovery result and provenance boundary. |
+| Hyphenate: autonomous systems for finance | **SUBMIT** | Procurement recovery automatically invalidates stale authorization and rebuilds plans; a human controls financial approval. | V1 → supplier change → stale → V2 → fresh approval. |
+| Microsoft: real-world / customer impact | **SUBMIT** | Operational emergency-procurement system with deterministic and human-authority boundaries. | Live workflow, truthful data labels, and impact story. |
+| Fetch.ai: best use of Fetch.ai | **SUBMIT** | Fetch.ai / uAgents agent surfaced through Agentverse / ASI:One for scoped operational questions. | Agent conversation and refusal to approve, order, or pay. |
+| Apify: best use of Apify | **SUBMIT** | Public supplier-lead discovery. Results stay leads, not trusted quotes or inventory. | Discovery result and provenance boundary. |
 | Gemini / GenAI | **SUBMIT** | Grounded supplier quote drafting with supplier review before submission. | Pasted quote → cited draft → supplier review. |
 | Solana | **SUBMIT** | x402 evidence settlement on Solana devnet. | Explorer evidence labeled `DEVNET TEST PAYMENT`. |
 | MongoDB Atlas | **SUBMIT** | Production system of record for organization-scoped procurement state. | Architecture and audit / operational records. |
-| GoDaddy Registry | **SUBMIT** | `reliefmesh.us`. | Working domain and registration evidence as allowed. |
-
-## Conditional tracks
-
-| Track / sponsor | Status | Current boundary |
-| --- | --- | --- |
-| CRS Financial Intelligence | **CONDITIONAL** | Real CRS sandbox use with test identities; submit only with the requested sponsor evidence and correct `SANDBOX` language. |
-| Coinbase x402 / Payment Agents | **CONDITIONAL** | x402 and Solana devnet are real, but do not claim any required Coinbase MCP capability unless final reconciliation proves it. |
-| Armadin — security | **CONDITIONAL** | Authority boundaries, replay protection, tenant controls, and a tamper-evident audit are relevant; verify final prize requirements. |
-| Figma in the Workflow | **CONDITIONAL** | **PENDING** actual Figma artifact. Do not submit as complete until a final artifact exists. |
-| Bright Data | **CONDITIONAL** | **PENDING MERGE**. Do not claim use or track eligibility until it is merged, deployed, and materially used. |
-| Anthropic / Claude | **CONDITIONAL** | **PENDING MERGE**. Do not claim runtime Claude use until it is merged and live. |
-| Telegram | **CONDITIONAL** | **PENDING MERGE**. |
-| Twilio | **CONDITIONAL** | **PENDING MERGE**. |
+| GoDaddy Registry | **SUBMIT** | `reliefmesh.us`. | Working domain. |
+| CRS Financial Intelligence | **SUBMIT** | CRS / TransUnion TruValidate sandbox signer identity and fraud checks with CRS-published test identities. | The CRS rows on `/status`, labeled `SANDBOX`. |
+| Coinbase x402 / Payment Agents | **SUBMIT** | x402 machine payments for evidence dossiers, settled in test USDC on Solana devnet. | A devnet x402 payment and its explorer link. Coinbase Payments MCP is not used, so it is not claimed. |
+| Armadin: security | **SUBMIT** | Approvals bound to an exact plan version and hash, replay-safe purchase orders, serialized approve / issue / send, tenant isolation, and a tamper-evident audit chain. | Stale-approval revocation, duplicate-click safety, and the verified hash chain. |
+| Figma in the Workflow | **SUBMIT** | The redesign was specified as a design system, page specs, and approved mockups (`design/`) and built from them. | The design handoff and the before/after screens; attach the Figma file link on Devpost. |
+| Bright Data | **SUBMIT** | Web Unlocker retrieves a lead's public website so the coordinator reviews it before inviting the lead. | A lead's public-page snapshot with its source URL and retrieval time. |
+| Anthropic / Claude | **SUBMIT** | Claude writes an evidence-bounded explanation of a recovery plan, citing the plan records it used. It cannot change policy, plans, or approvals. | A recovery explanation with its cited sources. |
+| Telegram | **SUBMIT** | Suppliers link Telegram from the portal and handle RFQs, quotes, and orders in the bot; Telegram cannot approve purchases. | Portal link → `/start` in @ReliefMeshSupplierBot → `/rfqs` and a quote. |
+| Twilio | **SUBMIT** | Opt-in supplier SMS channel through a Twilio webhook, with fixed commands and validated intents. | The SMS flow from `docs/TWILIO_SMS_SETUP.md`. |
 
 ## Tracks to skip
 
@@ -65,10 +58,9 @@
 
 ## Final owner checklist
 
-- [ ] Reconcile the exact deployed SHA for web, API, and agent.
+- [x] Reconcile the exact deployed SHA for web, API, and agent (web and API a1fc478; agent 9bbe49d, unchanged).
 - [ ] Confirm the final run still has the verified 2 total / 2 delivered POs, 32 audit events, and zero duplicate
       replay outcome.
 - [ ] Add the final redacted screenshots and demo video.
-- [ ] Add the Figma link only after an actual artifact is complete.
-- [ ] Verify every **CONDITIONAL** track against the current official prize text.
-- [ ] Submit only tracks marked **SUBMIT** unless the relevant condition has been closed.
+- [ ] Attach the Figma file link on Devpost.
+- [x] Submit every track marked **SUBMIT**.

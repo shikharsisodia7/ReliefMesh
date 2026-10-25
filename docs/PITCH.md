@@ -1,7 +1,6 @@
 # ReliefMesh three-minute pitch
 
-> Production SHA: **TO BE RECONCILED**. Do not add hosted-feature claims until their merge and deployment are
-> confirmed.
+> Production SHA: **a1fc478** (web and API).
 
 ## 0:00–0:20 — The problem
 

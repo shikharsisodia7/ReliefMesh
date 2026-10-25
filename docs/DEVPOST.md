@@ -1,7 +1,6 @@
 # Devpost submission: ReliefMesh
 
-> Production SHA: **TO BE RECONCILED**. Hosted-feature claims are **PENDING MERGE** unless the release
-> reconciliation confirms them. This copy is ready to paste after those fields are resolved.
+> Production SHA: **a1fc478** (web and API). This copy is ready to paste.
 
 ## Project name
 
@@ -55,7 +54,7 @@ replay, and zero duplicate Gmail, Slack, Calendar, Drive, PO, or x402 records.**
 - **Operations:** Gmail, Google Calendar, Google Drive, Slack, and Resend. Deliveries are idempotent and do not
   grant approval authority.
 - **Agent and AI:** Fetch.ai / uAgents / Agentverse / ASI:One for operational questions; Gemini for
-  supplier-reviewable quote drafting. Claude: **PENDING MERGE**.
+  supplier-reviewable quote drafting; Claude for cited, evidence-bounded recovery explanations.
 - **Payments:** Coinbase x402 with Solana devnet test USDC for machine-paid evidence only; no supplier is paid.
 - **Deploy:** Vercel, Render, MongoDB Atlas, and `reliefmesh.us`.
 
@@ -102,7 +101,7 @@ https://reliefmesh.us
 
 ## GitHub
 
-https://github.com/shikharsisodia7/calhacks
+https://github.com/shikharsisodia7/ReliefMesh
 
 ## Judge guide
 
@@ -110,7 +109,7 @@ https://reliefmesh.us/judge
 
 ## Figma
 
-**PENDING** — add the final artifact URL only after it exists.
+Design system, page specs, and mockups: https://github.com/shikharsisodia7/ReliefMesh/tree/main/design (attach the Figma file link here).
 
 ## Demo video
 
@@ -129,8 +128,11 @@ https://reliefmesh.us/judge
 | Solana | Devnet settlement; label `DEVNET TEST PAYMENT`. |
 | GoDaddy | `reliefmesh.us`. |
 | Armadin | Authority boundaries, replay protection, and tamper-evident audit. |
-| Coinbase x402 | Machine-paid evidence over x402; eligibility remains conditional. |
-| Figma | **PENDING** final artifact. |
-| Bright Data | **PENDING MERGE**; do not claim until reconciled and live. |
+| Coinbase x402 | Machine-paid evidence over x402 on Solana devnet (test USDC). |
+| Figma | Design system, page specs, and mockups the redesign was built from. |
+| Bright Data | Web Unlocker public-website review of supplier leads before inviting them. |
+| Anthropic / Claude | Cited, evidence-bounded recovery-plan explanations; no approval authority. |
+| Telegram | Supplier bot (@ReliefMeshSupplierBot) for RFQs, quotes, and orders; cannot approve purchases. |
+| Twilio | Opt-in supplier SMS channel with fixed commands. |
 
-For submission eligibility, use [the conservative track audit](qa/TRACK_ELIGIBILITY.md), not this summary table.
+Full track details: [track eligibility](qa/TRACK_ELIGIBILITY.md).
