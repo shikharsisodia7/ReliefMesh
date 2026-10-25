@@ -3,7 +3,7 @@
 import { Copy } from "lucide-react";
 import { useState } from "react";
 
-import { Provenance, StatusText, when } from "@/components/status-badges";
+import { Provenance, StatusText, money, signedAmount, when } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { AuditEvent, AuditVerification, Job, Notification, Payment } from "@/lib/types";
@@ -12,6 +12,20 @@ const shortHash = (hash?: string | null) => (hash ? `${hash.slice(0, 4)}…${has
 // "purchase_order.created" → "Purchase order created".
 const eventWords = (action: string) => { const text = action.replace(/[._]/g, " "); return text.charAt(0).toUpperCase() + text.slice(1); };
 const severityWord: Record<string, string> = { warning: "Warning", critical: "Critical" };
+
+const ISO_TIME = String.raw`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})`;
+
+// Rewrites the raw money and times in known API messages; anything else passes through unchanged.
+// "Plan v2 approved for $3466.00 (expires 2026-10-25T10:53Z)." → "Plan v2 approved for $3,466.00 · expires Oct 25, 3:53 AM"
+export function readableMessage(message: string) {
+  return message
+    // Unformatted amounts like "$3466.00"; amounts that already have commas are left alone.
+    .replace(/\$(\d+(?:\.\d+)?)(?![\d,]|\.\d)/g, (_, value: string) => money(value))
+    // The replan delta arrives without a dollar sign: "(195.00 vs prior plan)".
+    .replace(/\((-?\d+(?:\.\d+)?) vs prior plan\)/, (_, delta: string) => `(${signedAmount(delta, true)} vs prior plan)`)
+    .replace(new RegExp(String.raw` \(expires (${ISO_TIME})\)\.?$`), (_, at: string) => ` · expires ${when(at)}`)
+    .replace(new RegExp(ISO_TIME, "g"), (at) => when(at));
+}
 
 function CopyHash({ hash, sequence }: { hash: string; sequence: number }) {
   const [copied, setCopied] = useState(false);
@@ -44,7 +58,7 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
             <TableHeader><TableRow><TableHead className="w-12">#</TableHead><TableHead>Time</TableHead><TableHead>Event</TableHead><TableHead>Actor</TableHead><TableHead>Hash</TableHead></TableRow></TableHeader>
             <TableBody>
               {events.map((event) => (
-                <TableRow key={event.id}>
+                <TableRow key={event.id} className="h-9 [&>td]:py-2">
                   <TableCell className="tabular text-muted-foreground">{event.sequence}</TableCell>
                   <TableCell>{when(event.created_at)}</TableCell>
                   <TableCell className="whitespace-normal">{eventWords(event.action)}</TableCell>
@@ -64,7 +78,7 @@ export function AuditTab({ audit, verification, jobs, notifications, payments, a
             {notifications.map((notification) => (
               <li key={notification.id} className="grid gap-x-6 border-b py-2.5 text-sm sm:grid-cols-[140px_1fr]">
                 <span className="text-muted-foreground">{when(notification.created_at)}</span>
-                <span>{severityWord[notification.severity] && <StatusText value={notification.severity}>{severityWord[notification.severity]} · </StatusText>}{notification.message}</span>
+                <span>{severityWord[notification.severity] && <StatusText value={notification.severity}>{severityWord[notification.severity]} · </StatusText>}{readableMessage(notification.message)}</span>
               </li>
             ))}
           </ul>

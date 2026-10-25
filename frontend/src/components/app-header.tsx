@@ -21,7 +21,6 @@ const coordinatorTabs: Tab[] = [
   { label: "Missions", href: "/dashboard", active: (path) => path === "/dashboard" || path.startsWith("/missions/") },
   { label: "Suppliers", href: "/suppliers", active: (path) => path === "/suppliers" },
   { label: "Analytics", href: "/analytics", active: (path) => path === "/analytics" },
-  { label: "Judge guide", href: "/judge", active: (path) => path === "/judge" },
   { label: "System Status", href: "/status", active: (path) => path === "/status" },
 ];
 const supplierTabs: Tab[] = [
@@ -179,6 +178,8 @@ function AccountMenu({ session }: { session: Session }) {
             <Menu.Separator className="my-1.5 h-px bg-border" />
             {/* The island stays mounted across pages, so the menu must close itself on navigation. */}
             {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/settings" />} className={itemClass}>Settings</Menu.LinkItem>}
+            {/* Coordinators reach the judge guide here; logged-out visitors see it as a marketing tab. */}
+            {coordinator && <Menu.LinkItem closeOnClick render={<Link href="/judge" />} className={itemClass}>Judge guide</Menu.LinkItem>}
             <Menu.Item className={itemClass} onClick={() => signOut(router)}>Sign out</Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
@@ -218,6 +219,7 @@ function MobileMenu({ tabs, pathname, tab, session }: { tabs: Tab[]; pathname: s
               </div>
             )}
             {coordinator && <Link href="/settings" onClick={close} className={row}>Settings</Link>}
+            {coordinator && <Link href="/judge" onClick={close} className={row}>Judge guide</Link>}
             <button type="button" className={row} onClick={() => { close(); signOut(router); }}>Sign out</button>
           </div>
         ) : (

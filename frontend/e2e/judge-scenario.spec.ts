@@ -10,13 +10,21 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByLabel("Password").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Create coordinator account" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
+  // Coordinators reach the judge guide from the avatar menu, not the tabs.
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Judge guide" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Judge guide" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.getByPlaceholder("Organization name").fill("Bay Area Emergency Logistics");
   await page.getByLabel("Demo organization (labeled self-approval)").check();
   await page.getByRole("button", { name: "Create organization" }).click();
 
   const eventSelect = page.getByLabel("Real emergency (NASA EONET, open events)");
   await expect(eventSelect.locator("option")).not.toHaveCount(1, { timeout: 30_000 });
-  const eventId = await eventSelect.locator("option").nth(1).getAttribute("value");
+  // Link an open California event when EONET has one (the demo is set in Oakland); otherwise the first event.
+  const california = eventSelect.locator("option", { hasText: /, California$/ });
+  const eventOption = (await california.count()) > 0 ? california.first() : eventSelect.locator("option").nth(1);
+  const eventId = await eventOption.getAttribute("value");
   await eventSelect.selectOption(eventId!);
   await page.getByLabel("Mission name").fill("Shelter blankets");
   await page.getByLabel("Delivery location").fill("Oakland, CA");
