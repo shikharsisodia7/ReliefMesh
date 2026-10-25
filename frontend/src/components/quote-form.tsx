@@ -28,7 +28,8 @@ const schema = z.object({
 export type QuoteValues = z.infer<typeof schema>;
 
 // datetime-local inputs take local wall-clock time without a zone.
-const toLocalInput = (iso: string) => { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
+/** ISO timestamp -> value for a datetime-local input, in the viewer's local time. */
+export const toLocalInput = (iso: string) => { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
 
 // One block per mission requirement; each submitted line is pinned to that requirement's stable ID.
 export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requirements: Requirement[]; legalName?: string | null; onSubmit: (values: QuoteValues) => Promise<void>; onDraft?: (text: string) => Promise<QuoteDraft> }) {
