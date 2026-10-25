@@ -13,6 +13,7 @@ from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
+from pymongo.errors import DuplicateKeyError
 
 from ..core import Services, audit, get_services, new_id, now_iso, secret
 from ..integrations.openrouter_sms import parse_sms_intent
@@ -202,13 +203,24 @@ async def receive_twilio_sms(request: Request, services: Services = Depends(get_
     async with services.sms_locks[from_phone]:
         existing = await services.store.get("twilio_messages", sid)
         if existing:
-            return twiml(existing["reply"])
+            return twiml(existing.get("reply") or "ReliefMesh is processing this message. Please check your portal before retrying.")
+        message = {"id": sid, "message_sid": sid, "from": from_phone, "to": to_phone,
+                   "body": params.get("Body", "")[:1200], "reply": None, "status": "processing",
+                   "created_at": now_iso()}
+        try:
+            # Reserve the provider SID before applying any quote mutation. The unique Mongo index prevents a
+            # duplicate webhook delivered to another API worker from applying the same confirmation twice.
+            await services.store.insert("twilio_messages", message)
+        except (DuplicateKeyError, ValueError):
+            existing = await services.store.get("twilio_messages", sid)
+            if existing:
+                return twiml(existing.get("reply") or "ReliefMesh is processing this message. Please check your portal before retrying.")
+            raise
         try:
             reply = await reply_for_message(services, from_phone, params.get("Body", "")[:1200])
         except Exception:
             # Keep Twilio responses useful without echoing internal exceptions or credentials.
             reply = "ReliefMesh couldn't process that message right now. Please retry or use the supplier portal."
-        await services.store.insert("twilio_messages", {"id": sid, "message_sid": sid, "from": from_phone,
-                                    "to": to_phone, "body": params.get("Body", "")[:1200], "reply": reply,
-                                    "created_at": now_iso()})
+        message.update(reply=reply, status="processed", processed_at=now_iso())
+        await services.store.replace("twilio_messages", sid, message)
         return twiml(reply)
