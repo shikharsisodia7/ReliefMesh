@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # Deterministic, read-only counterfactual optimization.  It is safe in production
     # because it only reads persisted quote/evidence snapshots and never mutates them.
     continuity_engine_enabled: bool = True
+    # Bounds CPU use: concurrent analyses per process (each runs many CBC solves in a worker thread).
+    continuity_max_concurrent: int = 1
     # Agent chat senders allowed to spend paid credits (Apify discovery). Empty denies every agent sender.
     agent_privileged_senders: list[str] = []
 

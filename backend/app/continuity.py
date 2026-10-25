@@ -232,9 +232,9 @@ def _frontier_for_supplier(
         capacity,
         lambda value: solve(mission, _capacity_shock(quotes, supplier_id, value))["status"] == "feasible",
     )
-    actual_loss = None
+    removed_units = None
     if capacity_loss is not None:
-        actual_loss = _actual_capacity_loss(quotes, _capacity_shock(quotes, supplier_id, capacity_loss), supplier_id)
+        removed_units = _actual_capacity_loss(quotes, _capacity_shock(quotes, supplier_id, capacity_loss), supplier_id)
 
     return {
         "supplier_id": supplier_id,
@@ -244,11 +244,14 @@ def _frontier_for_supplier(
             "increase_percent": round(price_bps / 100, 2),
         } if price_bps is not None else None,
         "delay": {"hours": delay_hours} if delay_hours is not None else None,
+        # loss_units is the exact boundary of _capacity_shock: loss_units - 1 is survivable, loss_units is not.
+        # units_removed is what that shock removes after integer rounding across several quote lines.
         "capacity": {
-            "loss_units": actual_loss,
-            "loss_percent": round((actual_loss or 0) / capacity * 100, 2) if capacity else None,
+            "loss_units": capacity_loss,
+            "units_removed": removed_units,
+            "loss_percent": round(capacity_loss / capacity * 100, 2) if capacity else None,
             "method": "proportional reduction across the supplier's policy-eligible quote lines",
-        } if actual_loss is not None else None,
+        } if capacity_loss is not None else None,
     }
 
 
@@ -309,14 +312,31 @@ def build_continuity_analysis(
     evidence_fingerprint: str,
     optimizer_input_fingerprint: str,
     created_at: str,
+    progress: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, Any]:
-    """Build a deterministic counterfactual record from a fixed input snapshot."""
+    """Build a deterministic counterfactual record from a fixed input snapshot.
+
+    ``progress(done, total, label)`` reports finished scenario groups: one N-1 scenario and one failure
+    frontier per allocated supplier, plus the resilient alternative (which includes its own N-1).
+    """
 
     if plan["status"] not in {"feasible", "approved"}:
         raise ValueError("Only a current feasible or approved plan can be stress-tested")
     names = _supplier_names(plan)
     supplier_ids = _allocated_supplier_ids(plan)
-    scenarios = [_scenario(mission, plan, eligible_quotes, supplier_id, names) for supplier_id in supplier_ids]
+    total_steps = 2 * len(supplier_ids) + 1
+    done = 0
+
+    def step(label: str) -> None:
+        nonlocal done
+        done += 1
+        if progress:
+            progress(done, total_steps, label)
+
+    scenarios = []
+    for supplier_id in supplier_ids:
+        scenarios.append(_scenario(mission, plan, eligible_quotes, supplier_id, names))
+        step(f"Stress test: {names.get(supplier_id, supplier_id)} unavailable")
     survivable = sum(row["feasible"] for row in scenarios)
     units = _allocation_units(plan)
     total_units = sum(units.values())
@@ -333,12 +353,17 @@ def build_continuity_analysis(
     deadline_slack = None
     if latest_delivery:
         deadline_slack = max(0, round((_dt(mission["delivery_deadline"]) - _dt(latest_delivery)).total_seconds() / 3600, 2))
-    frontiers = [_frontier_for_supplier(mission, eligible_quotes, supplier_id, names) for supplier_id in supplier_ids]
+    frontiers = []
+    for supplier_id in supplier_ids:
+        frontiers.append(_frontier_for_supplier(mission, eligible_quotes, supplier_id, names))
+        step(f"Failure frontier: {names.get(supplier_id, supplier_id)}")
     price_values = [row["price"] for row in frontiers if row.get("price")]
     delay_values = [row["delay"] for row in frontiers if row.get("delay")]
     capacity_values = [row["capacity"] for row in frontiers if row.get("capacity")]
     unrecoverable = [row for row in scenarios if not row["feasible"]]
     critical = max(unrecoverable, key=lambda row: units.get(row["supplier_id"], 0), default=None)
+    alternative = _resilient_alternative(mission, plan, eligible_quotes, names)
+    step("Resilient alternative")
     return {
         "status": "COMPLETE",
         "provenance": HYPOTHETICAL_PROVENANCE,
@@ -375,5 +400,104 @@ def build_continuity_analysis(
         },
         "n1_scenarios": scenarios,
         "failure_frontier": frontiers,
-        "resilient_alternative": _resilient_alternative(mission, plan, eligible_quotes, names),
+        "resilient_alternative": alternative,
     }
+
+
+# --------------------------------------------------------------------------- actual vs. hypothetical
+
+def _quote_change(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """Exact, signed differences between two persisted versions of one quote."""
+
+    old_lines, new_lines = before.get("lines", []), after.get("lines", [])
+    price_bps: list[int] = []
+    delays: list[float] = []
+    for old, new in zip(old_lines, new_lines):
+        old_cents, new_cents = cents(old["unit_price"]), cents(new["unit_price"])
+        if old_cents:
+            price_bps.append(int((Decimal(new_cents - old_cents) * 10_000 / old_cents).to_integral_value()))
+        delays.append((_dt(new["delivery_date"]) - _dt(old["delivery_date"])).total_seconds() / 3600)
+    capacity_loss = (sum(int(row["available_quantity"]) for row in old_lines)
+                     - sum(int(row["available_quantity"]) for row in new_lines))
+    return {
+        "price_change_basis_points": max(price_bps, default=0),
+        "price_change_percent": round(max(price_bps, default=0) / 100, 2),
+        "capacity_loss_units": capacity_loss,
+        "delay_hours": round(max(delays, default=0.0), 2),
+    }
+
+
+def reality_check(
+    prior_analysis: dict[str, Any] | None,
+    plan: dict[str, Any],
+    change: dict[str, Any],
+) -> dict[str, Any]:
+    """Compare one real supplier change with the stress test that was run *before* it happened.
+
+    ``change`` = {supplier_id, supplier, kind: withdrawn|updated, source, before?, after?}. Nothing here
+    predicts anything new: the earlier side is copied from the stored HYPOTHETICAL analysis, the actual side
+    from persisted quote versions and the real replanned plan.
+    """
+
+    actual: dict[str, Any] = {
+        "provenance": change.get("source", "USER_SUBMITTED"),
+        "supplier": change["supplier"],
+        "kind": change["kind"],
+        "plan_version": plan["version"],
+        "plan_status": plan["status"],
+        "plan_total_cost": plan["total_cost"] if plan["status"] in {"feasible", "approved"} else None,
+    }
+    result: dict[str, Any] = {"supplier_id": change["supplier_id"], "actual": actual, "earlier_stress_test": None,
+                              "consistent": None}
+    if not prior_analysis:
+        result["note"] = "No stress test had been run on the plan this change disrupted."
+        return result
+    earlier: dict[str, Any] = {"provenance": HYPOTHETICAL_PROVENANCE, "analysis_id": prior_analysis.get("id"),
+                               "plan_version": prior_analysis.get("plan_version"),
+                               "created_at": prior_analysis.get("created_at")}
+    feasible_now = plan["status"] in {"feasible", "approved"}
+    if change["kind"] == "withdrawn":
+        scenario = next((row for row in prior_analysis.get("n1_scenarios", [])
+                         if row["supplier_id"] == change["supplier_id"]), None)
+        actual["change"] = "Supplier withdrew its quote"
+        if not scenario:
+            result["note"] = "This supplier had no allocation in the stress-tested plan, so no N-1 scenario covered it."
+            return result
+        earlier.update(label=scenario["label"], predicted_status=scenario["status"],
+                       predicted_cost=scenario.get("new_cost"), predicted_cost_delta=scenario.get("cost_delta"))
+        result["consistent"] = (scenario["status"] == "RECOVERABLE") == feasible_now
+    else:
+        delta = _quote_change(change["before"], change["after"])
+        actual["change"] = delta
+        frontier = next((row for row in prior_analysis.get("failure_frontier", [])
+                         if row["supplier_id"] == change["supplier_id"]), None)
+        if frontier is None:
+            result["note"] = "This supplier had no allocation in the stress-tested plan."
+            return result
+        tolerance = {
+            "price_breakpoint_basis_points": (frontier.get("price") or {}).get("increase_basis_points"),
+            "delay_breakpoint_hours": (frontier.get("delay") or {}).get("hours"),
+            "capacity_breakpoint_units": (frontier.get("capacity") or {}).get("loss_units"),
+        }
+        breaks = []
+        if tolerance["price_breakpoint_basis_points"] is not None and \
+                delta["price_change_basis_points"] >= tolerance["price_breakpoint_basis_points"]:
+            breaks.append("price")
+        if tolerance["delay_breakpoint_hours"] is not None and delta["delay_hours"] >= tolerance["delay_breakpoint_hours"]:
+            breaks.append("delay")
+        if tolerance["capacity_breakpoint_units"] is not None and \
+                delta["capacity_loss_units"] >= tolerance["capacity_breakpoint_units"]:
+            breaks.append("capacity")
+        changed = [name for name, value in (("price", delta["price_change_basis_points"]),
+                                            ("delay", delta["delay_hours"]), ("capacity", delta["capacity_loss_units"]))
+                   if value > 0]
+        earlier.update(label=f"Stress test: {frontier['supplier']} failure frontier", tolerance=tolerance,
+                       predicted_status="UNRECOVERABLE" if breaks else "RECOVERABLE",
+                       crossed=breaks)
+        if len(changed) > 1:
+            result["note"] = ("The real change moved several dimensions at once; the stress test bounded each one "
+                              "separately, so agreement is checked per dimension only.")
+        if changed:
+            result["consistent"] = bool(breaks) != feasible_now if len(changed) == 1 else None
+    result["earlier_stress_test"] = earlier
+    return result

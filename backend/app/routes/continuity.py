@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core import Services, current_principal, current_user, get_services, require_mission_access
 from ..jobs import enqueue
-from ..planning import continuity_digital_twin, continuity_input_snapshot
+from ..planning import continuity_digital_twin, continuity_input_snapshot, continuity_reality_check
 
 router = APIRouter()
 
@@ -73,7 +73,7 @@ async def mission_continuity(
     active = [row for row in await services.store.find("jobs", mission_id=mission_id)
               if row.get("type") == "continuity_analysis" and row.get("status") in {"queued", "running"}
               and (not plan or row.get("payload", {}).get("plan_id") == plan["id"])]
-    if active and analysis_state == "NOT_READY":
+    if active and analysis_state in {"NOT_READY", "STALE"}:
         analysis_state = "RUNNING"
     quotes = await services.store.find("quotes", mission_id=mission_id)
     approvals = await services.store.find("approvals", mission_id=mission_id)
@@ -85,5 +85,8 @@ async def mission_continuity(
         "state": analysis_state,
         "analysis": analysis,
         "active_jobs": [{"id": row["id"], "status": row["status"], "created_at": row["created_at"]} for row in active],
+        "progress": services.continuity_progress.get(plan["id"]) if plan and analysis_state == "RUNNING" else None,
+        # A real supplier change compared with the stress test run before it (never a prediction presented as fact).
+        "reality_check": await continuity_reality_check(services, mission, plan) if plan else [],
         "digital_twin": continuity_digital_twin(mission, plan, quotes, approvals, orders, analysis),
     }

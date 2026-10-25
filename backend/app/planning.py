@@ -89,9 +89,11 @@ async def continuity_input_snapshot(services: Services, mission: dict[str, Any],
 async def compute_continuity_analysis(services: Services, mission_id: str, plan_id: str) -> dict[str, Any]:
     """Persist a counterfactual analysis only if its pinned inputs remain current.
 
-    The same mission lock serializes plan construction and continuity snapshots.  A
-    final input re-check protects the record from concurrent supplier edits, which do
-    not take this lock because they must remain responsive.
+    The input snapshot and the final persist happen under the mission lock, so a plan is never analysed
+    half-built. The MILP stress tests themselves run in a worker thread outside the lock (bounded by
+    ``continuity_slots``) so they neither freeze the API nor delay real replans. Identical runs for the same
+    plan and input hash share one computation. A final input re-check discards a result whose quotes,
+    evidence, or policy changed while it was computing; such a result is never stored as current.
     """
 
     async with _mission_locks[mission_id]:
@@ -107,85 +109,176 @@ async def compute_continuity_analysis(services: Services, mission_id: str, plan_
                   and row.get("status") == "COMPLETE"]
         if cached:
             return {"status": "cached", "analysis_id": cached[-1]["id"], "plan_id": plan_id}
-        # Active purchase orders are fixed historical commitments, not inventory the
-        # optimizer is free to move. Stress-test only the uncommitted remainder and
-        # remove already-consumed quote capacity, using the same residual-problem
-        # transformation as a real replan.
-        commitments = committed_lines(snapshot["orders"])
-        analysis_mission = mission
-        analysis_plan = plan
-        analysis_quotes = snapshot["eligible_quotes"]
-        scope: dict[str, Any] = {
-            "kind": "FULL_MISSION",
-            "statement": "All feasible-plan requirements remain available for hypothetical reallocation.",
-            "fixed_commitment_cost": "0.00",
-            "fixed_commitment_count": 0,
-        }
-        if commitments:
-            remaining, adjusted_quotes, committed_cost = residual_problem(mission, snapshot["quotes"], commitments)
-            eligible_ids = {quote["id"] for quote in snapshot["eligible_quotes"]}
-            outstanding = [row for row in plan["allocations"] if not row.get("committed")]
-            analysis_mission = remaining
-            analysis_quotes = [quote for quote in adjusted_quotes if quote["id"] in eligible_ids]
-            analysis_plan = {
-                **plan,
-                "allocations": outstanding,
-                "total_cost": plan.get("new_spend") or money(cents(plan["total_cost"]) - committed_cost),
-                "latest_delivery": max((row["delivery_date"] for row in outstanding), default=None),
-            }
-            scope = {
-                "kind": "UNCOMMITTED_REMAINDER" if remaining["requirements"] else "NO_UNCOMMITTED_REQUIREMENTS",
-                "statement": (
-                    "Only requirements not already committed on active purchase orders are stress-tested."
-                    if remaining["requirements"]
-                    else "All requirements are already committed on active purchase orders; no uncommitted procurement can be reallocated."
-                ),
-                "fixed_commitment_cost": money(committed_cost),
-                "fixed_commitment_count": len(commitments),
-                "full_plan_total_cost": plan["total_cost"],
-            }
-        if not analysis_mission["requirements"]:
-            analysis = {
-                "status": "COMPLETE", "provenance": "HYPOTHETICAL",
-                "counterfactual_label": "HYPOTHETICAL STRESS TEST — does not change a supplier quote, plan, or approval.",
-                "input_hash": snapshot["input_hash"], "created_at": now_iso(), "mission_id": mission["id"],
-                "plan_id": plan["id"], "plan_version": plan["version"], "plan_hash": plan["plan_hash"],
-                "quote_versions": snapshot["quote_versions"], "policy_fingerprint": snapshot["policy_fingerprint"],
-                "evidence_fingerprint": snapshot["evidence_fingerprint"],
-                "optimizer_input_fingerprint": snapshot["optimizer_input_fingerprint"],
-                "baseline": {"total_cost": "0.00", "remaining_budget": plan["remaining_budget"],
-                             "latest_delivery": None, "supplier_concentration": []},
-                "metrics": {"n1_survivability": {"survives": 0, "tested": 0},
-                            "budget_headroom": plan["remaining_budget"], "deadline_slack_hours": None,
-                            "largest_supplier_concentration": 0, "alternative_eligible_capacity": 0,
-                            "price_shock_tolerance": None, "delay_tolerance": None,
-                            "capacity_loss_tolerance": None, "critical_supplier": None},
-                "n1_scenarios": [], "failure_frontier": [],
-                "resilient_alternative": {"status": "UNAVAILABLE", "reason": scope["statement"]},
-            }
-        else:
-            analysis = build_continuity_analysis(
-                analysis_mission, analysis_plan, analysis_quotes, input_hash=snapshot["input_hash"],
-                quote_versions=snapshot["quote_versions"], policy_fingerprint=snapshot["policy_fingerprint"],
+        key = (plan_id, snapshot["input_hash"])
+        inflight = services.continuity_inflight.get(key)
+        owner = inflight is None
+        if owner:
+            inflight = asyncio.get_running_loop().create_future()
+            services.continuity_inflight[key] = inflight
+    if not owner:
+        return await asyncio.shield(inflight)
+    try:
+        result = await _run_continuity(services, mission, plan, snapshot)
+        inflight.set_result(result)
+        return result
+    except BaseException as exc:
+        inflight.set_exception(exc)
+        inflight.exception()  # mark retrieved so an unawaited future does not log; waiters still re-raise
+        raise
+    finally:
+        services.continuity_inflight.pop(key, None)
+        services.continuity_progress.pop(plan_id, None)
+
+
+def _analysis_inputs(mission: dict[str, Any], plan: dict[str, Any],
+                     snapshot: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]], dict]:
+    # Active purchase orders are fixed historical commitments, not inventory the
+    # optimizer is free to move. Stress-test only the uncommitted remainder and
+    # remove already-consumed quote capacity, using the same residual-problem
+    # transformation as a real replan.
+    commitments = committed_lines(snapshot["orders"])
+    scope: dict[str, Any] = {
+        "kind": "FULL_MISSION",
+        "statement": "All feasible-plan requirements remain available for hypothetical reallocation.",
+        "fixed_commitment_cost": "0.00",
+        "fixed_commitment_count": 0,
+    }
+    if not commitments:
+        return mission, plan, snapshot["eligible_quotes"], scope
+    remaining, adjusted_quotes, committed_cost = residual_problem(mission, snapshot["quotes"], commitments)
+    eligible_ids = {quote["id"] for quote in snapshot["eligible_quotes"]}
+    outstanding = [row for row in plan["allocations"] if not row.get("committed")]
+    analysis_plan = {
+        **plan,
+        "allocations": outstanding,
+        "total_cost": plan.get("new_spend") or money(cents(plan["total_cost"]) - committed_cost),
+        "latest_delivery": max((row["delivery_date"] for row in outstanding), default=None),
+    }
+    scope = {
+        "kind": "UNCOMMITTED_REMAINDER" if remaining["requirements"] else "NO_UNCOMMITTED_REQUIREMENTS",
+        "statement": (
+            "Only requirements not already committed on active purchase orders are stress-tested."
+            if remaining["requirements"]
+            else "All requirements are already committed on active purchase orders; no uncommitted procurement "
+                 "can be reallocated."
+        ),
+        "fixed_commitment_cost": money(committed_cost),
+        "fixed_commitment_count": len(commitments),
+        "full_plan_total_cost": plan["total_cost"],
+    }
+    return remaining, analysis_plan, [quote for quote in adjusted_quotes if quote["id"] in eligible_ids], scope
+
+
+def _empty_analysis(mission: dict[str, Any], plan: dict[str, Any], snapshot: dict[str, Any], scope: dict) -> dict:
+    return {
+        "status": "COMPLETE", "provenance": "HYPOTHETICAL",
+        "counterfactual_label": "HYPOTHETICAL STRESS TEST — does not change a supplier quote, plan, or approval.",
+        "input_hash": snapshot["input_hash"], "created_at": now_iso(), "mission_id": mission["id"],
+        "plan_id": plan["id"], "plan_version": plan["version"], "plan_hash": plan["plan_hash"],
+        "quote_versions": snapshot["quote_versions"], "policy_fingerprint": snapshot["policy_fingerprint"],
+        "evidence_fingerprint": snapshot["evidence_fingerprint"],
+        "optimizer_input_fingerprint": snapshot["optimizer_input_fingerprint"],
+        "baseline": {"total_cost": "0.00", "remaining_budget": plan["remaining_budget"],
+                     "latest_delivery": None, "supplier_concentration": []},
+        "metrics": {"n1_survivability": {"survives": 0, "tested": 0},
+                    "budget_headroom": plan["remaining_budget"], "deadline_slack_hours": None,
+                    "largest_supplier_concentration": 0, "alternative_eligible_capacity": 0,
+                    "price_shock_tolerance": None, "delay_tolerance": None,
+                    "capacity_loss_tolerance": None, "critical_supplier": None},
+        "n1_scenarios": [], "failure_frontier": [],
+        "resilient_alternative": {"status": "UNAVAILABLE", "reason": scope["statement"]},
+    }
+
+
+async def _run_continuity(services: Services, mission: dict[str, Any], plan: dict[str, Any],
+                          snapshot: dict[str, Any]) -> dict[str, Any]:
+    plan_id = plan["id"]
+    analysis_mission, analysis_plan, analysis_quotes, scope = _analysis_inputs(mission, plan, snapshot)
+    progress = services.continuity_progress
+    progress[plan_id] = {"done": 0, "total": None, "label": "Waiting for a free analysis slot",
+                         "input_hash": snapshot["input_hash"]}
+
+    def report(done: int, total: int, label: str) -> None:  # called from the worker thread; plain dict writes
+        progress[plan_id] = {"done": done, "total": total, "label": label, "input_hash": snapshot["input_hash"]}
+
+    if not analysis_mission["requirements"]:
+        analysis = _empty_analysis(mission, plan, snapshot, scope)
+    else:
+        async with services.continuity_slots:
+            suppliers = {row["supplier_id"] for row in analysis_plan["allocations"] if not row.get("committed")}
+            report(0, 2 * len(suppliers) + 1, "Starting")
+            analysis = await asyncio.to_thread(
+                build_continuity_analysis, analysis_mission, analysis_plan, analysis_quotes,
+                input_hash=snapshot["input_hash"], quote_versions=snapshot["quote_versions"],
+                policy_fingerprint=snapshot["policy_fingerprint"],
                 evidence_fingerprint=snapshot["evidence_fingerprint"],
                 optimizer_input_fingerprint=snapshot["optimizer_input_fingerprint"], created_at=now_iso(),
+                progress=report,
             )
-        analysis["scope"] = scope
-        analysis["commitment_fingerprint"] = snapshot["commitment_fingerprint"]
-        current = await continuity_input_snapshot(services, mission, plan)
+    analysis["scope"] = scope
+    analysis["commitment_fingerprint"] = snapshot["commitment_fingerprint"]
+    async with _mission_locks[mission["id"]]:
+        current_plan = await services.store.get("plans", plan_id)
+        if not current_plan or current_plan["status"] not in {"feasible", "approved"}:
+            return {"status": "stale_before_persist", "reason": "plan is no longer current", "plan_id": plan_id}
+        current = await continuity_input_snapshot(services, mission, current_plan)
         if current["input_hash"] != snapshot["input_hash"]:
-            return {"status": "stale_before_persist", "reason": "quote, evidence, or policy changed", "plan_id": plan_id}
+            return {"status": "stale_before_persist", "reason": "quote, evidence, or policy changed",
+                    "plan_id": plan_id}
         analysis["id"] = new_id()
         analysis["organization_id"] = mission["organization_id"]
         await services.store.insert("continuity_analyses", analysis)
-        await audit("continuity.computed", None, mission["organization_id"], mission_id, "continuity_analysis",
-                    analysis["id"], services, {
-                        "plan_id": plan_id, "plan_version": plan["version"], "input_hash": analysis["input_hash"],
-                        "provenance": analysis["provenance"],
-                        "n1": analysis["metrics"]["n1_survivability"],
-                    })
-        return {"status": "complete", "analysis_id": analysis["id"], "plan_id": plan_id,
-                "plan_version": plan["version"]}
+    await audit("continuity.computed", None, mission["organization_id"], mission["id"], "continuity_analysis",
+                analysis["id"], services, {
+                    "plan_id": plan_id, "plan_version": plan["version"], "input_hash": analysis["input_hash"],
+                    "provenance": analysis["provenance"], "n1": analysis["metrics"]["n1_survivability"],
+                })
+    return {"status": "complete", "analysis_id": analysis["id"], "plan_id": plan_id,
+            "plan_version": plan["version"]}
+
+
+async def continuity_reality_check(services: Services, mission: dict[str, Any],
+                                   plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """For a plan produced by a real supplier change, line that change up with the earlier stress test."""
+
+    from .continuity import reality_check
+
+    previous_plan_id = (plan.get("difference") or {}).get("previous_plan_id")
+    if plan.get("trigger") != "supplier_disruption" or not previous_plan_id:
+        return []
+    prior_analyses = [row for row in await services.store.find("continuity_analyses", mission_id=mission["id"])
+                      if row.get("plan_id") == previous_plan_id and row.get("status") in {"COMPLETE", "STALE"}]
+    prior = max(prior_analyses, key=lambda row: row.get("created_at", ""), default=None)
+    demo_quotes = {row.get("quote_id") for row in await services.store.find("disruptions", mission_id=mission["id"])}
+    checks = []
+    seen: set[str] = set()
+    for detail in plan.get("trigger_detail") or []:
+        quote_id, supplier_id = detail.get("quote_id"), detail.get("supplier_id")
+        if not quote_id or not supplier_id or quote_id in seen:
+            continue
+        seen.add(quote_id)
+        quote = await services.store.get("quotes", quote_id)
+        if not quote:
+            continue
+        supplier = await services.store.get("suppliers", supplier_id)
+        change: dict[str, Any] = {
+            "supplier_id": supplier_id,
+            "supplier": (supplier or {}).get("legal_name") or quote.get("supplier_email") or supplier_id,
+            "kind": "withdrawn" if detail.get("kind") == "withdrawn" else "updated",
+            "source": "DEMO_SIMULATION" if quote_id in demo_quotes else "USER_SUBMITTED",
+        }
+        if change["kind"] == "updated":
+            pinned = {row["quote_id"]: row["version"] for row in (prior or {}).get("quote_versions", [])}
+            versions = sorted(await services.store.find("quote_versions", quote_id=quote_id),
+                              key=lambda row: row["version"])
+            before = next((row["snapshot"] for row in versions if row["version"] == pinned.get(quote_id)), None)
+            if before is None and versions:
+                before = versions[-1]["snapshot"]
+            if before is None:
+                continue
+            change.update(before=before, after=quote)
+        checks.append(reality_check(prior, plan, change))
+    return checks
 
 
 async def mark_continuity_stale(services: Services, mission: dict[str, Any], actor_id: str | None, reason: str) -> int:

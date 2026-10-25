@@ -70,6 +70,11 @@ class Services:
         # Operations integrations (Gmail/Calendar/Slack/Drive); wired in main.create_app.
         self.vault: Any = None
         self.ops: Any = None
+        # Continuity Engine: MILP stress tests run in worker threads, a bounded number at a time per process,
+        # identical (plan, input-hash) runs are shared, and progress is readable while a run is in flight.
+        self.continuity_slots = asyncio.Semaphore(settings.continuity_max_concurrent)
+        self.continuity_inflight: dict[tuple[str, str], asyncio.Future] = {}
+        self.continuity_progress: dict[str, dict[str, Any]] = {}
 
     def schedule(self, coroutine: Any, delay: float = 0.0) -> None:
         async def runner() -> None:
