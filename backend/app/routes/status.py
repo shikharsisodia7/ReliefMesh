@@ -14,6 +14,8 @@ from ..integrations.http import AdapterResult
 
 router = APIRouter()
 CACHE_SECONDS = 60
+MIN_REFRESH_SECONDS = 20  # floor for "Re-check now"; also bounds how often outbound checks can run
+_status_lock = asyncio.Lock()
 
 Check = Callable[[Services], Awaitable[tuple[str, str, str | None]]]
 
@@ -97,8 +99,8 @@ async def check_sam(services: Services) -> tuple[str, str, str | None]:
 
 async def check_apify(services: Services) -> tuple[str, str, str | None]:
     result = await apify.account(services.hub, secret(services.settings.apify_api_token))
-    detail = f"authenticated as {(result.data or {}).get('username')} ({(result.data or {}).get('plan')})" \
-        if result.ok else ""
+    # Account identity stays private; the public status page shows only that the token works and the plan.
+    detail = f"API token authenticated ({(result.data or {}).get('plan')} plan)" if result.ok else ""
     return from_result(result, detail)
 
 
@@ -113,15 +115,23 @@ async def check_resend(services: Services) -> tuple[str, str, str | None]:
         if last["status"] == "sent":
             return "ok", f"last delivery accepted by Resend at {last['created_at'][:19]}Z", "LIVE"
         return "error", f"last delivery failed: {last.get('error')}", None
-    # No delivery yet on this deployment: authenticate without sending (a request with no recipient is rejected
-    # by validation, 422, only after the key is accepted; a bad key gets 401).
-    async with services.hub.client(timeout=15) as client:
-        response = await client.post("https://api.resend.com/emails", json={
-            "from": services.settings.email_from, "to": [], "subject": "status probe", "html": "<p>probe</p>"},
-            headers={"Authorization": f"Bearer {services.settings.resend_api_key.get_secret_value()}"})
-    if response.status_code == 422:
-        return "ok", "API key accepted by Resend (no-send probe); no email sent from this deployment yet", "LIVE"
-    return "error", f"Resend rejected the API key (HTTP {response.status_code})", None
+    # No delivery yet on this deployment: validate the key with a read-only call, memoized for an hour.
+    # A sending-only key is recognised (401 restricted_api_key), a full key returns 200, anything else fails.
+    verdict = services.hub.memo_get("resend:key_check", 3600)
+    if verdict is None:
+        async with services.hub.client(timeout=15) as client:
+            response = await client.get("https://api.resend.com/domains", headers={
+                "Authorization": f"Bearer {services.settings.resend_api_key.get_secret_value()}"})
+        try:
+            name = response.json().get("name")
+        except ValueError:
+            name = None
+        valid = response.status_code == 200 or (response.status_code == 401 and name == "restricted_api_key")
+        verdict = ("ok", "API key accepted by Resend (read-only check); no email sent from this deployment yet",
+                   "LIVE") if valid else ("error", f"Resend rejected the API key (HTTP {response.status_code} "
+                                                   f"{name or 'unknown'})", None)
+        services.hub.memo_set("resend:key_check", verdict)
+    return verdict
 
 
 async def check_x402(services: Services) -> tuple[str, str, str | None]:
@@ -212,13 +222,17 @@ async def run_check(services: Services, key: str, name: str, category: str, chec
 
 @router.get("/v1/integrations/status")
 async def integrations_status(refresh: bool = False, services: Services = Depends(get_services)) -> dict:
-    cached = services.status_cache.get("status")
-    if cached and not refresh and time.monotonic() - cached[0] < CACHE_SECONDS:
-        return cached[1]
-    results = await asyncio.gather(*(run_check(services, key, *spec) for key, spec in CHECKS.items()))
-    payload = {"checked_at": now_iso(), "environment": services.settings.app_env, "integrations": list(results),
-               "breakers": services.hub.breaker_status()}
-    services.status_cache["status"] = (time.monotonic(), payload)
+    # Public endpoint: one run at a time, and a forced refresh can re-run checks at most every MIN_REFRESH_SECONDS,
+    # so callers cannot turn it into a way to hammer upstream providers with our credentials.
+    async with _status_lock:
+        cached = services.status_cache.get("status")
+        age = time.monotonic() - cached[0] if cached else None
+        if cached and (age < MIN_REFRESH_SECONDS or (not refresh and age < CACHE_SECONDS)):
+            return cached[1]
+        results = await asyncio.gather(*(run_check(services, key, *spec) for key, spec in CHECKS.items()))
+        payload = {"checked_at": now_iso(), "environment": services.settings.app_env, "integrations": list(results),
+                   "breakers": services.hub.breaker_status()}
+        services.status_cache["status"] = (time.monotonic(), payload)
     return payload
 
 

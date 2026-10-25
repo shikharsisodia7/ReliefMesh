@@ -81,3 +81,39 @@ async def test_crs_sandbox_proof_uses_test_identities_and_is_cached() -> None:
             calls = len([url for url in upstream.calls if "identity-manager-verification" in url])
             await client.get("/v1/sandbox/crs-proof")
             assert len([url for url in upstream.calls if "identity-manager-verification" in url]) == calls  # cached
+
+
+@pytest.mark.anyio
+async def test_public_status_refresh_cannot_amplify_upstream_calls(client: httpx.AsyncClient, upstream) -> None:
+    await client.get("/v1/integrations/status")
+    before = len(upstream.calls)
+    for _ in range(5):
+        assert (await client.get("/v1/integrations/status?refresh=true")).status_code == 200
+    assert len(upstream.calls) == before  # forced refreshes inside the floor are served from cache
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("status_code", "body", "expected"), [
+    (401, {"name": "restricted_api_key", "message": "This API key is restricted to only send emails"}, "ok"),
+    (200, {"data": []}, "ok"),
+    (400, {"name": "validation_error", "message": "API key is invalid"}, "error"),
+    (422, {"name": "missing_required_field"}, "error"),
+])
+async def test_resend_key_check_is_read_only_and_fails_closed(status_code, body, expected) -> None:
+    from app.core import Services
+    from app.emailing import TestEmailGateway
+    from app.integrations.http import IntegrationHub
+    from app.routes.status import check_resend
+    from app.store import MemoryStore
+
+    seen = []
+
+    def resend(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path))
+        return httpx.Response(status_code, json=body)
+
+    settings = make_settings(app_env="development", demo_mode=False, expose_invitation_links=False,
+                             resend_api_key="re_test_key_for_status_check")
+    hub = IntegrationHub(MemoryStore(), "ReliefMesh/test", transport=httpx.MockTransport(resend))
+    status, _detail, _ = await check_resend(Services(settings, MemoryStore(), TestEmailGateway(), hub))
+    assert status == expected and seen == [("GET", "/domains")]  # never POSTs (never sends) to validate
