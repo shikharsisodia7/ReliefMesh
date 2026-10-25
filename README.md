@@ -67,6 +67,10 @@ replans by itself when a supplier fails, and leaves financial authority with an 
 - **Google Gemini** (free tier): grounded quote-draft assistant; drafts are never stored or submitted without review.
 - **Resend**: RFQ and purchase-order email with provider message IDs recorded per delivery.
 - **MongoDB Atlas**: production system of record (M0, us-west-2).
+- **Operations integrations** ([docs/OPERATIONS_INTEGRATIONS.md](docs/OPERATIONS_INTEGRATIONS.md)): each organization
+  connects its own Gmail (RFQs, approval requests, disruption alerts, POs with PDF), Google Calendar (deadline,
+  approval window, supplier ETA), Google Drive (plan/PO/audit archive) and Slack (informational alerts, never
+  approvals). Gmail, Calendar and Drive are verified with real calls; deliveries are idempotent and never block procurement.
 
 ## Run locally
 
