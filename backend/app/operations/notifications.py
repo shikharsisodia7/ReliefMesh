@@ -449,10 +449,13 @@ class OperationsService:
                 raise IntegrationError("plan no longer exists")
             approval = await self.store.get("approvals", render["approval_id"]) if render.get("approval_id") else None
             return documents.plan_pdf(plan, mission, approval), "application/pdf"
-        from ..core import verify_chain
+        from ..core import audit_head_key, verify_chain
 
-        audit_events = await self.store.find("audit_events", chain_key=f"mission:{mission['id']}")
-        return documents.audit_export(mission, audit_events, verify_chain(audit_events)), "application/json"
+        chain_key = f"mission:{mission['id']}"
+        audit_events = await self.store.find("audit_events", chain_key=chain_key)
+        verification = verify_chain(audit_events, await self.store.get("audit_chain_heads", chain_key),
+                                    secret_key=audit_head_key(self.services))
+        return documents.audit_export(mission, audit_events, verification), "application/json"
 
     async def _send_drive(self, delivery: dict[str, Any]) -> dict[str, Any]:
         org, mission_id = delivery["organization_id"], delivery["mission_id"]

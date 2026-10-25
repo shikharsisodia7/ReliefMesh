@@ -86,7 +86,7 @@ async def _chain(app_and_client):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("tamper", ["payload", "removed_middle", "removed_last", "reordered", "previous_hash",
-                                    "event_hash"])
+                                    "event_hash", "removed_last_and_head", "removed_last_head_rewritten"])
 async def test_audit_chain_detects_every_tampering(app_and_client, tamper: str) -> None:
     store, events, verify = await _chain(app_and_client)
     target = dict(events[1])
@@ -108,5 +108,12 @@ async def test_audit_chain_detects_every_tampering(app_and_client, tamper: str) 
     elif tamper == "event_hash":
         target["event_hash"] = "f" * 64
         await store.replace("audit_events", target["id"], target)
+    elif tamper == "removed_last_and_head":
+        store._documents["audit_events"].pop(events[-1]["id"])
+        store._documents["audit_chain_heads"].pop(events[-1]["chain_key"])
+    elif tamper == "removed_last_head_rewritten":  # attacker hides the deletion but lacks the server key
+        store._documents["audit_events"].pop(events[-1]["id"])
+        head = store._documents["audit_chain_heads"][events[-1]["chain_key"]]
+        head.update(sequence=events[-2]["sequence"], event_hash=events[-2]["event_hash"])
     result = await verify()
     assert result["valid"] is False and result["reason"], (tamper, result)
