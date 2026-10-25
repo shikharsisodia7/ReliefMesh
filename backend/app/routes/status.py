@@ -165,10 +165,14 @@ async def check_x402(services: Services) -> tuple[str, str, str | None]:
         "jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
         "params": [settings.x402_pay_to, {"mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"},
                    {"encoding": "jsonParsed"}]})
-    accounts = ((balance.data or {}).get("result") or {}).get("value") or [] if balance.ok else []
-    held = sum(a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0 for a in accounts)
+    if balance.ok:
+        accounts = ((balance.data or {}).get("result") or {}).get("value") or []
+        held = sum(a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0 for a in accounts)
+        treasury = f"holds {held:g} devnet USDC"
+    else:  # a failed balance lookup is not an empty treasury
+        treasury = f"balance unavailable ({balance.error or 'Solana devnet RPC error'})"
     return "ok", (f"DEVNET TEST PAYMENTS: facilitator supports exact/solana-devnet; treasury {settings.x402_pay_to[:6]}… "
-                  f"holds {held:g} devnet USDC. No real money; suppliers are never paid through x402."), "SANDBOX"
+                  f"{treasury}. No real money; suppliers are never paid through x402."), "SANDBOX"
 
 
 async def check_crs(services: Services) -> tuple[str, str, str | None]:

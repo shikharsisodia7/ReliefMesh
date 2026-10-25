@@ -152,6 +152,16 @@ async def test_solana_rpc_and_mongo_down_render_as_errors_on_the_status_page() -
     status, _detail, _ = await check_x402(services)
     assert status != "ok"
 
+    def facilitator_up_rpc_down(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "x402.org":
+            return httpx.Response(200, json={"kinds": [{"scheme": "exact",
+                                                        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"}]})
+        raise httpx.ConnectTimeout("simulated Solana RPC outage", request=request)
+    rpc_hub = IntegrationHub(store, "ReliefMesh/test", transport=httpx.MockTransport(facilitator_up_rpc_down))
+    rpc_down = Services(settings, store, services.email, rpc_hub)
+    _status, detail, _ = await check_x402(rpc_down)
+    assert "balance unavailable" in detail and "holds 0" not in detail, detail
+
     class DeadMongo(MemoryStore):
         async def ping(self):
             raise ConnectionError("simulated MongoDB outage")

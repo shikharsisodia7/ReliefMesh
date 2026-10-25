@@ -60,6 +60,8 @@ function MissionLoop({ missionId, token }: { missionId: string; token: string })
   const analysis = view?.analysis;
   const event = mission?.emergency_event;
   const revoked = approvals.filter((row) => row.status === "invalidated").length;
+  // Real supplier changes vs demo-deployment simulations (the disruptions collection only holds the latter).
+  const realChanges = reality.filter((row) => row.actual.provenance === "USER_SUBMITTED").length;
   const steps: Step[] = [
     { label: "Live disaster", done: Boolean(event), detail: event ? event.title : "No disaster event linked to this mission", provenance: event?.provenance ?? undefined },
     { label: "Supplier quote", done: quotes.length > 0, detail: `${quotes.length} quote${quotes.length === 1 ? "" : "s"} submitted by supplier accounts`, provenance: quotes.length ? "USER_SUBMITTED" : undefined },
@@ -69,8 +71,8 @@ function MissionLoop({ missionId, token }: { missionId: string; token: string })
       detail: analysis ? `N-1 ${analysis.metrics.n1_survivability.survives}/${analysis.metrics.n1_survivability.tested} for plan v${analysis.plan_version} · ${view?.state}` : `State: ${view?.state ?? "NOT_READY"}`, provenance: analysis ? "HYPOTHETICAL" : undefined },
     { label: "Stress test + resilient alternative", done: Boolean(analysis),
       detail: analysis ? `${analysis.metrics.critical_supplier ? `Single point of failure: ${analysis.metrics.critical_supplier.supplier}` : "No single point of failure"} · ${analysis.resilient_alternative.status === "AVAILABLE" ? `resilient alternative ${money(analysis.resilient_alternative.total_cost)} (+${money(analysis.resilient_alternative.added_cost)})` : "no feasible resilient alternative"}` : "Runs automatically for every feasible plan", provenance: analysis ? "HYPOTHETICAL" : undefined },
-    { label: "Actual disruption", done: disruptions.length > 0 || reality.length > 0,
-      detail: reality.length ? `${reality.length} real change${reality.length === 1 ? "" : "s"} compared with the earlier stress test` : disruptions.length ? `${disruptions.length} real supplier change${disruptions.length === 1 ? "" : "s"}` : "No real supplier change yet", provenance: reality.length || disruptions.length ? "USER_SUBMITTED" : undefined },
+    { label: "Actual disruption", done: realChanges > 0 || disruptions.length > 0,
+      detail: realChanges ? `${realChanges} real change${realChanges === 1 ? "" : "s"} compared with the earlier stress test` : disruptions.length ? `${disruptions.length} simulated demo disruption${disruptions.length === 1 ? "" : "s"} (demo deployment only)` : "No real supplier change yet", provenance: realChanges ? "USER_SUBMITTED" : disruptions.length ? "SYNTHETIC" : undefined },
     { label: "Plan V2", done: Boolean(latest && first && latest.version > first.version),
       detail: latest && first && latest.version > first.version ? `Plan v${latest.version} · ${latest.status} · ${money(latest.total_cost)} (V1 ${first.status})` : "Only one plan version so far" },
     { label: "Approval", done: approvals.some((row) => row.status === "active" || row.status === "consumed"),
@@ -98,7 +100,10 @@ function MissionLoop({ missionId, token }: { missionId: string; token: string })
           </li>
         ))}
       </ol>
-      <p className="text-xs text-tertiary">Every row above is read from this mission&apos;s stored records. Nothing on this page is pre-filled or simulated.</p>
+      <p className="text-xs text-tertiary">
+        Every row above is read from this mission&apos;s stored records. Nothing on this page is pre-filled
+        {disruptions.length ? "; simulated demo disruptions are labeled SYNTHETIC." : " or simulated."}
+      </p>
     </section>
   );
 }
