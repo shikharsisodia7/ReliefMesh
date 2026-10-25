@@ -63,7 +63,9 @@ transparent 50% supplier-concentration guardrail and still requires the normal i
 
 | Data | Provenance |
 | --- | --- |
-| NASA EONET, NWS, NASA FIRMS, OpenFEMA, OFAC SDN/ALT, openFDA, USAspending, Apify results | `LIVE` (or `CACHED` last-known-good with its original timestamp) |
+| NASA EONET, NWS, NASA FIRMS, OpenFEMA, OFAC SDN/ALT, openFDA, USAspending | `LIVE` (or `CACHED` last-known-good with its original timestamp, or `UNAVAILABLE`; a failed provider is never a pass and never invents an event) |
+| Apify results | `LIVE` public **leads** only: never inventory, price, a quote, a delivery commitment, or a verified supplier |
+| Continuity Engine results | **HYPOTHETICAL STRESS TEST** (`PREDICTED COUNTERFACTUAL`); a real supplier revision is shown separately as `ACTUAL USER-SUBMITTED CHANGE` |
 | CRS identity verification | sponsor `SANDBOX`: CRS-published test identities only, never real supplier data; not real-world verification |
 | x402 payments | **DEVNET TEST PAYMENT** (`SANDBOX`): proves machine-to-machine payment; no real money, no supplier is paid. Any signed-in user can run one from `/status` |
 | Suppliers and quotes | real accounts only (`USER_SUBMITTED`); a new mission starts with 0 suppliers and 0 quotes |
@@ -73,22 +75,44 @@ transparent 50% supplier-concentration guardrail and still requires the normal i
 
 ## Sponsor integrations (verified against live services)
 
-- **Fetch.ai**: uAgents mailbox agent on Agentverse, Agent Chat Protocol (manifest published), usable from ASI:One.
-  Real tool execution against the API ([agent/](agent/README.md)). Per-conversation isolation; it can't approve, order,
-  or block.
-- **CRS**: TransUnion TruValidate identity checks of supplier signers ([integrations/crs.py](backend/app/integrations/crs.py)).
-  A failed check holds a supplier for review even after its sanctions false-positive is cleared.
-- **Apify**: supplier discovery via `compass/crawler-google-places`, storing actor, run, and dataset IDs ([integrations/apify.py](backend/app/integrations/apify.py)).
-- **Coinbase x402 + Solana**: official x402 Python SDK. Exact scheme on `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
-  through the x402.org facilitator ([payments/x402_exchange.py](backend/app/payments/x402_exchange.py)). Example settled tx:
-  [`3bd8HVQj…c87Es`](https://explorer.solana.com/tx/3bd8HVQjv5eqGCDsMUKreueZe9YygUXHxbrqBmQztrro1amRN1g9EdeVN76chKSwNfgyuUmNeP6Q7EKq45sc87Es?cluster=devnet).
+Release `9bbe49d` is deployed to the web app, the API and the Fetch agent. Track-by-track status, including what is
+partial or skipped, is in [docs/qa/TRACK_ELIGIBILITY.md](docs/qa/TRACK_ELIGIBILITY.md).
+
+- **Fetch.ai / ASI:One**: uAgents mailbox agent on Agentverse, Agent Chat Protocol (manifest published), usable from
+  ASI:One. Real tool execution against the API ([agent/](agent/README.md)), including continuity answers ("biggest
+  single point of failure", "survive losing X", "what changed V1→V2") read from the stored deterministic analysis.
+  Per-conversation isolation; it can't approve, order, pay, or block, and with no data it says so.
+- **Apify**: supplier discovery via `compass/crawler-google-places`, storing actor, run, and dataset IDs
+  ([integrations/apify.py](backend/app/integrations/apify.py)). Results are leads only. Newest production run
+  `UzUWPV9bx3pecTERA` (dataset `QvXc5W61SgngKrC4i`).
+- **CRS** (`SANDBOX`): TransUnion TruValidate identity checks of supplier signers
+  ([integrations/crs.py](backend/app/integrations/crs.py)); only CRS-published test identities are ever sent. A failed
+  check holds a supplier for review even after its sanctions false-positive is cleared.
 - **Google Gemini** (free tier): grounded quote-draft assistant; drafts are never stored or submitted without review.
-- **Resend**: RFQ and purchase-order email with provider message IDs recorded per delivery.
+- **Coinbase x402 + Solana** (`DEVNET TEST PAYMENT`): official x402 Python SDK. Exact scheme on
+  `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` through the x402.org facilitator
+  ([payments/x402_exchange.py](backend/app/payments/x402_exchange.py)). Newest settled tx (production mission
+  dossier): [`3xYUqjWe…Crddq`](https://explorer.solana.com/tx/3xYUqjWeXs8Yz8RgHzNm9CohygZDJJfRw2s2FWapfuJJ1jh9gRnFJNDsx5AJt1UPsvR3vhzYuskyTjZt3t5Crddq?cluster=devnet);
+  historical example [`3bd8HVQj…c87Es`](https://explorer.solana.com/tx/3bd8HVQjv5eqGCDsMUKreueZe9YygUXHxbrqBmQztrro1amRN1g9EdeVN76chKSwNfgyuUmNeP6Q7EKq45sc87Es?cluster=devnet).
+  Coinbase MCP for Agents is **not** implemented, so the Coinbase track is partial.
 - **MongoDB Atlas**: production system of record (M0, us-west-2).
-- **Operations integrations** ([docs/OPERATIONS_INTEGRATIONS.md](docs/OPERATIONS_INTEGRATIONS.md)): each organization
-  connects its own Gmail (RFQs, approval requests, disruption alerts, POs with PDF), Google Calendar (deadline,
-  approval window, supplier ETA), Google Drive (plan/PO/audit archive) and Slack (informational alerts, never
-  approvals). Gmail, Calendar, Drive and Slack are verified with real calls; deliveries are idempotent and never block procurement.
+- **GoDaddy Registry**: `reliefmesh.us`, registered through the MLH × GoDaddy Registry offer.
+
+## Public-data and evidence integrations
+
+- **Disaster context**: NASA EONET events, NWS alerts, NASA FIRMS fire detections, OpenFEMA declarations.
+- **Supplier screening**: Treasury OFAC SDN/ALT, SAM.gov registration (registration only), USAspending awards,
+  openFDA enforcement reports. Failures surface as `UNAVAILABLE`, never as a pass.
+
+## Product operations integrations (not sponsor tracks)
+
+- **Gmail, Google Calendar, Google Drive, Slack** ([docs/OPERATIONS_INTEGRATIONS.md](docs/OPERATIONS_INTEGRATIONS.md)):
+  each organization connects its own Gmail (RFQs, approval requests, disruption alerts, POs with PDF), Google Calendar
+  (deadline, approval window, supplier ETA, updated in place), Google Drive (plan/PO/audit archive) and Slack
+  (informational alerts, never approvals). Verified with real calls; deliveries are idempotent (replayed twice on a
+  production mission with zero duplicates) and never block procurement.
+- **Resend**: RFQ and purchase-order email from `procurement@reliefmesh.us` for organizations without Gmail connected,
+  with provider message IDs recorded per delivery.
 
 ## Run locally
 
@@ -109,7 +133,8 @@ Copy `backend/.env.example` for optional keys (FIRMS, SAM.gov, CRS sandbox, Apif
 ## Tests
 
 ```bash
-cd backend && python -m pytest            # 105 tests: policy, evidence, SoD, isolation break-in, failure modes, x402 + SAM.gov quota guards, audit chain
+cd backend && python -m pytest            # 145 tests (38 continuity guarantees, 0 skipped): policy, evidence, SoD, isolation break-in, failure modes, x402 + SAM.gov quota guards, audit chain
+cd agent && python -m pytest test_continuity_answers.py   # 9 continuity-answer tests for the Fetch agent
 cd frontend && npm test && npm run lint && npm run build
 cd frontend && npx playwright test        # two-supplier flow with an independent approver + live-data judge scenario
 python backend/scripts/smoke.py http://127.0.0.1:8000                 # demo deployments only (RELIEFMESH_DEMO_MODE=true)
