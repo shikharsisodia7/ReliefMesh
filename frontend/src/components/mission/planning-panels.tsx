@@ -1,15 +1,14 @@
 "use client";
 
-import { AlertTriangle, Link2 } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "@/components/patterns/overlays";
-import { PlanStatusText, Provenance, StatusText, ago, money, signedAmount, when } from "@/components/status-badges";
+import { PlanStatusText, ago, money, signedAmount } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import type { Approval, AuditEvent, AuditVerification, Disruption, Job, Notification, Payment, Plan, SupplierRow } from "@/lib/types";
+import type { Approval, Disruption, Plan, SupplierRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Run = (operation: () => Promise<void>) => Promise<void>;
@@ -114,60 +113,6 @@ export function CompareView({ latest, previous, approvals, onClose }: { latest: 
         <dt className="text-muted-foreground">Approval</dt>
         <dd>{invalidated ? <><span className="font-medium">Approval revoked</span> · v{previous.version} approval for {money(invalidated.amount)}: {invalidated.invalidation_reason}</> : <span className="text-muted-foreground">Plan v{previous.version} was not approved.</span>}</dd>
       </dl>
-    </section>
-  );
-}
-
-export function PaymentsPanel({ payments }: { payments: Payment[] }) {
-  if (payments.length === 0) return null;
-  return (
-    <section aria-label="Machine payments" className="rounded-xl border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Machine payments · x402 on Solana devnet</h2>
-        <span className="flex gap-3"><Provenance value="SANDBOX" /><span className="text-xs font-medium tracking-wide text-muted-foreground">DEVNET · TEST PAYMENT</span></span>
-      </div>
-      <p className="mb-2 text-xs text-tertiary">HTTP 402 → signed USDC transfer → facilitator verification and on-chain settlement → evidence unlocked. Devnet test USDC only: this proves machine-to-machine payment works. No supplier is paid and procurement funds never move through x402.</p>
-      <ul className="space-y-2">
-        {payments.map((payment) => (
-          <li key={payment.id} className="rounded border p-2 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">Signed dossier: {payment.subject_name}</span><span className="font-mono text-telemetry">{payment.amount_display} · {payment.network_label}</span></div>
-            <p className="mt-1 font-mono text-[11px] text-muted-foreground">{payment.payer.slice(0, 6)}… → {payment.pay_to.slice(0, 6)}… · {payment.scheme} · {payment.verified ? "settled" : payment.status} · {when(payment.created_at)}</p>
-            <a className="font-mono text-[11px] text-live hover:underline" href={payment.explorer_url} target="_blank" rel="noreferrer">tx {payment.transaction.slice(0, 20)}… ↗</a>
-            <span className="ml-2 font-mono text-[10px] text-tertiary">dossier sha256 {payment.dossier_sha256.slice(0, 12)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-// Only notifications that need attention carry a word; red stays reserved for real errors.
-const severityWord: Record<string, string> = { warning: "Warning", critical: "Critical" };
-
-export function Timeline({ notifications, audit, verification, jobs }: { notifications: Notification[]; audit: AuditEvent[]; verification?: AuditVerification; jobs: Job[] }) {
-  const active = jobs.filter((job) => job.status === "queued" || job.status === "running");
-  return (
-    <section aria-label="Mission timeline" className="rounded-xl border bg-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">Timeline &amp; audit</h2>
-        {verification && (
-          <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 font-mono text-[11px] ${verification.valid ? "border-ok/40 text-ok" : "border-critical/50 text-critical"}`} title="SHA-256 hash chain over canonical audit fields">
-            <Link2 className="size-3" />{verification.valid ? `hash chain verified · ${verification.length} events · ${verification.head_hash?.slice(0, 10)}` : `CHAIN BROKEN at #${verification.broken_at}: ${verification.reason}`}
-          </span>
-        )}
-      </div>
-      {active.length > 0 && <div className="mt-2 space-y-1">{active.map((job) => <p key={job.id} className="text-sm text-muted-foreground">{job.type.replace(/_/g, " ")} {job.status} · attempt {job.attempts}/{job.max_attempts}</p>)}</div>}
-      {jobs.filter((job) => job.status === "failed").slice(0, 2).map((job) => <p key={job.id} className="mt-1 flex items-center gap-2 text-sm text-critical"><AlertTriangle className="size-3.5" />{job.type} failed: {job.last_error}</p>)}
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
-        <ol className="max-h-96 space-y-2 overflow-y-auto pr-1" aria-label="Notifications">
-          {notifications.length === 0 && <li className="text-sm text-muted-foreground">No notifications yet.</li>}
-          {notifications.map((notification) => <li key={notification.id} className="text-sm"><span>{severityWord[notification.severity] && <StatusText tone="warn" value={notification.severity}>{severityWord[notification.severity]} · </StatusText>}<span>{notification.message}</span><span className="block font-mono text-[10px] text-tertiary">{when(notification.created_at)}</span></span></li>)}
-        </ol>
-        <ol className="max-h-96 space-y-1 overflow-y-auto pr-1 font-mono text-[11px]" aria-label="Audit events">
-          {[...audit].reverse().map((event) => <li key={event.id} className="flex gap-2"><span className="w-7 shrink-0 text-right text-tertiary">#{event.sequence}</span><span className="min-w-0 flex-1 truncate">{event.action}</span><span className="text-tertiary" title={`prev ${event.previous_hash}`}>{event.event_hash.slice(0, 8)}</span></li>)}
-        </ol>
-      </div>
-      <p className="mt-2 text-[11px] text-tertiary">Tamper-evident application audit chaining (each event hashes its predecessor). Not blockchain storage. <Provenance value="LIVE" className="ml-1" /> data is fetched at the time shown.</p>
     </section>
   );
 }

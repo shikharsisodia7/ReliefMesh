@@ -111,5 +111,5 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   // Units already on sent purchase orders stay committed: the policy change must not re-buy them.
   await expect(page.getByText(/Committed on POs \$3,466\.00 · New spend \$0\.00/)).toBeVisible();
   await page.getByRole("tab", { name: "Audit" }).click();
-  await expect(page.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

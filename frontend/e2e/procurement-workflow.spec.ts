@@ -121,5 +121,5 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await supplierTwo.getByRole("button", { name: "Mark delivered" }).click();
   await expect(supplierTwo.getByText("completed", { exact: true })).toBeVisible();
   await coordinator.getByRole("tab", { name: "Audit" }).click();
-  await expect(coordinator.getByText(/hash chain verified/)).toBeVisible({ timeout: 15_000 });
+  await expect(coordinator.getByText(/Hash chain verified/)).toBeVisible({ timeout: 15_000 });
 });

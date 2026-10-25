@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { Page, PageHeader } from "@/components/layout/page-header";
 import { ApprovalTab } from "@/components/mission/approval-tab";
+import { AuditTab } from "@/components/mission/audit-tab";
 import { EmergencyPanel } from "@/components/mission/emergency-panel";
 import { MissionMenu } from "@/components/mission/lifecycle-controls";
 import { LeadsSection, MarketActions } from "@/components/mission/market-panel";
 import { OrdersTab } from "@/components/mission/orders-tab";
 import { ExplainDrawer, PlanTab, isReplan, rebuildSeconds } from "@/components/mission/plan-tab";
-import { PaymentsPanel, Timeline } from "@/components/mission/planning-panels";
 import { SupplierEvidence } from "@/components/mission/supplier-evidence";
 import { useMissionData } from "@/components/mission/use-mission-data";
 import { showToast } from "@/components/patterns/toast";
@@ -81,6 +81,9 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
   const approvalBlocked = mission.created_by === session.user.id && !organization?.is_demo ? "You requested this mission, so another approver in your organization must approve its plan." : null;
   const requester = mission.created_by === session.user.id ? "you"
     : members.data?.members.find((member) => member.user_id === mission.created_by)?.email ?? (mission.created_via === "agent" ? "the Fetch.ai agent" : "the mission's requester");
+  // Audit actors by email where the organization's member list knows them.
+  const actorName = (id: string | null) => id === null ? "System" : id === session.user.id ? "You"
+    : members.data?.members.find((member) => member.user_id === id)?.email ?? `User ${id.slice(0, 6)}`;
   const checking = jobs.some((job) => job.type === "evidence_refresh" && running(job.status));
   const replanning = jobs.some((job) => job.type === "replan" && running(job.status));
   const continuityRunning = jobs.some((job) => job.type === "continuity_analysis" && running(job.status));
@@ -149,10 +152,7 @@ export function MissionWorkspace({ missionId }: { missionId: string }) {
                 token={token} run={run} setNotice={setNotice} isAdmin={isAdmin} onTab={setTab} />
             </TabPanel>
             <TabPanel value="audit">
-              <div className="space-y-5">
-                <Timeline notifications={data.notifications.data ?? []} audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} />
-                <PaymentsPanel payments={data.payments.data ?? []} />
-              </div>
+              <AuditTab audit={data.audit.data ?? []} verification={data.verification.data} jobs={jobs} notifications={data.notifications.data ?? []} payments={data.payments.data ?? []} actorName={actorName} />
             </TabPanel>
           </UnderlineTabs>
         </div>
