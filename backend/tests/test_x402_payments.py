@@ -103,10 +103,13 @@ async def test_public_devnet_proof_is_throttled_and_rejects_replays(app_and_clie
     services = app.state.services
     services.settings.x402_pay_to, services.settings.x402_buyer_private_key = "TreasuryWallet111", "configured"
     assert (await client.get("/v1/sandbox/x402-proof")).json()["proof"] is None  # nothing faked before a real run
-    first = await run_proof(services, buyer=fake_buyer)
+    anonymous = await client.post("/v1/sandbox/x402-proof")
+    assert anonymous.status_code == 401  # spending, even devnet test funds, needs a signed-in user
+    actor = {"id": "user-1"}
+    first = await run_proof(services, actor, buyer=fake_buyer)
     assert first["reused"] is False and first["provenance"] == "SANDBOX" and "DEVNET TEST PAYMENT" in first["notice"]
     assert first["proof"]["explorer_url"].endswith("?cluster=devnet")
-    again = await run_proof(services, buyer=fake_buyer)  # inside the cooldown: no second payment
+    again = await run_proof(services, actor, buyer=fake_buyer)  # inside the cooldown: no second payment
     assert again["reused"] is True and again["proof"]["transaction"] == first["proof"]["transaction"]
     shown = (await client.get("/v1/sandbox/x402-proof")).json()
     assert shown["proof"]["transaction"] == first["proof"]["transaction"]
@@ -119,11 +122,13 @@ async def test_public_devnet_proof_is_throttled_and_rejects_replays(app_and_clie
     async def same_tx(services_, name):
         return {"dossier_sha256": "x"}, {"success": True, "transaction": first["proof"]["transaction"]}, 200
     with pytest.raises(HTTPException) as replay:
-        await run_proof(services, buyer=same_tx)
+        await run_proof(services, actor, buyer=same_tx)
     assert replay.value.status_code == 409
 
     services.settings.x402_buyer_private_key = None
     with pytest.raises(HTTPException) as blocked:
-        await run_proof(services, buyer=fake_buyer)
+        await run_proof(services, actor, buyer=fake_buyer)
     assert blocked.value.status_code == 503
     assert x402_exchange.PROOF_DAILY_LIMIT >= 1
+    events = [e for e in await services.store.find("audit_events") if e["action"] == "sandbox.x402_proof.settled"]
+    assert len(events) == 1 and events[0]["metadata"]["transaction"] == first["proof"]["transaction"]

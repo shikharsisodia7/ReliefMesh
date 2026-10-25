@@ -25,7 +25,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..core import Services, audit, get_services, new_id, now_iso, secret
+from ..core import Services, audit, current_user, get_services, new_id, now_iso, secret
 from ..integrations import entity, ofac
 from ..integrations.http import canonical_json
 from ..integrations.ofac import normalize_name
@@ -247,8 +247,8 @@ async def latest_proof(services: Services) -> dict[str, Any]:
     return _proof_view(rows[-1] if rows else None)
 
 
-async def run_proof(services: Services, buyer=pay_for_dossier) -> dict[str, Any]:
-    """Public, judge-triggered devnet payment. Throttled globally so it cannot drain the test wallet."""
+async def run_proof(services: Services, actor: dict[str, Any], buyer=pay_for_dossier) -> dict[str, Any]:
+    """Signed-in, judge-triggered devnet payment. Throttled per user and globally; every run is audited."""
     settings = services.settings
     if not (settings.x402_pay_to and settings.x402_buyer_private_key):
         raise HTTPException(status_code=503, detail="BLOCKED_EXTERNAL: x402 buyer wallet or payTo is not configured")
@@ -272,7 +272,11 @@ async def run_proof(services: Services, buyer=pay_for_dossier) -> dict[str, Any]
             "facilitator": settings.x402_facilitator_url, "dossier_sha256": dossier.get("dossier_sha256"),
             "explorer_url": f"https://explorer.solana.com/tx/{transaction}?cluster=devnet", "created_at": now_iso(),
         }
+        row["actor_id"] = actor["id"]
         await services.store.insert("sandbox_proofs", row)
+        await audit("sandbox.x402_proof.settled", actor["id"], None, None, "sandbox_proof", row["id"], services,
+                    {"transaction": transaction, "network": network, "amount": row["amount_display"],
+                     "payer": row["payer"], "pay_to": row["pay_to"]})
         return {**_proof_view(row), "reused": False}
 
 
@@ -282,5 +286,6 @@ async def get_x402_proof(services: Services = Depends(get_services)) -> dict[str
 
 
 @router.post("/v1/sandbox/x402-proof")
-async def post_x402_proof(services: Services = Depends(get_services)) -> dict[str, Any]:
-    return await run_proof(services)
+async def post_x402_proof(user: dict = Depends(current_user), services: Services = Depends(get_services)) -> dict:
+    services.assist_limiter.check(f"x402-proof:{user['id']}")  # per-user floor on top of the global cooldown
+    return await run_proof(services, user)
