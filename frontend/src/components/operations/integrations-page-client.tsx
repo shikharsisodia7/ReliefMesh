@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { IntegrationsSettings } from "@/components/operations/integrations-settings";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, type ApiError } from "@/lib/api";
+import { clearSession } from "@/lib/session";
 import { useHydrated, useSession } from "@/hooks/use-session";
 
 type Organization = { id: string; name: string; membership_role: string };
@@ -31,6 +32,9 @@ export function IntegrationsPageClient() {
   useEffect(() => { if (hydrated && (!session || session.user.role !== "coordinator")) router.replace("/sign-in"); }, [hydrated, router, session]);
   const organizations = useQuery({ queryKey: ["organizations", session?.token], enabled: Boolean(session), queryFn: () => api<Organization[]>("/v1/organizations", { token: session!.token }) });
   const selected = organizationId ?? organizations.data?.[0]?.id ?? null;
+  const expired = (organizations.error as ApiError | null)?.status === 401;
+  // A token for a deleted or revoked account must not leave a blank settings page: start a fresh sign-in.
+  useEffect(() => { if (expired) { clearSession(); router.replace("/sign-in"); } }, [expired, router]);
   if (!session) return <main className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</main>;
   return (
     <main className="min-h-screen bg-background">
@@ -44,6 +48,7 @@ export function IntegrationsPageClient() {
         {(organizations.data?.length ?? 0) > 1 && (
           <div className="flex flex-wrap gap-2">{organizations.data!.map((row) => <Button key={row.id} size="sm" variant={row.id === selected ? "default" : "outline"} onClick={() => setOrganizationId(row.id)}>{row.name} · {row.membership_role}</Button>)}</div>
         )}
+        {organizations.isError && !expired && <p role="alert" className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm text-critical">{organizations.error.message}</p>}
         {organizations.data?.length === 0 && <p className="text-muted-foreground">Create an organization on the dashboard first.</p>}
         {selected && <IntegrationsSettings key={selected} organizationId={selected} token={session.token} notice={selected === params.get("org") ? oauthNotice(params) : null} />}
       </div>
