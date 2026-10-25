@@ -30,6 +30,8 @@ export type QuoteValues = z.infer<typeof schema>;
 // datetime-local inputs take local wall-clock time without a zone.
 /** ISO timestamp -> value for a datetime-local input, in the viewer's local time. */
 export const toLocalInput = (iso: string) => { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
+/** Draft timestamp -> datetime-local value: a zoned instant is shown in local time; a naive wall-clock time as written. */
+export const draftToInput = (value: string) => (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? toLocalInput(value) : value.slice(0, 16));
 
 // One block per mission requirement; each submitted line is pinned to that requirement's stable ID.
 export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requirements: Requirement[]; legalName?: string | null; onSubmit: (values: QuoteValues) => Promise<void>; onDraft?: (text: string) => Promise<QuoteDraft> }) {
@@ -63,10 +65,10 @@ export function QuoteForm({ requirements, legalName, onSubmit, onDraft }: { requ
         form.setValue(`lines.${index}.item`, row.item, { shouldDirty: true });
         if (row.available_quantity !== null) form.setValue(`lines.${index}.available_quantity`, row.available_quantity, { shouldDirty: true });
         if (row.unit_price !== null) form.setValue(`lines.${index}.unit_price`, Number(row.unit_price), { shouldDirty: true });
-        if (row.delivery_date) form.setValue(`lines.${index}.delivery_date`, toLocalInput(row.delivery_date), { shouldDirty: true });
+        if (row.delivery_date) form.setValue(`lines.${index}.delivery_date`, draftToInput(row.delivery_date), { shouldDirty: true });
       });
       if (result.shipping_cost !== null) form.setValue("shipping_cost", Number(result.shipping_cost), { shouldDirty: true });
-      if (result.expires_at) form.setValue("expires_at", toLocalInput(result.expires_at), { shouldDirty: true });
+      if (result.expires_at) form.setValue("expires_at", draftToInput(result.expires_at), { shouldDirty: true });
       setDraft(result);
     } catch (error) {
       setDraftError(error instanceof Error ? error.message : "The quote assistant is unavailable; fill the form manually.");

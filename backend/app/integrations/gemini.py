@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
@@ -86,7 +86,11 @@ def _timestamp(value: Any) -> str | None:
         parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
     except ValueError:
         return None
-    return iso(parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC))
+    if parsed.tzinfo:
+        return iso(parsed)
+    # The supplier wrote a wall-clock time with no zone ("Oct 26 at 12:00 PM"). Keep it naive so the form shows
+    # exactly that time; stamping it UTC shifted it by the viewer's offset (12:00 PM became 5:00 AM PDT).
+    return parsed.isoformat()
 
 
 def validate_draft(raw: dict[str, Any], text: str, mission: dict[str, Any]) -> dict[str, Any]:
