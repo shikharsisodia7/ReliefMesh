@@ -60,6 +60,8 @@ test("coordinator and two suppliers complete quote, screening, disruption recove
   await approver.getByRole("button", { name: "Accept invitation" }).click();
   await expect(approver).toHaveURL(/\/dashboard/);
   await coordinator.getByRole("link", { name: "Missions" }).click();
+  // The mission form lives in the New mission slide-over.
+  await coordinator.getByRole("button", { name: "New mission" }).click();
   await coordinator.getByLabel("Mission name").fill("Winter response");
   await coordinator.getByLabel("Delivery location").fill("Oakland, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");

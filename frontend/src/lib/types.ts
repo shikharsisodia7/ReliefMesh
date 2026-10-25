@@ -20,6 +20,7 @@ export type EmergencyEvent = {
   categories: { id: string; title: string }[];
   sources: { id: string; url: string }[];
   link?: string;
+  closed?: string | null;
   first_observed?: string | null;
   last_observed?: string | null;
   latest_geometry?: { type: string; date: string; coordinates: unknown; magnitude_value?: number | null; magnitude_unit?: string | null } | null;

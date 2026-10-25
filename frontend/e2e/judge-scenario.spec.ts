@@ -19,6 +19,8 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await page.getByLabel("Demo organization (labeled self-approval)").check();
   await page.getByRole("button", { name: "Create organization" }).click();
 
+  // The mission form lives in the New mission slide-over.
+  await page.getByRole("button", { name: "New mission" }).click();
   const eventSelect = page.getByLabel("Real emergency (NASA EONET, open events)");
   await expect(eventSelect.locator("option")).not.toHaveCount(1, { timeout: 30_000 });
   // Link an open California event when EONET has one (the demo is set in Oakland); otherwise the first event.

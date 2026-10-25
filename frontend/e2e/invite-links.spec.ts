@@ -12,6 +12,8 @@ test("RFQ link opened under a coordinator session switches to a new supplier acc
   await expect(page).toHaveURL(/\/dashboard/);
   await page.getByPlaceholder("Organization name").fill("Link Check Response");
   await page.getByRole("button", { name: "Create organization" }).click();
+  // The mission form lives in the New mission slide-over.
+  await page.getByRole("button", { name: "New mission" }).click();
   await page.getByLabel("Mission name").fill("Link check");
   await page.getByLabel("Delivery location").fill("Oakland, CA");
   await page.getByLabel("Delivery deadline").fill("2030-01-05T10:00");

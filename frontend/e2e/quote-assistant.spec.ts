@@ -18,6 +18,8 @@ test("supplier pastes a quote, Gemini pre-fills a grounded draft, supplier revie
   await expect(coordinator).toHaveURL(/\/dashboard/);
   await coordinator.getByPlaceholder("Organization name").fill("Paste Test Relief");
   await coordinator.getByRole("button", { name: "Create organization" }).click();
+  // The mission form lives in the New mission slide-over.
+  await coordinator.getByRole("button", { name: "New mission" }).click();
   await coordinator.getByLabel("Mission name").fill("Shelter blankets");
   await coordinator.getByLabel("Delivery location").fill("Oakland, CA");
   await coordinator.getByLabel("Delivery deadline").fill("2030-01-05T10:00");
