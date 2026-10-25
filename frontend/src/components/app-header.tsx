@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { DotWordmark } from "@/components/landing/dot-wordmark";
 import { pageWidth } from "@/components/layout/page-header";
 import { Drawer } from "@/components/patterns/overlays";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -66,10 +67,8 @@ function Island() {
   if (!hydrated) return <Frame />;
   const role = session?.user.role;
   const tabs = role === "coordinator" ? coordinatorTabs : role === "supplier" ? supplierTabs : marketingTabs;
-  const home = role === "coordinator" ? "/dashboard" : role === "supplier" ? "/supplier" : "/";
   return (
     <Frame
-      home={home}
       nav={<TabNav key={role ?? "public"} tabs={tabs} pathname={pathname} tab={tab} />}
       actions={session ? <AccountMenu session={session} /> : <MarketingActions />}
       mobile={<MobileMenu tabs={tabs} pathname={pathname} tab={tab} session={session} />}
@@ -77,12 +76,15 @@ function Island() {
   );
 }
 
-function Frame({ home = "/", nav, actions, mobile }: { home?: string; nav?: ReactNode; actions?: ReactNode; mobile?: ReactNode }) {
+function Frame({ nav, actions, mobile }: { nav?: ReactNode; actions?: ReactNode; mobile?: ReactNode }) {
   return (
     <div className="sticky top-4 z-40 mt-4">
       <div className={pageWidth}>
         <header className="grid h-14 grid-cols-[1fr_auto] items-center rounded-xl border bg-background px-6 shadow-[0_2px_12px_rgb(32_33_36/0.08)] md:grid-cols-[1fr_auto_1fr]">
-          <Link href={home} className="justify-self-start text-lg font-semibold tracking-tight">ReliefMesh</Link>
+          {/* The brand mark always returns to the marketing landing page, regardless of sign-in state. */}
+          <Link href="/" className="justify-self-start text-ink" aria-label="ReliefMesh home">
+            <DotWordmark density="compact" className="block h-9 w-auto" />
+          </Link>
           <div className="hidden self-stretch md:block">{nav}</div>
           <div className="hidden items-center justify-end gap-4 md:flex">{actions}</div>
           <div className="justify-self-end md:hidden">{mobile}</div>

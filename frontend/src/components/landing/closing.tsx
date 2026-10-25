@@ -63,7 +63,7 @@ export function Closing() {
         <p className="mt-12 text-right text-sm">Built at Cal Hacks 13.0</p>
       </div>
       <div className="mx-auto mt-3 max-w-[1440px] px-2">
-        <DotWordmark />
+        <DotWordmark className="block h-auto w-full text-ink" />
       </div>
       <div className="border-t border-ink/25">
         <div className="mx-auto flex max-w-[1376px] gap-6 px-4 py-4 text-xs md:px-8">
