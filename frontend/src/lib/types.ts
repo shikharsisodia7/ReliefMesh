@@ -172,3 +172,25 @@ export type MissionContext = {
 export type IntegrationCheck = { id: string; name: string; category: string; status: "ok" | "degraded" | "not_configured" | "error"; detail: string; provenance: string | null; latency_ms: number; checked_at: string };
 
 export type Payment = { id: string; supplier_id: string; subject_name: string; protocol: string; scheme: string; network: string; network_label: string; asset_symbol: string; amount_display: string; payer: string; pay_to: string; transaction: string; explorer_url: string; status: string; verified: boolean; dossier_sha256: string; evidence_id: string; created_at: string };
+
+// Operations integrations (Gmail, Google Calendar, Google Drive, Slack). States are computed by the API from
+// real provider calls: LIVE only after a call succeeded, BLOCKED when the provider revoked access.
+export type IntegrationState = "LIVE" | "DEGRADED" | "NOT_CONFIGURED" | "BLOCKED";
+export type CapabilityStatus = { state: IntegrationState; detail: string; last_success?: string | null };
+export type DeliveryStatus = "PENDING" | "SENDING" | "RETRYING" | "SENT" | "FAILED" | "NOT_CONFIGURED" | "TEST" | "DISABLED" | "SUPPRESSED" | "SKIPPED";
+export type OperationsDelivery = {
+  id: string; event_type: string; mission_id: string | null; channel: "gmail" | "slack" | "calendar" | "drive"; target: string;
+  summary: string | null; subject?: string | null; operation?: string | null; status: DeliveryStatus; attempts: number; max_attempts: number;
+  provider: string | null; provider_id: string | null; provider_url: string | null; last_error: string | null; next_retry_at: string | null;
+  sent_at: string | null; created_at: string; updated_at: string;
+};
+export type IntegrationsView = {
+  organization_id: string; membership_role: string;
+  email: { mode: "disabled" | "test" | "live"; transport: "gmail" | "resend" | "none"; allowlist_active: boolean };
+  google: {
+    oauth_configured: boolean; status: string; account_email: string | null; connected_at: string | null; granted_scopes: string[];
+    calendar_id: string | null; capabilities: Record<"gmail" | "calendar" | "drive", CapabilityStatus>;
+  };
+  slack: CapabilityStatus & { oauth_configured: boolean; status: string; mode: "bot" | "webhook" | null; team_name: string | null; channel_name: string | null; connected_at: string | null };
+  deliveries: OperationsDelivery[];
+};

@@ -230,7 +230,7 @@ async def test_budget_and_deadline_make_plan_honestly_infeasible(client: httpx.A
 
 
 @pytest.mark.anyio
-async def test_unconfigured_email_is_recorded_as_a_failed_delivery() -> None:
+async def test_unconfigured_email_is_recorded_as_not_configured() -> None:
     app = create_app(
         Settings(
             _env_file=None,
@@ -269,4 +269,5 @@ async def test_unconfigured_email_is_recorded_as_a_failed_delivery() -> None:
         assert deliveries.status_code == 200
         assert deliveries.json()[0]["status"] == "not_configured"
         assert deliveries.json()[0]["sent_at"] is None and deliveries.json()[0]["message_id"] is None
-        assert deliveries.json()[0]["error"] == "RELIEFMESH_RESEND_API_KEY is not configured; no email was sent"
+        assert deliveries.json()[0]["error"] == ("Email is not configured: connect Gmail in Operations Integrations or "
+                                                 "set RELIEFMESH_RESEND_API_KEY; no email was sent")

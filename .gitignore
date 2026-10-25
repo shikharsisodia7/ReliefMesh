@@ -22,3 +22,9 @@ Thumbs.db
 agent/.venv/
 agent/**/__pycache__/
 agent/*.log
+
+# OAuth credentials and tokens (Google/Slack) must never be committed
+client_secret*.json
+credentials.json
+token.json
+*.token.json

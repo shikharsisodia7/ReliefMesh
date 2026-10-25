@@ -108,6 +108,14 @@ class MongoStore:
             await self.database[collection].create_index([("mission_id", ASCENDING)])
         for collection in ("organizations", "users", "missions", "quotes", "plans", "suppliers", "evidence"):
             await self.database[collection].create_index([("id", ASCENDING)], unique=True)
+        # Operations integrations: ids are idempotency hashes, so a duplicate insert is the dedupe signal.
+        for collection in ("ops_events", "ops_deliveries", "integration_connections", "oauth_states",
+                           "calendar_slots", "drive_files", "drive_folders", "email_outbox"):
+            await self.database[collection].create_index([("id", ASCENDING)], unique=True)
+        await self.database.ops_deliveries.create_index([("organization_id", ASCENDING), ("created_at", DESCENDING)])
+        await self.database.ops_deliveries.create_index([("mission_id", ASCENDING), ("channel", ASCENDING)])
+        await self.database.ops_deliveries.create_index([("status", ASCENDING)])
+        await self.database.email_dispatches.create_index([("organization_id", ASCENDING), ("provider", ASCENDING)])
 
     async def insert(self, collection: str, document: Document) -> Document:
         await self.database[collection].insert_one(deepcopy(document))

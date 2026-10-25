@@ -55,7 +55,7 @@ test("judge scenario: real emergency, evidence, policy, disruption, recovery, ap
   await expect(page.getByText("OLD PLAN")).toBeVisible();
   await expect(page.getByText("NEW PLAN")).toBeVisible();
   await expect(page.getByText("INVALIDATED", { exact: true })).toBeVisible();
-  await expect(page.getByText("+$195.00")).toBeVisible();
+  await expect(page.getByText("+$195.00", { exact: true })).toBeVisible();
   await expect(page.getByText(/Bayside Relief Supply Co withdrew its quote/).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Approve plan" }).click();
