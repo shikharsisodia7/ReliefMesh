@@ -201,7 +201,8 @@ async def audit(
         return event
 
 
-def verify_chain(events: list[dict[str, Any]]) -> dict[str, Any]:
+def verify_chain(events: list[dict[str, Any]], head: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Recompute the hash chain; with the stored chain head, also detect events removed from the end."""
     ordered = sorted(events, key=lambda row: row.get("sequence", 0))
     previous = GENESIS_HASH
     for expected_sequence, event in enumerate(ordered, start=1):
@@ -215,6 +216,9 @@ def verify_chain(events: list[dict[str, Any]]) -> dict[str, Any]:
             return {"valid": False, "length": len(ordered), "broken_at": expected_sequence,
                     "reason": "event contents do not match their hash"}
         previous = event["event_hash"]
+    if head and (head.get("sequence") != len(ordered) or head.get("event_hash") != previous):
+        return {"valid": False, "length": len(ordered), "broken_at": len(ordered) + 1,
+                "reason": "chain head does not match: events were removed or replaced at the end"}
     return {"valid": True, "length": len(ordered), "head_hash": previous, "broken_at": None, "reason": None}
 
 

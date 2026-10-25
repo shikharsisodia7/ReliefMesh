@@ -848,7 +848,7 @@ async def verify_mission_audit(mission_id: str, principal: dict = Depends(curren
                                services: Services = Depends(get_services)) -> dict:
     await require_mission_access(mission_id, principal, services)
     events = await services.store.find("audit_events", chain_key=f"mission:{mission_id}")
-    return verify_chain(events)
+    return verify_chain(events, await services.store.get("audit_chain_heads", f"mission:{mission_id}"))
 
 
 @router.get("/v1/missions/{mission_id}/notifications")
