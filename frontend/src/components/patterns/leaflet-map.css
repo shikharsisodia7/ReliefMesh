@@ -1,0 +1,15 @@
+/* Leaflet maps: grayscale OpenStreetMap tiles, the marker labels, and popups in the app's type and colors.
+   Imported right after leaflet.css (and scoped under .map-gray) so these win over Leaflet's defaults. */
+.map-gray .leaflet-tile-pane { filter: grayscale(1) contrast(0.75) brightness(1.1); opacity: 0.85; }
+.map-gray.leaflet-container { font-family: inherit; font-size: 14px; background: var(--muted); }
+.map-gray.leaflet-container a { color: var(--foreground); }
+.map-gray .map-marker { color: var(--foreground); }
+.map-gray .map-marker svg { display: block; }
+.map-gray .map-label {
+  position: absolute; top: 50%; left: 100%; margin-left: 4px; transform: translateY(-50%);
+  padding: 0 4px; border-radius: 4px; background: rgb(255 255 255 / 0.9);
+  font-size: 12px; font-weight: 500; line-height: 18px; white-space: nowrap;
+}
+.map-gray .map-label-left { left: auto; right: 100%; margin-left: 0; margin-right: 4px; }
+.map-gray .leaflet-popup-content-wrapper { border-radius: 10px; box-shadow: 0 4px 16px rgb(32 33 36 / 0.16); }
+.map-gray .leaflet-popup-content { margin: 12px 14px; font-size: 14px; line-height: 1.4; }

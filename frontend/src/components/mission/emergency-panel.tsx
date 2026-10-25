@@ -39,7 +39,10 @@ export function EmergencyPanel({ mission, context, loading }: { mission: Mission
   const point = event?.point ?? context?.point ?? null;
   const markers: MapMarker[] = [
     ...(firms?.status === "OK" ? firms.data.map((row) => ({ lat: row.latitude, lon: row.longitude, kind: "detection" as const })) : []),
-    ...(point ? [{ lat: point.lat, lon: point.lon, kind: "event" as const, label: event?.title }] : []),
+    ...(point ? [{
+      lat: point.lat, lon: point.lon, kind: "event" as const, label: event?.title,
+      popup: event ? { title: event.title, category: event.categories[0]?.title, date: event.last_observed ? when(event.last_observed) : undefined, links: event.link ? [{ label: "EONET record", href: event.link, external: true }] : [] } : undefined,
+    }] : []),
   ];
   return (
     <div className="grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
