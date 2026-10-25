@@ -189,6 +189,10 @@ async def check_gemini(services: Services) -> tuple[str, str, str | None]:
         return "not_configured", "RELIEFMESH_GEMINI_API_KEY is not configured (quote assistant hidden)", None
     result = await services.hub.fetch("gemini", f"{gemini.API_BASE}/models/{model}", headers={"x-goog-api-key": key},
                                       retries=0, source_url=f"{gemini.API_BASE}/models/{model}")
+    limited_at = services.hub.memo_get(gemini.RATE_LIMIT_MEMO, 6 * 3600)
+    if result.ok and limited_at:  # the model exists, but drafting is being refused right now
+        return "degraded", (f"{model} rate-limited on the last draft request ({limited_at}); free-tier quota, the "
+                            "daily limit resets at midnight Pacific. Suppliers fill the form manually meanwhile"),             result.provenance
     return from_result(result, f"{model} available to the quote-draft assistant (free tier)")
 
 

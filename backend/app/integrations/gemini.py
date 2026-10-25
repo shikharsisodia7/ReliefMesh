@@ -130,6 +130,11 @@ def validate_draft(raw: dict[str, Any], text: str, mission: dict[str, Any]) -> d
     }
 
 
+# The free tier allows ~20 generate requests a day. A 429 is remembered so /status can say the assistant is
+# rate-limited instead of reporting the model as available; the next successful draft clears it.
+RATE_LIMIT_MEMO = "gemini:rate_limited_at"
+
+
 async def draft_quote(hub: IntegrationHub, api_key: str | None, model: str, text: str,
                       mission: dict[str, Any]) -> AdapterResult:
     url = f"{API_BASE}/models/{model}:generateContent"
@@ -151,7 +156,11 @@ async def draft_quote(hub: IntegrationHub, api_key: str | None, model: str, text
     result = await hub.fetch("gemini", url, method="POST", json_body=body, headers={"x-goog-api-key": api_key},
                              retries=1, timeout=45, source_url=url)
     if not result.ok:
+        if (result.error or "").startswith("HTTP 429"):
+            hub.memo_set(RATE_LIMIT_MEMO, iso(utc_now()))
+            result.meta = {"rate_limited": True}
         return result
+    hub.memo_set(RATE_LIMIT_MEMO, None)
     response = result.data or {}
     try:
         raw = json.loads(response["candidates"][0]["content"]["parts"][0]["text"])

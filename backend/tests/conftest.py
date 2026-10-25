@@ -42,6 +42,7 @@ class FakeUpstream:
     calls: list[str] = field(default_factory=list)
     gemini_answer: dict[str, Any] = field(default_factory=dict)
     gemini_requests: list[dict[str, Any]] = field(default_factory=list)
+    gemini_status: int = 200  # e.g. 429 to simulate the free-tier quota being used up
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -80,6 +81,8 @@ class FakeUpstream:
             if request.method == "GET":
                 return httpx.Response(200, json={"name": path.split("/v1beta/")[-1]})
             self.gemini_requests.append(json.loads(request.content))
+            if self.gemini_status != 200:
+                return httpx.Response(self.gemini_status, json={"error": {"code": self.gemini_status}})
             return httpx.Response(200, json={"modelVersion": "gemini-test", "usageMetadata": {"totalTokenCount": 42},
                                              "candidates": [{"content": {"parts": [{"text": json.dumps(self.gemini_answer)}]}}]})
         if host == "www.fema.gov":

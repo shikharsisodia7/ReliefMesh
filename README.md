@@ -91,7 +91,7 @@ Copy `backend/.env.example` for optional keys (FIRMS, SAM.gov, CRS sandbox, Apif
 ## Tests
 
 ```bash
-cd backend && python -m pytest            # 104 tests: policy, evidence, SoD, isolation break-in, failure modes, x402 + SAM.gov quota guards, audit chain
+cd backend && python -m pytest            # 105 tests: policy, evidence, SoD, isolation break-in, failure modes, x402 + SAM.gov quota guards, audit chain
 cd frontend && npm test && npm run lint && npm run build
 cd frontend && npx playwright test        # two-supplier flow with an independent approver + live-data judge scenario
 python backend/scripts/smoke.py http://127.0.0.1:8000                 # demo deployments only (RELIEFMESH_DEMO_MODE=true)

@@ -350,6 +350,11 @@ async def draft_quote_from_text(token: str, payload: QuoteDraftRequest, user: di
                                       services.settings.gemini_model, payload.text, mission)
     if result.status == "BLOCKED_EXTERNAL":
         raise HTTPException(status_code=503, detail={"code": "GEMINI_NOT_CONFIGURED", "message": result.error})
+    if not result.ok and result.meta.get("rate_limited"):
+        raise HTTPException(status_code=429, detail={
+            "code": "GEMINI_RATE_LIMITED",
+            "message": "The quote assistant hit Gemini's free-tier limit (per-minute or daily; the daily quota "
+                       "resets at midnight Pacific). Fill the form manually or try again later."})
     if not result.ok:
         raise HTTPException(status_code=502, detail={"code": "GEMINI_UNAVAILABLE",
                                                      "message": "The quote assistant is unavailable; fill the form "

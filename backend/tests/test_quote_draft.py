@@ -117,3 +117,25 @@ def test_fabricated_excerpt_marks_every_number_unverified() -> None:
     assert line["grounded"] is False
     assert line["unverified_fields"] == ["available_quantity", "unit_price"]
     assert line["delivery_date"] is None  # non-ISO dates are dropped, never guessed
+
+
+@pytest.mark.anyio
+async def test_free_tier_rate_limit_is_named_and_shown_on_status(gemini_app) -> None:
+    client, upstream = gemini_app
+    ctx = await invited_supplier(client)
+    upstream.gemini_status = 429
+    limited = await client.post(f"/v1/supplier-invitations/{ctx['token']}/quote-draft",
+                                headers=auth(ctx["supplier"]), json={"text": QUOTE_TEXT})
+    assert limited.status_code == 429 and limited.json()["detail"]["code"] == "GEMINI_RATE_LIMITED"
+    rows = {row["id"]: row for row in (await client.get("/v1/integrations/status?refresh=true")).json()["integrations"]}
+    assert rows["gemini"]["status"] == "degraded" and "rate-limited" in rows["gemini"]["detail"]
+
+    upstream.gemini_status = 200  # quota back: one successful draft clears the warning
+    upstream.gemini_answer = {"lines": [], "shipping_cost": None, "currency": "USD"}
+    recovered = await client.post(f"/v1/supplier-invitations/{ctx['token']}/quote-draft",
+                                  headers=auth(ctx["supplier"]), json={"text": QUOTE_TEXT})
+    assert recovered.status_code == 200, recovered.text
+    client_app = client._transport.app  # noqa: SLF001 - reach the status cache to force a fresh check
+    client_app.state.services.status_cache.clear()
+    rows = {row["id"]: row for row in (await client.get("/v1/integrations/status?refresh=true")).json()["integrations"]}
+    assert rows["gemini"]["status"] == "ok"

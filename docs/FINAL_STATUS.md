@@ -47,7 +47,7 @@ Found and fixed during verification: the supplier portal's "Save revision" never
   no account usernames shown.
 - Keepalive cron verified in production runtime logs (API and Fetch agent warm every 10 minutes).
 - Sender branded "ReliefMesh Procurement"; the sending domain lives only in deployment env (see EMAIL_DOMAIN.md).
-- Tests: 104 backend, 3 Playwright E2E, deployed QA smoke check; secret-value scan clean across all branches.
+- Tests: 105 backend, 4 Playwright E2E, deployed QA smoke check; secret-value scan clean across all branches.
 - Judge-triggerable x402 proof on `/status`: a signed-in user runs a real HTTP 402 payment from the server's devnet
   test wallet (once per 10 minutes, 10 a day, audited, replayed settlements rejected). First production run settled
   [`jbsGqZmk…`](https://explorer.solana.com/tx/jbsGqZmkgwVUrm9w4CLTwVVWRMVdrPvYc2sZvs99z5x3rCqLt6K2rWJiSHdAuWiMxpjCqZa9iSgSW7jofLophfv?cluster=devnet)
@@ -63,5 +63,8 @@ Found and fixed during verification: the supplier portal's "Save revision" never
 - The SAM.gov key is a personal non-federal key: about 10 requests a day, and it expires about 2027-01-20 (renew it
   under SAM.gov Workspace → Profile → Account Details). Past the quota, new lookups show `UNAVAILABLE` and the
   supplier gets a WARN, never a pass.
+- The Gemini quote assistant runs on the free tier: about 20 drafts a day, reset at midnight Pacific. When the limit
+  is hit, suppliers see `GEMINI_RATE_LIMITED` and fill the form manually, and `/status` shows Gemini as degraded
+  until a draft succeeds again.
 - Gmail, Google Calendar, Google Drive and Slack show NOT_CONFIGURED in production until Google Cloud and Slack OAuth
   app credentials are configured.
