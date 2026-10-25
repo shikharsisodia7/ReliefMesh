@@ -12,7 +12,7 @@ import type { Evidence, Quote, SupplierRow } from "@/lib/types";
 
 type Run = (operation: () => Promise<void>) => Promise<void>;
 
-const EVIDENCE_ORDER = [
+export const EVIDENCE_ORDER = [
   ["OFAC_SCREENING", "OFAC"],
   ["SAM_REGISTRATION", "SAM.gov"],
   ["FDA_RECALLS", "openFDA"],

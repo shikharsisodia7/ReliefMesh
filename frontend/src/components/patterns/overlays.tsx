@@ -15,8 +15,9 @@ type OverlayProps = {
   // Overrides the accessible name when it must differ from the visible title.
   label?: string;
   closeLabel?: string;
-  // Footer actions; a plain "Cancel" is added before them.
+  // Footer actions; a plain "Cancel" (or cancelLabel) is added before them.
   footer?: ReactNode;
+  cancelLabel?: string;
   children: ReactNode;
 };
 
@@ -35,17 +36,17 @@ function Header({ title, subtitle, label, closeLabel }: Pick<OverlayProps, "titl
   );
 }
 
-function Footer({ children }: { children: ReactNode }) {
+function Footer({ cancelLabel = "Cancel", children }: { cancelLabel?: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
-      <BaseDialog.Close render={<Button variant="text" />}>Cancel</BaseDialog.Close>
+      <BaseDialog.Close render={<Button variant="text" />}>{cancelLabel}</BaseDialog.Close>
       {children}
     </div>
   );
 }
 
 // Right-side panel shared by Drawer (read-only detail) and SlideOver (forms).
-function Sheet({ width, open, onOpenChange, label, footer, children, ...header }: OverlayProps & { width: string }) {
+function Sheet({ width, open, onOpenChange, label, footer, cancelLabel, children, ...header }: OverlayProps & { width: string }) {
   return (
     <BaseDialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
       <BaseDialog.Portal>
@@ -60,7 +61,7 @@ function Sheet({ width, open, onOpenChange, label, footer, children, ...header }
         >
           <div className="px-6 pt-6 pb-4"><Header label={label} {...header} /></div>
           <div className="flex-1 overflow-y-auto px-6 pb-6">{children}</div>
-          {footer && <Footer>{footer}</Footer>}
+          {footer && <Footer cancelLabel={cancelLabel}>{footer}</Footer>}
         </BaseDialog.Popup>
       </BaseDialog.Portal>
     </BaseDialog.Root>
@@ -78,7 +79,7 @@ export function SlideOver(props: OverlayProps) {
 }
 
 // Centered 520px confirmation: the facts, one consequence sentence, then Cancel + primary.
-export function Dialog({ open, onOpenChange, label, footer, children, ...header }: OverlayProps) {
+export function Dialog({ open, onOpenChange, label, footer, cancelLabel, children, ...header }: OverlayProps) {
   return (
     <BaseDialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
       <BaseDialog.Portal>
@@ -92,7 +93,7 @@ export function Dialog({ open, onOpenChange, label, footer, children, ...header 
         >
           <div className="px-6 pt-6 pb-4"><Header label={label} {...header} /></div>
           <div className="overflow-y-auto px-6 pb-6 text-sm">{children}</div>
-          {footer && <Footer>{footer}</Footer>}
+          {footer && <Footer cancelLabel={cancelLabel}>{footer}</Footer>}
         </BaseDialog.Popup>
       </BaseDialog.Portal>
     </BaseDialog.Root>

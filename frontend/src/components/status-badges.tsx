@@ -60,10 +60,37 @@ export function money(value: string | number | null | undefined) {
   return number.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 }
 
+// Whole-dollar amounts drop ".00" ("$3,466"); real cents stay ("$1,098.50"). Unit prices use money().
+export function amount(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return "—";
+  const number = typeof value === "number" ? value : Number(value);
+  const whole = Math.abs(number - Math.round(number)) < 0.005;
+  return number.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 });
+}
+
+// "+$195" / "−$1,900"; pass cents=true to keep cents ("+$195.00").
+export function signedAmount(value: string | number, cents = false) {
+  const number = typeof value === "number" ? value : Number(value);
+  const sign = number > 0.004 ? "+" : number < -0.004 ? "−" : "";
+  return `${sign}${cents ? money(Math.abs(number)) : amount(Math.abs(number))}`;
+}
+
 // Dates and times people read, e.g. "Oct 24, 2:20 PM".
 export function when(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+// Time people read, e.g. "2:20 PM".
+export function timeOnly(value?: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// A day people read, e.g. "Oct 28".
+export function day(value?: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 // Compact 24-hour HH:mm, only for provenance stamps.
