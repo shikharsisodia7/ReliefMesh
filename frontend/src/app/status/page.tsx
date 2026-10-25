@@ -6,6 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { Provenance, StatusText, ago } from "@/components/status-badges";
+import { pageWidth } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { API_BASE_URL, api } from "@/lib/api";
@@ -36,11 +37,10 @@ export default function StatusPage() {
   for (const check of status.data?.integrations ?? []) groups.set(check.category, [...(groups.get(check.category) ?? []), check]);
   return (
     <main className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl space-y-6 px-5 py-10">
+      <div className={`${pageWidth} space-y-6 pt-10 pb-16`}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <Link className="font-mono text-sm font-bold tracking-[0.2em]" href="/">RELIEF<span className="text-live">MESH</span></Link>
-            <h1 className="mt-3 text-3xl font-semibold">Integration status</h1>
+            <h1 className="text-3xl font-semibold">Integration status</h1>
             <p className="mt-1 text-sm text-muted-foreground">Each row is a real request made by the API just now (cached for 60 s). Green only appears when that request succeeded. API: <span className="font-mono">{API_BASE_URL}</span></p>
           </div>
           <Button variant="secondary" size="sm" disabled={status.isFetching} onClick={() => setRefresh((value) => value + 1)}><RefreshCw className={status.isFetching ? "size-3.5 animate-spin" : "size-3.5"} />Re-check now</Button>

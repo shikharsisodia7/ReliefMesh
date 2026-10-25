@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 
+import { AppHeader } from "@/components/app-header";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -17,5 +18,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${inter.variable} ${geistMono.variable} h-full`}><body className="min-h-full"><Providers>{children}</Providers></body></html>;
+  return <html lang="en" className={`${inter.variable} ${geistMono.variable} h-full`}><body className="min-h-full"><Providers><AppHeader />{children}</Providers></body></html>;
 }
