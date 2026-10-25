@@ -49,13 +49,18 @@ async def main(mission_id: str) -> int:
           f"{event['id']} status={event['status']} summary={event['summary']!r}")
     failures += replayed["status"] != "SENT" or event["id"] != latest["payload"]["event_id"]
 
-    gmail = next(r for r in await store.find("ops_deliveries", mission_id=mission_id, channel="gmail", status="SENT"))
-    attempts = gmail["attempts"]
-    await ops.attempt(gmail["id"])
-    again = await store.get("ops_deliveries", gmail["id"])
-    print(f"3. re-attempt of SENT Gmail delivery: attempts {attempts} -> {again['attempts']}",
-          "OK" if again["attempts"] == attempts else "FAIL")
-    failures += again["attempts"] != attempts
+    for channel in ("gmail", "slack", "drive", "calendar"):
+        sent = await store.find("ops_deliveries", mission_id=mission_id, channel=channel, status="SENT")
+        if not sent:
+            print(f"3. {channel}: no SENT delivery on this mission (not connected?)")
+            continue
+        row = sent[0]
+        await ops.attempt(row["id"])
+        again = await store.get("ops_deliveries", row["id"])
+        ok = again["attempts"] == row["attempts"] and again["provider_id"] == row["provider_id"]
+        print(f"3. re-attempt of SENT {channel} delivery: attempts {row['attempts']} -> {again['attempts']}",
+              "OK (no second send)" if ok else "FAIL")
+        failures += not ok
     await asyncio.gather(*services.jobs, return_exceptions=True)
     return failures
 
