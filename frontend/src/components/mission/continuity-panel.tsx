@@ -165,7 +165,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
   const metrics = analysis?.metrics;
   const progress = view?.progress;
   return (
-    <section aria-label="Continuity" className="space-y-5 border-t pt-6">
+    <section aria-label="Continuity Engine" className="space-y-5 border-t pt-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-baseline gap-3"><h2 className="text-base font-semibold">Continuity</h2><Provenance value="HYPOTHETICAL" /></div>
@@ -189,7 +189,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
         <>
           {analysis.scope && analysis.scope.kind !== "FULL_MISSION" && <p className="text-sm text-muted-foreground">{analysis.scope.statement} Already committed on purchase orders: {money(analysis.scope.fixed_commitment_cost)}.</p>}
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-            <div>
+            <div role="region" aria-label="N-1 survivability">
               <p className="text-xs font-medium text-muted-foreground">N-1 survivability</p>
               <p className="tabular text-4xl font-semibold">{metrics.n1_survivability.survives} / {metrics.n1_survivability.tested}</p>
               <p className="text-xs text-muted-foreground">allocated suppliers whose loss is recoverable</p>
@@ -208,7 +208,7 @@ export function ContinuityPanel({ plan, view, running, onRun }: { plan?: Plan; v
             <SinglePointOfFailure analysis={analysis} />
           </div>
           <CostOfResilience analysis={analysis} plan={plan} />
-          <details className="text-sm" open>
+          <details className="text-sm" open aria-label="Failure frontier">
             <summary className="cursor-pointer font-medium">Failure frontier by supplier <StressLabel /></summary>
             <table className="mt-2 w-full">
               <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Supplier</th><th className="py-1 text-right font-medium">Price</th><th className="py-1 text-right font-medium">ETA delay</th><th className="py-1 text-right font-medium">Capacity loss</th></tr></thead>
