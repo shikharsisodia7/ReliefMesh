@@ -292,7 +292,8 @@ def _resilient_alternative(
         "constraint": {"max_supplier_share": str(max_share)},
         "total_cost": outcome["total_cost"],
         "added_cost": money(cents(outcome["total_cost"]) - cents(baseline["total_cost"])),
-        "allocations": outcome["allocations"],
+        "allocations": [{**row, "supplier": names.get(row["supplier_id"], row["supplier_email"])}
+                        for row in outcome["allocations"]],
         "supplier_count": len(_allocated_supplier_ids(proposal)),
         "n1_survivability": {"survives": survivable, "tested": len(scenarios)},
         "scenarios": scenarios,

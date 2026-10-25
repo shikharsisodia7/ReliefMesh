@@ -156,7 +156,7 @@ export type Lead = { id: string; name: string; website?: string | null; phone?: 
 export type Disruption = { id: string; kind: string; supplier_id: string; supplier_name: string; summary: string; before: Record<string, unknown>; after: Record<string, unknown>; job_id: string | null; created_at: string };
 
 export type ContinuityScenario = {
-  supplier_id: string; supplier: string; feasible: boolean; status: "RECOVERABLE" | "UNRECOVERABLE";
+  supplier_id: string; supplier: string; feasible: boolean; status: "RECOVERABLE" | "UNRECOVERABLE"; label: string;
   replacement_suppliers: string[]; new_cost: string | null; cost_delta: string | null; latest_delivery: string | null;
   deadline_delta_hours: number | null; lost_quantity: number; budget_feasible: boolean; deadline_feasible: boolean;
   shortages: { item: string; shortage: number; reason: string }[];
@@ -165,7 +165,7 @@ export type ContinuityFrontier = {
   supplier_id: string; supplier: string;
   price: { increase_basis_points: number; increase_percent: number } | null;
   delay: { hours: number } | null;
-  capacity: { loss_units: number; loss_percent: number | null; method: string } | null;
+  capacity: { loss_units: number; units_removed?: number; loss_percent: number | null; method: string } | null;
   note?: string;
 };
 export type ContinuityAnalysis = {
@@ -185,11 +185,30 @@ export type ContinuityAnalysis = {
   resilient_alternative: {
     status: "AVAILABLE" | "UNAVAILABLE"; total_cost?: string; added_cost?: string; supplier_count?: number;
     n1_survivability?: { survives: number; tested: number }; improvement?: string; reason?: string;
+    constraint?: { max_supplier_share: string };
+    allocations?: (Allocation & { supplier?: string })[];
+  };
+};
+export type RealityCheck = {
+  supplier_id: string;
+  consistent: boolean | null;
+  note?: string;
+  earlier_stress_test: {
+    provenance: "HYPOTHETICAL"; plan_version: number; label?: string; predicted_status?: "RECOVERABLE" | "UNRECOVERABLE";
+    predicted_cost?: string | null; predicted_cost_delta?: string | null; crossed?: string[];
+    tolerance?: { price_breakpoint_basis_points: number | null; delay_breakpoint_hours: number | null; capacity_breakpoint_units: number | null };
+  } | null;
+  actual: {
+    provenance: "USER_SUBMITTED" | "DEMO_SIMULATION"; supplier: string; kind: "withdrawn" | "updated"; plan_version: number;
+    plan_status: string; plan_total_cost: string | null;
+    change?: string | { price_change_basis_points: number; price_change_percent: number; capacity_loss_units: number; delay_hours: number };
   };
 };
 export type ContinuityView = {
   mission_id: string; plan_id: string | null; plan_version: number | null; state: "NOT_READY" | "RUNNING" | "COMPLETE" | "STALE";
   analysis: ContinuityAnalysis | null; active_jobs: { id: string; status: string; created_at: string }[];
+  progress: { done: number; total: number | null; label: string } | null;
+  reality_check: RealityCheck[];
   digital_twin: { label: string; provenance: string; nodes: { id: string; type: string; label: string; status?: string; quantity?: number }[]; edges: { from: string; to: string; type: string; quantity?: number }[]; disaster_context: EmergencyEvent | null };
 };
 
